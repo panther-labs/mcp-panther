@@ -1,9 +1,11 @@
 import logging
 import os
 import datetime
-from typing import List, Dict, Any
-import aiohttp
+from typing import Dict, Any, Optional
+
 from dotenv import load_dotenv
+from gql import Client, gql
+from gql.transport.aiohttp import AIOHTTPTransport
 from mcp.server.fastmcp import FastMCP
 
 # Server name
@@ -21,6 +23,7 @@ load_dotenv()
 # Server dependencies
 deps = [
     "python-dotenv",
+    "gql[aiohttp]",
     "aiohttp",
     "uvicorn",
 ]
@@ -38,68 +41,118 @@ def get_panther_api_key() -> str:
         raise ValueError("PANTHER_API_KEY environment variable is not set")
     return api_key
 
-# GraphQL query to get today's alerts
-GET_TODAYS_ALERTS_QUERY = """
-query GetTodaysAlerts {
-  alerts(
-    input: {
-      pageSize: 100
-      sortBy: { field: createdAt, direction: descending }
-      timeRange: { type: relative, value: { unit: day, value: 1 } }
+# GraphQL queries
+AUTHENTICATE_QUERY = gql("""
+query AlertDetails {
+    alert(id: "FAKE_ALERT_ID") {
+        id
+        title
+        severity
+        status
     }
-  ) {
-    alertSummaries {
-      alertId
-      title
-      severity
-      status
-      createdAt
-      ruleId
-      updateTime
-    }
-    paging {
-      totalItems
-      totalPages
-    }
-  }
 }
-"""
+""")
+
+GET_TODAYS_ALERTS_QUERY = gql("""
+query FirstPageOfAllAlerts($input: AlertsInput!) {
+    alerts(input: $input) {
+        edges {
+            node {
+                id
+                title
+                severity
+                status
+                createdAt
+                type
+                description
+                reference
+                runbook
+                firstEventOccurredAt
+                lastReceivedEventAt
+                origin {
+                    ... on Detection {
+                        id
+                        name
+                    }
+                }
+            }
+        }
+        pageInfo {
+            hasNextPage
+            endCursor
+            hasPreviousPage
+            startCursor
+        }
+    }
+}
+""")
+
+GET_ALERT_BY_ID_QUERY = gql("""
+query GetAlertById($id: ID!) {
+    alert(id: $id) {
+        id
+        title
+        severity
+        status
+        createdAt
+        type
+        description
+        reference
+        runbook
+        firstEventOccurredAt
+        lastReceivedEventAt
+        updatedAt
+        origin {
+            ... on Detection {
+                id
+                name
+            }
+        }
+    }
+}
+""")
+
+def _get_today_date_range() -> tuple:
+    """Get date range for today (UTC)"""
+    # Get current UTC time and shift back by one day since we're already in tomorrow
+    now = datetime.datetime.now(datetime.timezone.utc)
+    now = now - datetime.timedelta(days=1)
+    
+    # Get start of today (midnight UTC)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Get end of today (midnight UTC of next day)
+    today_end = today_start + datetime.timedelta(days=1)
+    
+    # Format for GraphQL query (ISO 8601 with milliseconds and Z suffix)
+    start_date = today_start.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    end_date = today_end.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    
+    logger.debug(f"Calculated date range - Start: {start_date}, End: {end_date}")
+    return start_date, end_date
+
+def _create_panther_client() -> Client:
+    """Create a Panther GraphQL client with proper configuration"""
+    transport = AIOHTTPTransport(
+        url=PANTHER_API_URL,
+        headers={"X-API-Key": get_panther_api_key()},
+        ssl=True  # Enable SSL verification
+    )
+    return Client(transport=transport, fetch_schema_from_transport=True)
 
 @mcp.tool()
 async def authenticate_with_panther() -> Dict[str, Any]:
     """Test authentication with Panther using the API key"""
     logger.info("Testing authentication with Panther")
     try:
-        # Simple GraphQL query to test authentication
-        query = """
-        query TestAuth {
-          alerts(input: { pageSize: 1 }) {
-            paging {
-              totalItems
-            }
-          }
-        }
-        """
-        api_key = get_panther_api_key()
+        client = _create_panther_client()
         
-        async with aiohttp.ClientSession() as session:
-            headers = {
-                "x-api-key": api_key,
-                "Content-Type": "application/json"
-            }
-            async with session.post(
-                PANTHER_API_URL,
-                json={"query": query},
-                headers=headers
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    logger.info("Successfully authenticated with Panther")
-                    return {"success": True, "message": "Authentication successful"}
-                else:
-                    error_text = await response.text()
-                    logger.error(f"Authentication failed: HTTP {response.status}, {error_text}")
-                    return {"success": False, "message": f"Authentication failed: HTTP {response.status}, {error_text}"}
+        # Execute the query asynchronously
+        async with client as session:
+            await session.execute(AUTHENTICATE_QUERY)
+            
+        logger.info("Successfully authenticated with Panther")
+        return {"success": True, "message": "Authentication successful"}
     except Exception as e:
         logger.error(f"Authentication failed: {str(e)}")
         return {"success": False, "message": f"Authentication failed: {str(e)}"}
@@ -109,44 +162,136 @@ async def get_todays_alerts() -> Dict[str, Any]:
     """Get alerts from Panther for the current day"""
     logger.info("Fetching today's alerts from Panther")
     try:
-        api_key = get_panther_api_key()
+        client = _create_panther_client()
         
-        async with aiohttp.ClientSession() as session:
-            headers = {
-                "x-api-key": api_key,
-                "Content-Type": "application/json"
+        # Get today's date range
+        start_date, end_date = _get_today_date_range()
+        logger.info(f"Querying alerts between {start_date} and {end_date}")
+        
+        # Prepare input variables
+        variables = {
+            "input": {
+                "createdAtAfter": start_date,
+                "createdAtBefore": end_date,
+                "pageSize": 25,  # Default page size
+                "sortBy": "createdAt",  # Sort by creation date
+                "sortDir": "descending"  # Most recent first
             }
-            async with session.post(
-                PANTHER_API_URL,
-                json={"query": GET_TODAYS_ALERTS_QUERY},
-                headers=headers
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if "errors" in data:
-                        logger.error(f"GraphQL errors: {data['errors']}")
-                        return {"success": False, "message": f"GraphQL errors: {data['errors']}"}
-                    
-                    results = data.get("data", {}).get("alerts", {})
-                    alert_summaries = results.get("alertSummaries", [])
-                    paging_info = results.get("paging", {})
-                    
-                    logger.info(f"Successfully retrieved {len(alert_summaries)} alerts out of {paging_info.get('totalItems', 0)} total")
-                    
-                    # Format the response
-                    return {
-                        "success": True,
-                        "alerts": alert_summaries,
-                        "total_alerts": paging_info.get("totalItems", 0),
-                        "total_pages": paging_info.get("totalPages", 0)
-                    }
-                else:
-                    error_text = await response.text()
-                    logger.error(f"Failed to fetch alerts: HTTP {response.status}, {error_text}")
-                    return {"success": False, "message": f"Failed to fetch alerts: HTTP {response.status}, {error_text}"}
+        }
+        logger.debug(f"Query variables: {variables}")
+        
+        # Execute the query asynchronously
+        async with client as session:
+            result = await session.execute(GET_TODAYS_ALERTS_QUERY, variable_values=variables)
+        
+        # Log the raw result for debugging
+        logger.debug(f"Raw query result: {result}")
+        
+        # Process results
+        alerts_data = result.get("alerts", {})
+        alert_edges = alerts_data.get("edges", [])
+        page_info = alerts_data.get("pageInfo", {})
+        
+        # Extract alerts from edges
+        alerts = [edge["node"] for edge in alert_edges]
+        
+        logger.info(f"Successfully retrieved {len(alerts)} alerts")
+        
+        # Format the response
+        return {
+            "success": True,
+            "alerts": alerts,
+            "total_alerts": len(alerts),
+            "has_next_page": page_info.get("hasNextPage", False),
+            "has_previous_page": page_info.get("hasPreviousPage", False),
+            "end_cursor": page_info.get("endCursor"),
+            "start_cursor": page_info.get("startCursor")
+        }
     except Exception as e:
         logger.error(f"Failed to fetch alerts: {str(e)}")
         return {"success": False, "message": f"Failed to fetch alerts: {str(e)}"}
+
+@mcp.tool()
+async def get_alerts_with_cursor(cursor: str) -> Dict[str, Any]:
+    """Get next page of alerts using a cursor from a previous query"""
+    logger.info(f"Fetching alerts with cursor: {cursor}")
+    try:
+        client = _create_panther_client()
+        
+        # Get today's date range
+        start_date, end_date = _get_today_date_range()
+        
+        # Prepare input variables
+        variables = {
+            "input": {
+                "createdAtAfter": start_date,
+                "createdAtBefore": end_date,
+                "cursor": cursor
+            }
+        }
+        
+        # Execute the query asynchronously
+        async with client as session:
+            result = await session.execute(GET_TODAYS_ALERTS_QUERY, variable_values=variables)
+        
+        # Process results
+        alerts_data = result.get("alerts", {})
+        alert_edges = alerts_data.get("edges", [])
+        page_info = alerts_data.get("pageInfo", {})
+        
+        # Extract alerts from edges
+        alerts = [edge["node"] for edge in alert_edges]
+        
+        logger.info(f"Successfully retrieved {len(alerts)} alerts with cursor")
+        
+        # Format the response
+        return {
+            "success": True,
+            "alerts": alerts,
+            "total_alerts": len(alerts),
+            "has_next_page": page_info.get("hasNextPage", False),
+            "end_cursor": page_info.get("endCursor")
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch alerts with cursor: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch alerts with cursor: {str(e)}"}
+
+@mcp.tool()
+async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
+    """Get detailed information about a specific alert by ID"""
+    logger.info(f"Fetching alert details for ID: {alert_id}")
+    try:
+        client = _create_panther_client()
+                
+        # Prepare input variables
+        variables = {
+            "id": alert_id
+        }
+        
+        # Execute the query asynchronously
+        async with client as session:
+            result = await session.execute(GET_ALERT_BY_ID_QUERY, variable_values=variables)
+        
+        # Get alert data
+        alert_data = result.get("alert", {})
+        
+        if not alert_data:
+            logger.warning(f"No alert found with ID: {alert_id}")
+            return {
+                "success": False,
+                "message": f"No alert found with ID: {alert_id}"
+            }
+        
+        logger.info(f"Successfully retrieved alert details for ID: {alert_id}")
+        
+        # Format the response
+        return {
+            "success": True,
+            "alert": alert_data
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch alert details: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch alert details: {str(e)}"}
 
 @mcp.resource("config://panther")
 def get_panther_config() -> Dict[str, Any]:
@@ -155,12 +300,10 @@ def get_panther_config() -> Dict[str, Any]:
         "api_url": PANTHER_API_URL,
         "authenticated": bool(os.getenv("PANTHER_API_KEY")),
         "server_name": MCP_SERVER_NAME,
+        "tools": [
+            "authenticate_with_panther",
+            "get_todays_alerts",
+            "get_alerts_with_cursor",
+            "get_alert_by_id"
+        ]
     }
-
-# Export the app instance for Uvicorn
-app = mcp.app
-
-if __name__ == "__main__":
-    # For local testing (not needed when using 'mcp dev' or 'mcp install')
-    import uvicorn
-    uvicorn.run("panther_mcp_server:app", host="127.0.0.1", port=8000) 

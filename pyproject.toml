@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.8.0",
+    "gql>=3.5.2",
     "mcp[cli]>=0.7.0",
     "pip-system-certs>=0.1.0",
     "python-dotenv>=1.0.0",
