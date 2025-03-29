@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from mcp.server.fastmcp import FastMCP
+import mcp.server.stdio
 
 # Server name
 MCP_SERVER_NAME = "panther-mcp"
@@ -25,7 +26,6 @@ deps = [
     "python-dotenv",
     "gql[aiohttp]",
     "aiohttp",
-    "uvicorn",
 ]
 
 # Create the MCP server
@@ -307,3 +307,16 @@ def get_panther_config() -> Dict[str, Any]:
             "get_alert_by_id"
         ]
     }
+
+async def main():
+    """Main entry point for the MCP server."""
+    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+        logger.info("Server running with stdio transport")
+        await mcp.run(
+            read_stream,
+            write_stream,
+        )
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
