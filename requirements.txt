@@ -1,5 +1,0 @@
-mcp[cli]
-aiohttp
-python-dotenv
-uvicorn
-pip-system-certs
