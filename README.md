@@ -6,7 +6,7 @@ This is a Model Context Protocol (MCP) server for Panther that provides function
 
 ## Prerequisites
 
-- Python 3.8 or higher
+- Python 3.12
 - Panther API key
 - MCP client (like Claude Desktop App) to interact with the server
 
@@ -17,7 +17,15 @@ This is a Model Context Protocol (MCP) server for Panther that provides function
 2. Install the required dependencies:
 
 ```bash
+# Using pip
 pip install -r requirements.txt
+
+# Using uv (recommended)
+uv venv
+source .venv/bin/activate  # On Unix/macOS
+# or
+.venv\Scripts\activate  # On Windows
+uv pip install -r requirements.txt
 ```
 
 This will install MCP with CLI components, which are necessary for the `mcp install` and `mcp dev` commands.
@@ -31,12 +39,19 @@ PANTHER_API_URL=https://api.your-panther-instance.com/public/graphql
 
 Replace `your_panther_api_key_here` with your actual Panther API key, and optionally update the API URL if you're using a custom Panther instance.
 
-## File Structure
+## Project Structure
 
-- `mcp_panther_module.py` - The core MCP server module with tools and resources
-- `run_panther_mcp.py` - Runner script to start the server
-- `.env.example` - Example environment variable configuration
-- `requirements.txt` - Python dependencies
+```
+.
+├── src/
+│   └── mcp_panther/
+│       ├── __init__.py
+│       └── server.py
+├── .env.example
+├── pyproject.toml
+├── requirements.txt
+└── LICENSE
+```
 
 ## Usage
 
@@ -45,7 +60,7 @@ Replace `your_panther_api_key_here` with your actual Panther API key, and option
 The simplest way to use this server is to install it in the Claude Desktop App:
 
 ```bash
-mcp install mcp_panther_module.py
+mcp install src/mcp_panther/server.py
 ```
 
 This will make the Panther MCP server available to Claude directly.
@@ -55,7 +70,7 @@ This will make the Panther MCP server available to Claude directly.
 For testing and development, you can run the MCP server in development mode:
 
 ```bash
-mcp dev mcp_panther_module.py
+mcp dev src/mcp_panther/server.py
 ```
 
 This starts the MCP server and provides an interactive web interface to test its functionality.
@@ -65,7 +80,7 @@ This starts the MCP server and provides an interactive web interface to test its
 You can also run the server directly:
 
 ```bash
-python run_panther_mcp.py
+python -m mcp_panther.server
 ```
 
 This will start the server at http://127.0.0.1:8000/
@@ -74,10 +89,13 @@ If you're using a virtual environment tool like pipenv or uv, make sure to run t
 
 ```bash
 # Using pipenv
-pipenv run python run_panther_mcp.py
+pipenv run python -m mcp_panther.server
 
 # Using uv
-uv run python run_panther_mcp.py
+source .venv/bin/activate  # On Unix/macOS
+# or
+.venv\Scripts\activate  # On Windows
+python -m mcp_panther.server
 ```
 
 ## Available Tools
@@ -102,4 +120,4 @@ The server provides the following resources:
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.

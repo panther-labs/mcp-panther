@@ -1,20 +1,24 @@
 import logging
 import os
 import datetime
-from typing import Dict, Any, Optional
+import sys
+from typing import Dict, Any
 
 from dotenv import load_dotenv
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from mcp.server.fastmcp import FastMCP
-import mcp.server.stdio
+from mcp.server import stdio
+from mcp.server.lowlevel.server import Server
 
 # Server name
-MCP_SERVER_NAME = "panther-mcp"
+MCP_SERVER_NAME = "mcp-panther"
 
-# Configure logging
+# Configure logging with more detail
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG,  # Change to DEBUG for more info
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stderr  # Ensure logs go to stderr
 )
 logger = logging.getLogger(MCP_SERVER_NAME)
 
@@ -26,6 +30,7 @@ deps = [
     "python-dotenv",
     "gql[aiohttp]",
     "aiohttp",
+    "mcp[cli]",
 ]
 
 # Create the MCP server
@@ -310,13 +315,27 @@ def get_panther_config() -> Dict[str, Any]:
 
 async def main():
     """Main entry point for the MCP server."""
-    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-        logger.info("Server running with stdio transport")
-        await mcp.run(
-            read_stream,
-            write_stream,
-        )
+    try:
+        logger.info("Starting Panther MCP server...")
+        server = Server(mcp)
+        async with stdio.stdio_server() as (read_stream, write_stream):
+            logger.info("Server running with stdio transport")
+            await server.run(
+                read_stream, 
+                write_stream,
+                initialization_options={"name": MCP_SERVER_NAME}
+            )
+    except Exception as e:
+        logger.error(f"Server error: {str(e)}", exc_info=True)
+        raise
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    try:
+        import asyncio
+        logger.info("Starting server from command line...")
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Server stopped by user")
+    except Exception as e:
+        logger.error(f"Fatal error: {str(e)}", exc_info=True)
+        sys.exit(1)
