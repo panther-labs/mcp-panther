@@ -118,7 +118,7 @@ query GetAlertById($id: ID!) {
 """)
 
 def _get_today_date_range() -> tuple:
-    """Get date range for today (UTC)"""
+    """Get date range for the last 24 hours (UTC)"""
     # Get current UTC time and shift back by one day since we're already in tomorrow
     now = datetime.datetime.now(datetime.timezone.utc)
     now = now - datetime.timedelta(days=1)
@@ -163,15 +163,31 @@ def _create_panther_client() -> Client:
 #         return {"success": False, "message": f"Authentication failed: {str(e)}"}
 
 @mcp.tool()
-async def get_todays_alerts() -> Dict[str, Any]:
-    """Get alerts from Panther for the current day"""
-    logger.info("Fetching today's alerts from Panther")
+async def list_alerts(
+    start_date: str = None, 
+    end_date: str = None,
+    severities: list[str] = None,
+    statuses: list[str] = None
+) -> Dict[str, Any]:
+    """List alerts from Panther for a specified date range or the last 24 hours by default
+    
+    Args:
+        start_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
+        end_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
+        severities: Optional list of severities to filter by (e.g. ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"])
+        statuses: Optional list of statuses to filter by (e.g. ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"])
+    """
+    logger.info("Fetching alerts from Panther")
+
     try:
         client = _create_panther_client()
         
-        # Get today's date range
-        start_date, end_date = _get_today_date_range()
-        logger.info(f"Querying alerts between {start_date} and {end_date}")
+        # If no dates provided, get the last 24 hours
+        if not start_date or not end_date:
+            start_date, end_date = _get_today_date_range()
+            logger.info(f"No date range provided, using last 24 hours: {start_date} to {end_date}")
+        else:
+            logger.info(f"Using provided date range: {start_date} to {end_date}")
         
         # Prepare input variables
         variables = {
@@ -180,9 +196,20 @@ async def get_todays_alerts() -> Dict[str, Any]:
                 "createdAtBefore": end_date,
                 "pageSize": 25,  # Default page size
                 "sortBy": "createdAt",  # Sort by creation date
-                "sortDir": "descending"  # Most recent first
+                "sortDir": "descending",  # Most recent first
             }
         }
+
+        # Add severity filters if provided
+        if severities:
+            variables["input"]["severities"] = severities
+            logger.info(f"Filtering by severities: {severities}")
+
+        # Add status filters if provided
+        if statuses:
+            variables["input"]["statuses"] = statuses
+            logger.info(f"Filtering by statuses: {statuses}")
+
         logger.debug(f"Query variables: {variables}")
         
         # Execute the query asynchronously
@@ -217,8 +244,8 @@ async def get_todays_alerts() -> Dict[str, Any]:
         return {"success": False, "message": f"Failed to fetch alerts: {str(e)}"}
 
 @mcp.tool()
-async def get_alerts_with_cursor(cursor: str) -> Dict[str, Any]:
-    """Get next page of alerts using a cursor from a previous query"""
+async def list_alerts_with_cursor(cursor: str) -> Dict[str, Any]:
+    """Get next page of Panther alerts using a cursor from a previous list_alerts query"""
     logger.info(f"Fetching alerts with cursor: {cursor}")
     try:
         client = _create_panther_client()
@@ -263,7 +290,7 @@ async def get_alerts_with_cursor(cursor: str) -> Dict[str, Any]:
 
 @mcp.tool()
 async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
-    """Get detailed information about a specific alert by ID"""
+    """Get detailed information about a specific Panther alert by ID"""
     logger.info(f"Fetching alert details for ID: {alert_id}")
     try:
         client = _create_panther_client()
@@ -308,7 +335,7 @@ def get_panther_config() -> Dict[str, Any]:
         "tools": [
             # "authenticate_with_panther",
             "get_todays_alerts",
-            "get_alerts_with_cursor",
+            "list_alerts_with_cursor",
             "get_alert_by_id"
         ]
     }
