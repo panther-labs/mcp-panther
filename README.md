@@ -113,6 +113,12 @@ The server provides the following tools:
 5. `get_data_lake_query_results`: Get results from a previously executed data lake query
 6. `list_rules`: List all Panther rules with optional pagination
 7. `get_rule_by_id`: Get detailed information about a specific rule
+8. `update_alert_status`: Update the status of a Panther alert (e.g. OPEN, TRIAGED, RESOLVED, CLOSED)
+9. `add_alert_comment`: Add a comment to a Panther alert
+10. `get_metrics_alerts_per_severity`: Get metrics about alerts grouped by severity over time
+11. `get_metrics_alerts_per_rule`: Get metrics about alerts grouped by rule over time
+12. `update_alert_assignee_by_id`: Update the assignee of one or more alerts through the assignee's ID
+13. `list_panther_users`: List all Panther user accounts
 
 ## Available Resources
 

@@ -198,6 +198,75 @@ query GetDataLakeQuery($id: ID!, $root: Boolean = false) {
 }
 """)
 
+UPDATE_ALERT_STATUS_MUTATION = gql("""
+mutation UpdateAlertStatusById($input: UpdateAlertStatusByIdInput!) {
+    updateAlertStatusById(input: $input) {
+        alerts {
+            id
+            status
+            updatedAt
+        }
+    }
+}
+""")
+
+ADD_ALERT_COMMENT_MUTATION = gql("""
+mutation CreateAlertComment($input: CreateAlertCommentInput!) {
+    createAlertComment(input: $input) {
+        comment {
+            id
+            body
+            createdAt
+            createdBy {
+                ... on User {
+                    id
+                    email
+                    givenName
+                    familyName
+                }
+            }
+            format
+        }
+    }
+}
+""")
+
+UPDATE_ALERTS_ASSIGNEE_BY_ID_MUTATION = gql("""
+mutation UpdateAlertsAssigneeById($input: UpdateAlertsAssigneeByIdInput!) {
+    updateAlertsAssigneeById(input: $input) {
+        alerts {
+            id
+            assignee {
+                id
+                email
+                givenName
+                familyName
+            }
+        }
+    }
+}
+""")
+
+LIST_USERS_QUERY = gql("""
+query ListUsers {
+    users {
+        id
+        email
+        givenName
+        familyName
+        createdAt
+        lastLoggedInAt
+        status
+        enabled
+        role {
+            id
+            name
+            permissions
+        }
+    }
+}
+""")
+
 
 def _get_today_date_range() -> tuple:
     """Get date range for the last 24 hours (UTC)"""
@@ -574,11 +643,11 @@ def triage_alert(alert_id: str) -> str:
 
 
 @mcp.prompt()
-def prioritize_alerts() -> str:
+def prioritize_and_triage_alerts() -> str:
     return """You are an expert cyber security analyst. Your goal is to prioritize alerts based on severity, impact, and other relevant criteria to decide which alerts to investigate first. Use the following steps to prioritize alerts:
-    1. List all alerts in the last 24 hours and logically group them by user, host, or other similar criteria. Alerts can be related even if they have different titles or log types (for example, if a user logs into Okta and then AWS).
+    1. List all alerts in the last 7 days of severities MEDIUM, HIGH, or CRITICAL, and logically group them by user, host, or other similar criteria. Alerts can be related even if they have different titles or log types (for example, if a user logs into Okta and then AWS).
     2. Triage each group of alerts to understand what happened and what the impact was. Query the data lake to read all associated events (database: panther_rule_matches.public, table: log type from the alert) and use the results to understand the impact.
-    3. Create next steps for each group of alerts to investigate and resolve.
+    3. For each group, if the alerts are false positives, suggest a rule improvement by reading the Python source, comment on the alert with your analysis, and mark the alert as invalid. If the alerts are true positives, begin pivoting on the available data to understand the root cause and impact.
     """
 
 
@@ -677,6 +746,92 @@ async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
         return {"success": False, "message": f"Failed to fetch rule details: {str(e)}"}
 
 
+@mcp.tool()
+async def update_alert_assignee_by_id(
+    alert_ids: list[str], assignee_id: str
+) -> Dict[str, Any]:
+    """Update the assignee of one or more alerts through the assignee's ID.
+
+    Args:
+        alert_ids: List of alert IDs to update
+        assignee_id: The ID of the user to assign the alerts to
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the update was successful
+        - alerts: List of updated alerts if successful
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Updating assignee for alerts {alert_ids} to user {assignee_id}")
+
+    try:
+        # Prepare variables
+        variables = {
+            "input": {
+                "ids": alert_ids,
+                "assigneeId": assignee_id,
+            }
+        }
+
+        # Execute mutation
+        result = await _execute_query(UPDATE_ALERTS_ASSIGNEE_BY_ID_MUTATION, variables)
+
+        if not result or "updateAlertsAssigneeById" not in result:
+            raise Exception("Failed to update alert assignee")
+
+        alerts_data = result["updateAlertsAssigneeById"]["alerts"]
+
+        logger.info(f"Successfully updated assignee for alerts {alert_ids}")
+
+        return {
+            "success": True,
+            "alerts": alerts_data,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to update alert assignee: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to update alert assignee: {str(e)}",
+        }
+
+
+@mcp.tool()
+async def list_panther_users() -> Dict[str, Any]:
+    """List all Panther user accounts.
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - users: List of user accounts if successful
+        - message: Error message if unsuccessful
+    """
+    logger.info("Fetching all Panther users")
+
+    try:
+        # Execute query
+        result = await _execute_query(LIST_USERS_QUERY, {})
+
+        if not result or "users" not in result:
+            raise Exception("Failed to fetch users")
+
+        users = result["users"]
+
+        logger.info(f"Successfully retrieved {len(users)} users")
+
+        return {
+            "success": True,
+            "users": users,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to fetch users: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch users: {str(e)}",
+        }
+
+
 @mcp.resource("config://panther")
 def get_panther_config() -> Dict[str, Any]:
     """Get the Panther configuration."""
@@ -693,6 +848,10 @@ def get_panther_config() -> Dict[str, Any]:
             "get_rule_by_id",
             "get_metrics_alerts_per_severity",
             "get_metrics_alerts_per_rule",
+            "update_alert_status",
+            "add_alert_comment",
+            "update_alert_assignee_by_id",
+            "list_panther_users",
         ],
         "available_resources": ["config://panther"],
         "available_prompts": ["triage_alert", "prioritize_alerts"],
@@ -869,6 +1028,102 @@ async def get_metrics_alerts_per_rule(
         return {
             "success": False,
             "message": f"Failed to fetch alerts per rule metrics: {str(e)}",
+        }
+
+
+@mcp.tool()
+async def update_alert_status(alert_id: str, status: str) -> Dict[str, Any]:
+    """Update the status of a Panther alert.
+
+    Args:
+        alert_id: The ID of the alert to update
+        status: The new status for the alert (e.g. "OPEN", "TRIAGED", "RESOLVED", "CLOSED")
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the update was successful
+        - alerts: List of updated alerts if successful
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Updating status for alert {alert_id} to {status}")
+
+    try:
+        # Prepare variables
+        variables = {
+            "input": {
+                "ids": [alert_id],
+                "status": status,
+            }
+        }
+
+        # Execute mutation
+        result = await _execute_query(UPDATE_ALERT_STATUS_MUTATION, variables)
+
+        if not result or "updateAlertStatusById" not in result:
+            raise Exception("Failed to update alert status")
+
+        alerts_data = result["updateAlertStatusById"]["alerts"]
+
+        logger.info(f"Successfully updated alert {alert_id} status to {status}")
+
+        return {
+            "success": True,
+            "alerts": alerts_data,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to update alert status: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to update alert status: {str(e)}",
+        }
+
+
+@mcp.tool()
+async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
+    """Add a comment to a Panther alert. Comments support Markdown formatting.
+
+    Args:
+        alert_id: The ID of the alert to comment on
+        comment: The comment text to add
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the comment was added successfully
+        - comment: Created comment information if successful
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Adding comment to alert {alert_id}")
+
+    try:
+        # Prepare variables
+        variables = {
+            "input": {
+                "alertId": alert_id,
+                "body": comment,
+            }
+        }
+
+        # Execute mutation
+        result = await _execute_query(ADD_ALERT_COMMENT_MUTATION, variables)
+
+        if not result or "createAlertComment" not in result:
+            raise Exception("Failed to add alert comment")
+
+        comment_data = result["createAlertComment"]["comment"]
+
+        logger.info(f"Successfully added comment to alert {alert_id}")
+
+        return {
+            "success": True,
+            "comment": comment_data,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to add alert comment: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to add alert comment: {str(e)}",
         }
 
 
