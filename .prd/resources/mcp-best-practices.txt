@@ -1,0 +1,8 @@
+Best practices
+When building MCP servers with Claude:
+
+Break down complex servers into smaller pieces
+Test each component thoroughly before moving on
+Keep security in mind - validate inputs and limit access appropriately
+Document your code well for future maintenance
+Follow MCP protocol specifications carefully
