@@ -1,0 +1,22 @@
+[project]
+name = "mcp-panther"
+version = "0.1.0"
+description = "Panther Labs MCP Server"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.11.14",
+    "gql>=3.5.2",
+    "mcp[cli]>=1.6.0",
+    "pip-system-certs>=0.1.0",
+    "python-dotenv>=1.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.3.0",
+]
+
+[project.scripts]
+mcp-panther = "mcp_panther:main"
+ruff = "ruff:main"
