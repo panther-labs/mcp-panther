@@ -12,5 +12,11 @@ dependencies = [
     "python-dotenv>=1.1.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.3.0",
+]
+
 [project.scripts]
 mcp-panther = "mcp_panther:main"
+ruff = "ruff:main"
