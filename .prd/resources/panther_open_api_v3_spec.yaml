@@ -1,0 +1,4685 @@
+# Copyright (C) 2022 Panther Labs, Inc.
+#
+# The Panther SaaS is licensed under the terms of the Panther Enterprise Subscription
+# Agreement available at https://panther.com/enterprise-subscription-agreement/.
+# All intellectual property rights in and to the Panther SaaS, including any and all
+# rights to access the Panther SaaS, are governed by the Panther Enterprise Subscription Agreement.
+
+openapi: 3.0.3
+info:
+  title: Panther REST API
+  version: '1.0'
+servers:
+  - url: https://{api_host}
+    variables:
+      api_host:
+        default: your-api-host
+paths:
+  /alert-comments:
+    get:
+      tags:
+        - comment
+      summary: List alert comments
+      operationId: comment#list
+      parameters:
+        - name: alert-id
+          in: query
+          description: The alert ID the comments are associated with
+          allowEmptyValue: true
+          required: true
+          schema:
+            type: string
+            description: The alert ID the comments are associated with
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 25
+            format: int64
+            maximum: 50
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.ListResp'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.BadRequestError'
+    post:
+      tags:
+        - comment
+      summary: Create a comment for an alert
+      operationId: comment#create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentAPI.ModifyCommentReq'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.Comment'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.NotFoundError'
+  /alert-comments/{id}:
+    get:
+      tags:
+        - comment
+      summary: Get a comment for an alert
+      operationId: comment#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the comment
+          required: true
+          schema:
+            type: string
+            description: ID of the comment
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.Comment'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.NotFoundError'
+    post:
+      tags:
+        - comment
+      summary: Update a comment for an alert
+      operationId: comment#update
+      parameters:
+        - name: id
+          in: path
+          description: ID of the comment
+          required: true
+          schema:
+            type: string
+            description: ID of the comment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentAPI.ModifyCommentReq'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.Comment'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentAPI.NotFoundError'
+  /alerts:
+    get:
+      tags:
+        - alert
+      summary: List alerts
+      operationId: alert#list
+      parameters:
+        - name: type
+          in: query
+          allowEmptyValue: true
+          schema:
+            type: string
+            default: ALERT
+            enum:
+              - ALERT
+              - DETECTION_ERROR
+              - SYSTEM_ERROR
+        - name: sub-type
+          in: query
+          description: The sub-type of the alert
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - RULE
+                - RULE_ERROR
+                - SCHEDULED_RULE
+                - SCHEDULED_RULE_ERROR
+                - POLICY
+                - SYSTEM_ERROR
+                - CORRELATION_RULE
+                - CORRELATION_RULE_ERROR
+            description: The sub-type of the alert
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 25
+            format: int64
+            maximum: 50
+        - name: created-after
+          in: query
+          description: The date and time after which the alerts were created. If empty we default to 30 days ago
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: The date and time after which the alerts were created. If empty we default to 30 days ago
+            example: '1672531200'
+          examples:
+            Date only:
+              summary: Date only
+              value: '2025-01-01'
+            Month only:
+              summary: Month only
+              value: 2025-01
+            RFC3339:
+              summary: RFC3339
+              value: '2025-01-01T15:04:05Z'
+            Unix timestamp:
+              summary: Unix timestamp
+              value: '1672531200'
+        - name: created-before
+          in: query
+          description: The date and time before which the alerts were created. If empty we default to the current time
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: The date and time before which the alerts were created. If empty we default to the current time
+            example: '1672531200'
+          examples:
+            Date only:
+              summary: Date only
+              value: '2025-01-01'
+            Month only:
+              summary: Month only
+              value: 2025-01
+            RFC3339:
+              summary: RFC3339
+              value: '2025-01-01T15:04:05Z'
+            Unix timestamp:
+              summary: Unix timestamp
+              value: '1672531200'
+        - name: detection-id
+          in: query
+          description: The detection ID to filter alerts by
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: The detection ID to filter alerts by
+        - name: sort-dir
+          in: query
+          description: The sort direction of the results
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: The sort direction of the results
+            default: desc
+            enum:
+              - asc
+              - desc
+        - name: name-contains
+          in: query
+          description: A string to search for in the alert name
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: A string to search for in the alert name
+        - name: log-source
+          in: query
+          description: The log source of the alert
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: The log source of the alert
+        - name: log-type
+          in: query
+          description: The log type of the alert
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: The log type of the alert
+        - name: resource-type
+          in: query
+          description: The resource type of the alert
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: The resource type of the alert
+        - name: status
+          in: query
+          description: The status of the alert
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - OPEN
+                - CLOSED
+                - TRIAGED
+                - RESOLVED
+            description: The status of the alert
+        - name: severity
+          in: query
+          description: The severity of the alert
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - CRITICAL
+                - HIGH
+                - MEDIUM
+                - LOW
+                - INFO
+            description: The severity of the alert
+        - name: assignee
+          in: query
+          description: The assignee of the alert. This should be a user id
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: The assignee of the alert. This should be a user id
+        - name: event-count-min
+          in: query
+          description: The minimum number of events in the alert
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: The minimum number of events in the alert
+            format: int64
+        - name: event-count-max
+          in: query
+          description: The maximum number of events in the alert
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: The maximum number of events in the alert
+            format: int64
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.ListResp'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.BadRequestError'
+    patch:
+      tags:
+        - alert
+      summary: Update the status or assignee of multiple alerts
+      operationId: alert#bulkPatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertAPI.BulkPatchAlertReq'
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.NotFoundError'
+  /alerts/{id}:
+    get:
+      tags:
+        - alert
+      summary: Get an alert
+      operationId: alert#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the alert
+          required: true
+          schema:
+            type: string
+            description: ID of the alert
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.Alert'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.NotFoundError'
+    patch:
+      tags:
+        - alert
+      summary: Update the status or assignee of an alert
+      operationId: alert#patch
+      parameters:
+        - name: id
+          in: path
+          description: ID of the alert
+          required: true
+          schema:
+            type: string
+            description: ID of the alert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertAPI.PatchAlertReq'
+      responses:
+        '200':
+          description: OK response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.NotFoundError'
+  /alerts/{id}/events:
+    get:
+      tags:
+        - alert
+      summary: List alert events
+      operationId: alert#events
+      parameters:
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 25
+            format: int64
+            maximum: 50
+        - name: id
+          in: path
+          description: The alert id
+          required: true
+          schema:
+            type: string
+            description: The alert id
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.ListEventsResp'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAPI.NotFoundError'
+  /api-tokens:
+    get:
+      tags:
+        - api token
+      summary: List api tokens
+      operationId: api token#list
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.ListResp'
+    post:
+      tags:
+        - api token
+      summary: Create an api token
+      operationId: api token#create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APITokenAPI.ModifyAPIToken'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.APIToken'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.BadRequestError'
+  /api-tokens/{id}:
+    delete:
+      tags:
+        - api token
+      summary: delete api token
+      operationId: api token#delete
+      parameters:
+        - name: id
+          in: path
+          description: 'ID of the api token to delete. Note: if self is provided, the current api token will be deleted'
+          required: true
+          schema:
+            type: string
+            description: 'ID of the api token to delete. Note: if self is provided, the current api token will be deleted'
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.NotFoundError'
+    get:
+      tags:
+        - api token
+      summary: Get an api token
+      operationId: api token#get
+      parameters:
+        - name: id
+          in: path
+          description: 'ID of the api token. Note: if self is provided, the current api token will be returned'
+          required: true
+          schema:
+            type: string
+            description: 'ID of the api token. Note: if self is provided, the current api token will be returned'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.APIToken'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.NotFoundError'
+    post:
+      tags:
+        - api token
+      summary: Update an api token
+      operationId: api token#update
+      parameters:
+        - name: id
+          in: path
+          description: 'ID of the api token. Note: if self is provided, the current api token will be updated'
+          required: true
+          schema:
+            type: string
+            description: 'ID of the api token. Note: if self is provided, the current api token will be updated'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APITokenAPI.ModifyAPIToken'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.APIToken'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.NotFoundError'
+  /api-tokens/{id}/rotate:
+    post:
+      tags:
+        - api token
+      summary: Rotate an api token. If self is provided the current token will be rotated
+      operationId: api token#rotate
+      parameters:
+        - name: id
+          in: path
+          description: 'ID of the api token to rotate. Note: if self is provided, the current api token will be rotated'
+          required: true
+          schema:
+            type: string
+            description: 'ID of the api token to rotate. Note: if self is provided, the current api token will be rotated'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.APIToken'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.BadRequestError'
+        '403':
+          description: 'forbidden: Forbidden response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.ForbiddenErr'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APITokenAPI.NotFoundError'
+  /data-models:
+    get:
+      tags:
+        - data model
+      summary: list data models
+      operationId: data model#list
+      parameters:
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 100
+            format: int64
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.ListResp'
+    post:
+      tags:
+        - data model
+      summary: create data model
+      operationId: data model#create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataModelAPI.ModifyDataModel'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.DataModel'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.BadRequestError'
+        '409':
+          description: 'exists: Conflict response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.ExistsError'
+  /data-models/{id}:
+    delete:
+      tags:
+        - data model
+      summary: delete data model
+      operationId: data model#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the data model to delete
+          required: true
+          schema:
+            type: string
+            description: ID of the data model to delete
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.NotFoundError'
+    get:
+      tags:
+        - data model
+      summary: get data model
+      operationId: data model#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the data model to fetch
+          required: true
+          schema:
+            type: string
+            description: ID of the data model to fetch
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.DataModel'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.NotFoundError'
+    put:
+      tags:
+        - data model
+      summary: put data model
+      description: put creates or updates a data model
+      operationId: data model#put
+      parameters:
+        - name: id
+          in: path
+          description: the id of the data model
+          required: true
+          schema:
+            type: string
+            description: the id of the data model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataModelAPI.ModifyDataModel'
+      responses:
+        '200':
+          description: 200 returned if the item already existed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.DataModel'
+        '201':
+          description: 201 returned if the item was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.DataModel'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelAPI.BadRequestError'
+  /globals:
+    get:
+      tags:
+        - global
+      summary: list globals
+      operationId: global#list
+      parameters:
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 100
+            format: int64
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.ListResp'
+    post:
+      tags:
+        - global
+      summary: create global
+      operationId: global#create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalAPI.ModifyGlobal'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.Global'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.BadRequestError'
+        '409':
+          description: 'exists: Conflict response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.ExistsError'
+  /globals/{id}:
+    delete:
+      tags:
+        - global
+      summary: delete global
+      operationId: global#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the global to delete
+          required: true
+          schema:
+            type: string
+            description: ID of the global to delete
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.NotFoundError'
+    get:
+      tags:
+        - global
+      summary: get global
+      operationId: global#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the global to fetch
+          required: true
+          schema:
+            type: string
+            description: ID of the global to fetch
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.Global'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.NotFoundError'
+    put:
+      tags:
+        - global
+      summary: put global
+      description: put creates or updates a global
+      operationId: global#put
+      parameters:
+        - name: id
+          in: path
+          description: The id of the global
+          required: true
+          schema:
+            type: string
+            description: The id of the global
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalAPI.ModifyGlobal2'
+      responses:
+        '200':
+          description: 200 returned if the item already existed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.PutGlobalResp'
+        '201':
+          description: 201 returned if the item was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.PutGlobalResp'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalAPI.BadRequestError'
+  /log-sources/http:
+    post:
+      tags:
+        - http source
+      summary: create http source
+      operationId: http source#create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HttpSourceAPI.ModifyHTTPSource'
+      responses:
+        '201':
+          description: Created response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.HTTPSource'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.BadRequestError'
+        '409':
+          description: 'exists: Conflict response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.ExistsError'
+        '500':
+          description: 'service: Internal Server Error response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.ServiceError'
+  /log-sources/http/{id}:
+    delete:
+      tags:
+        - http source
+      summary: delete http source
+      operationId: http source#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the http source to delete
+          required: true
+          schema:
+            type: string
+            description: ID of the http source to delete
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.BadRequestError'
+        '500':
+          description: 'service: Internal Server Error response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.ServiceError'
+    get:
+      tags:
+        - http source
+      summary: get http source
+      operationId: http source#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the http source to fetch
+          required: true
+          schema:
+            type: string
+            description: ID of the http source to fetch
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.HTTPSource'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.NotFoundError'
+        '500':
+          description: 'service: Internal Server Error response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.ServiceError'
+    put:
+      tags:
+        - http source
+      summary: put http source
+      description: put updates an http source
+      operationId: http source#put
+      parameters:
+        - name: id
+          in: path
+          description: ID of the http source to update
+          required: true
+          schema:
+            type: string
+            description: ID of the http source to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HttpSourceAPI.ModifyHTTPSource'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.HTTPSource'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.NotFoundError'
+        '409':
+          description: 'exists: Conflict response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.ExistsError'
+        '500':
+          description: 'service: Internal Server Error response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSourceAPI.ServiceError'
+  /policies:
+    get:
+      tags:
+        - policy
+      summary: list policies
+      operationId: policy#list
+      parameters:
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 100
+            format: int64
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.ListResp'
+    post:
+      tags:
+        - policy
+      summary: create policy
+      operationId: policy#create
+      parameters:
+        - name: run-tests-first
+          in: query
+          description: set this field to false to exclude running tests prior to saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to false to exclude running tests prior to saving
+            default: true
+        - name: run-tests-only
+          in: query
+          description: set this field to true if you want to run tests without saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to true if you want to run tests without saving
+            default: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyAPI.ModifyPolicy'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.Policy'
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.BadRequestWithTestResultsErr'
+        '409':
+          description: 'exists: Conflict response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.ExistsError'
+  /policies/{id}:
+    delete:
+      tags:
+        - policy
+      summary: delete policy
+      operationId: policy#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the policy to delete
+          required: true
+          schema:
+            type: string
+            description: ID of the policy to delete
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.BadRequestWithTestResultsErr'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.NotFoundError'
+    get:
+      tags:
+        - policy
+      summary: get policy
+      operationId: policy#get
+      parameters:
+        - name: id
+          in: path
+          description: the id of the policy to fetch
+          required: true
+          schema:
+            type: string
+            description: the id of the policy to fetch
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.Policy'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.NotFoundError'
+    put:
+      tags:
+        - policy
+      summary: put policy
+      description: put creates or updates a policy
+      operationId: policy#put
+      parameters:
+        - name: run-tests-first
+          in: query
+          description: set this field to false to exclude running tests prior to saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to false to exclude running tests prior to saving
+            default: true
+        - name: run-tests-only
+          in: query
+          description: set this field to true if you want to run tests without saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to true if you want to run tests without saving
+            default: false
+        - name: id
+          in: path
+          description: the id of the policy
+          required: true
+          schema:
+            type: string
+            description: the id of the policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyAPI.ModifyPolicy'
+      responses:
+        '200':
+          description: 200 returned if the item already existed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.Policy'
+        '201':
+          description: 201 returned if the item was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.Policy'
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyAPI.BadRequestWithTestResultsErr'
+  /queries:
+    get:
+      tags:
+        - query
+      summary: list queries
+      operationId: query#list
+      parameters:
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 100
+            format: int64
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.ListResp'
+    post:
+      tags:
+        - query
+      summary: create query
+      operationId: query#create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryAPI.ModifyQuery'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.Query'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.BadRequestError'
+        '409':
+          description: 'exists: Conflict response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.ExistsError'
+  /queries/{id}:
+    delete:
+      tags:
+        - query
+      summary: delete query
+      operationId: query#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the query to delete
+          required: true
+          schema:
+            type: string
+            description: ID of the query to delete
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.NotFoundError'
+    get:
+      tags:
+        - query
+      summary: get query
+      operationId: query#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the query to fetch
+          required: true
+          schema:
+            type: string
+            description: ID of the query to fetch
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.Query'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.NotFoundError'
+    post:
+      tags:
+        - query
+      summary: update query
+      description: updates a query
+      operationId: query#update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryAPI.ModifyQuery'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.Query'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryAPI.NotFoundError'
+  /roles:
+    get:
+      tags:
+        - role
+      summary: List roles
+      operationId: role#list
+      parameters:
+        - name: name-contains
+          in: query
+          description: A string to search for in the Role name
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: A string to search for in the Role name
+        - name: name
+          in: query
+          description: An exact match of a role's name to return. If provided all other parameters are ignored
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: An exact match of a role's name to return. If provided all other parameters are ignored
+        - name: id
+          in: query
+          description: Set of IDS to return
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Set of IDS to return
+        - name: ids
+          in: query
+          description: A comma delimited list of IDs
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: A comma delimited list of IDs
+        - name: sort-dir
+          in: query
+          description: The sort direction of the results
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: The sort direction of the results
+            default: asc
+            enum:
+              - asc
+              - desc
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.ListResp'
+    post:
+      tags:
+        - role
+      summary: Create a role
+      operationId: role#create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleAPI.ModifyRole'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.Role'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.BadRequestError'
+  /roles/{id}:
+    delete:
+      tags:
+        - role
+      summary: Delete a role
+      operationId: role#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the role
+          required: true
+          schema:
+            type: string
+            description: ID of the role
+      responses:
+        '200':
+          description: OK response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.NotFoundError'
+    get:
+      tags:
+        - role
+      summary: Get a role
+      operationId: role#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the role
+          required: true
+          schema:
+            type: string
+            description: ID of the role
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.Role'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.NotFoundError'
+    post:
+      tags:
+        - role
+      summary: Update a role
+      operationId: role#update
+      parameters:
+        - name: id
+          in: path
+          description: ID of the role
+          required: true
+          schema:
+            type: string
+            description: ID of the role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleAPI.ModifyRole'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.Role'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAPI.NotFoundError'
+  /rules:
+    get:
+      tags:
+        - rule
+      summary: list rules
+      operationId: rule#list
+      parameters:
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 100
+            format: int64
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.ListResp'
+    post:
+      tags:
+        - rule
+      summary: create rule
+      operationId: rule#create
+      parameters:
+        - name: run-tests-first
+          in: query
+          description: set this field to false to exclude running tests prior to saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to false to exclude running tests prior to saving
+            default: true
+        - name: run-tests-only
+          in: query
+          description: set this field to true if you want to run tests without saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to true if you want to run tests without saving
+            default: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleAPI.ModifyRule'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.Rule'
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.BadRequestWithTestResultsErr'
+        '409':
+          description: 'exists: Conflict response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.ExistsError'
+  /rules/{id}:
+    delete:
+      tags:
+        - rule
+      summary: delete rule
+      operationId: rule#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the rule to delete
+          required: true
+          schema:
+            type: string
+            description: ID of the rule to delete
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.BadRequestWithTestResultsErr'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.NotFoundError'
+    get:
+      tags:
+        - rule
+      summary: get rule
+      operationId: rule#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the rule to fetch
+          required: true
+          schema:
+            type: string
+            description: ID of the rule to fetch
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.Rule'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.NotFoundError'
+    put:
+      tags:
+        - rule
+      summary: put rule
+      description: put creates or updates a rule
+      operationId: rule#put
+      parameters:
+        - name: run-tests-first
+          in: query
+          description: set this field to false to exclude running tests prior to saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to false to exclude running tests prior to saving
+            default: true
+        - name: run-tests-only
+          in: query
+          description: set this field to true if you want to run tests without saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to true if you want to run tests without saving
+            default: false
+        - name: id
+          in: path
+          description: the id of the rule
+          required: true
+          schema:
+            type: string
+            description: the id of the rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleAPI.ModifyRule'
+      responses:
+        '200':
+          description: 200 returned if the item already existed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.Rule'
+        '201':
+          description: 201 returned if the item was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.Rule'
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleAPI.BadRequestWithTestResultsErr'
+  /scheduled-rules:
+    get:
+      tags:
+        - scheduled rule
+      summary: list scheduled rules
+      operationId: scheduled rule#list
+      parameters:
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 100
+            format: int64
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.ListResp'
+    post:
+      tags:
+        - scheduled rule
+      summary: create scheduled rule
+      operationId: scheduled rule#create
+      parameters:
+        - name: run-tests-first
+          in: query
+          description: set this field to false to exclude running tests prior to saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to false to exclude running tests prior to saving
+            default: true
+        - name: run-tests-only
+          in: query
+          description: set this field to true if you want to run tests without saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to true if you want to run tests without saving
+            default: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduledRuleAPI.ModifyRule'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.ScheduledRule'
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.BadRequestWithTestResultsErr'
+        '409':
+          description: 'exists: Conflict response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.ExistsError'
+  /scheduled-rules/{id}:
+    delete:
+      tags:
+        - scheduled rule
+      summary: delete scheduled rule
+      operationId: scheduled rule#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the rule to delete
+          required: true
+          schema:
+            type: string
+            description: ID of the rule to delete
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.BadRequestWithTestResultsErr'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.NotFoundError'
+    get:
+      tags:
+        - scheduled rule
+      summary: get scheduled rule
+      operationId: scheduled rule#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the rule to fetch
+          required: true
+          schema:
+            type: string
+            description: ID of the rule to fetch
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.ScheduledRule'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.NotFoundError'
+    put:
+      tags:
+        - scheduled rule
+      summary: put scheduled rule
+      description: put creates or updates a scheduled rule
+      operationId: scheduled rule#put
+      parameters:
+        - name: run-tests-first
+          in: query
+          description: set this field to false to exclude running tests prior to saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to false to exclude running tests prior to saving
+            default: true
+        - name: run-tests-only
+          in: query
+          description: set this field to true if you want to run tests without saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to true if you want to run tests without saving
+            default: false
+        - name: id
+          in: path
+          description: the id of the scheduled rule
+          required: true
+          schema:
+            type: string
+            description: the id of the scheduled rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduledRuleAPI.ModifyRule'
+      responses:
+        '200':
+          description: 200 returned if the item already existed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.ScheduledRule'
+        '201':
+          description: 201 returned if the item was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.ScheduledRule'
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledRuleAPI.BadRequestWithTestResultsErr'
+  /simple-rules:
+    get:
+      tags:
+        - simple rule
+      summary: list simple rules
+      operationId: simple rule#list
+      parameters:
+        - name: cursor
+          in: query
+          description: the pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: the pagination token
+        - name: limit
+          in: query
+          description: the maximum results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: the maximum results to return
+            default: 100
+            format: int64
+        - name: include-python
+          in: query
+          description: determines if associated python for the generated rule is returned
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: determines if associated python for the generated rule is returned
+            default: false
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.ListResp'
+    post:
+      tags:
+        - simple rule
+      summary: create simple rule
+      operationId: simple rule#create
+      parameters:
+        - name: run-tests-first
+          in: query
+          description: set this field to false to exclude running tests prior to saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to false to exclude running tests prior to saving
+            default: true
+        - name: run-tests-only
+          in: query
+          description: set this field to true if you want to run tests without saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to true if you want to run tests without saving
+            default: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleRuleAPI.ModifyRule'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.SimpleRule'
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.BadRequestWithTestResultsErr'
+        '409':
+          description: 'exists: Conflict response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.ExistsError'
+  /simple-rules/{id}:
+    delete:
+      tags:
+        - simple rule
+      summary: delete simple rule
+      operationId: simple rule#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the simple rule to delete
+          required: true
+          schema:
+            type: string
+            description: ID of the simple rule to delete
+      responses:
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.BadRequestWithTestResultsErr'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.NotFoundError'
+    get:
+      tags:
+        - simple rule
+      summary: get a simple rule
+      operationId: simple rule#get
+      parameters:
+        - name: include-python
+          in: query
+          description: determines if associated python for the generated rule is returned
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: determines if associated python for the generated rule is returned
+            default: false
+        - name: id
+          in: path
+          description: ID of the rule to fetch
+          required: true
+          schema:
+            type: string
+            description: ID of the rule to fetch
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.SimpleRule'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.NotFoundError'
+    put:
+      tags:
+        - simple rule
+      summary: put simple rule
+      description: put creates or updates a rule
+      operationId: simple rule#put
+      parameters:
+        - name: run-tests-first
+          in: query
+          description: set this field to false to exclude running tests prior to saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to false to exclude running tests prior to saving
+            default: true
+        - name: run-tests-only
+          in: query
+          description: set this field to true if you want to run tests without saving
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: set this field to true if you want to run tests without saving
+            default: false
+        - name: id
+          in: path
+          description: the id of the rule
+          required: true
+          schema:
+            type: string
+            description: the id of the rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleRuleAPI.ModifyRule'
+      responses:
+        '200':
+          description: 200 returned if the item already existed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.SimpleRule'
+        '201':
+          description: 201 returned if the item was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.SimpleRule'
+        '204':
+          description: No Content response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleRuleAPI.BadRequestWithTestResultsErr'
+  /users:
+    get:
+      tags:
+        - user
+      summary: List users
+      operationId: user#list
+      parameters:
+        - name: contains
+          in: query
+          description: Search name and email fields in a case-insensitive fashion
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Search name and email fields in a case-insensitive fashion
+        - name: email
+          in: query
+          description: An exact match of a user's email to return. If provided all other parameters are ignored
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: An exact match of a user's email to return. If provided all other parameters are ignored
+        - name: id
+          in: query
+          description: Set of IDS to return
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Set of IDS to return
+        - name: ids
+          in: query
+          description: A comma delimited list of IDs
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: A comma delimited list of IDs
+        - name: include-deactivated
+          in: query
+          description: Include deactivated users
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            description: Include deactivated users
+        - name: sort-dir
+          in: query
+          description: The sort direction of the results
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: The sort direction of the results
+            default: asc
+            enum:
+              - asc
+              - desc
+        - name: status
+          in: query
+          description: Show only users with this Cognito status
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Show only users with this Cognito status
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.ListResp'
+    post:
+      tags:
+        - user
+      summary: Create a user
+      operationId: user#create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAPI.ModifyUser'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.User'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.BadRequestError'
+  /users/{id}:
+    delete:
+      tags:
+        - user
+      summary: Delete a user
+      operationId: user#delete
+      parameters:
+        - name: id
+          in: path
+          description: ID of the user
+          required: true
+          schema:
+            type: string
+            description: ID of the user
+      responses:
+        '200':
+          description: OK response.
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.NotFoundError'
+    get:
+      tags:
+        - user
+      summary: Get a user
+      operationId: user#get
+      parameters:
+        - name: id
+          in: path
+          description: ID of the user
+          required: true
+          schema:
+            type: string
+            description: ID of the user
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.User'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.NotFoundError'
+    post:
+      tags:
+        - user
+      summary: Update a user
+      operationId: user#update
+      parameters:
+        - name: id
+          in: path
+          description: ID of the user
+          required: true
+          schema:
+            type: string
+            description: ID of the user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAPI.ModifyUser'
+      responses:
+        '200':
+          description: OK response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.User'
+        '400':
+          description: 'bad_request: Bad Request response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.BadRequestError'
+        '404':
+          description: 'not_found: Not Found response.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAPI.NotFoundError'
+components:
+  schemas:
+    APITokenAPI.APIToken:
+      type: object
+      properties:
+        allowedCIDRBlocks:
+          type: array
+          items:
+            type: string
+          description: The set of CIDR blocks that are allowed to use this API token. If empty, all CIDR blocks are allowed
+        createdAt:
+          type: string
+          description: Time when the API token was created
+        createdBy:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The actor who created the token
+        expiresAt:
+          type: string
+          description: Time when the API token will expire. Will be null if the token is non-expiring
+        id:
+          type: string
+          description: The unique identifier of the token
+        lastUsedAt:
+          type: string
+          description: The last time this token was used to authenticate
+        name:
+          type: string
+          description: The name of the token
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+              - AlertModify
+              - AlertRead
+              - BulkUpload
+              - BulkUploadValidate
+              - CloudsecSourceModify
+              - CloudsecSourceRead
+              - DataAnalyticsModify
+              - DataAnalyticsRead
+              - DestinationModify
+              - DestinationRead
+              - GeneralSettingsModify
+              - GeneralSettingsRead
+              - LogSourceModify
+              - LogSourceRawDataRead
+              - LogSourceRead
+              - LookupModify
+              - LookupRead
+              - OrganizationAPITokenModify
+              - OrganizationAPITokenRead
+              - PolicyModify
+              - PolicyRead
+              - ResourceModify
+              - ResourceRead
+              - RuleModify
+              - RuleRead
+              - RunPantherAI
+              - SummaryRead
+              - UserModify
+              - UserRead
+        rotatedAt:
+          type: string
+          description: Time when the API token was rotated
+        updatedAt:
+          type: string
+          description: Time when the API token was updated
+        updatedBy:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The actor who updated the token
+        value:
+          type: string
+          description: The API token value, only populated during create and rotate actions
+      required:
+        - name
+        - permissions
+        - id
+        - createdAt
+    APITokenAPI.BadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    APITokenAPI.ForbiddenErr:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    APITokenAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: Pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/APITokenAPI.APIToken'
+      required:
+        - results
+    APITokenAPI.ModifyAPIToken:
+      type: object
+      properties:
+        allowedCIDRBlocks:
+          type: array
+          items:
+            type: string
+          description: The set of CIDR blocks that are allowed to use this API token. If empty, all CIDR blocks are allowed
+        name:
+          type: string
+          description: The name of the token
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+              - AlertModify
+              - AlertRead
+              - BulkUpload
+              - BulkUploadValidate
+              - CloudsecSourceModify
+              - CloudsecSourceRead
+              - DataAnalyticsModify
+              - DataAnalyticsRead
+              - DestinationModify
+              - DestinationRead
+              - GeneralSettingsModify
+              - GeneralSettingsRead
+              - LogSourceModify
+              - LogSourceRawDataRead
+              - LogSourceRead
+              - LookupModify
+              - LookupRead
+              - OrganizationAPITokenModify
+              - OrganizationAPITokenRead
+              - PolicyModify
+              - PolicyRead
+              - ResourceModify
+              - ResourceRead
+              - RuleModify
+              - RuleRead
+              - RunPantherAI
+              - SummaryRead
+              - UserModify
+              - UserRead
+      required:
+        - name
+        - permissions
+    APITokenAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    AlertAPI.Alert:
+      type: object
+      properties:
+        assignee:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The Actor that is assigned to this alert
+        context:
+          description: The context of this alert
+        createdAt:
+          type: string
+          description: Date and time when the alert got created
+        deliveries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertAPI.Delivery'
+          description: The metadata around the alert's delivery attempts
+        detection:
+          $ref: '#/components/schemas/AlertAPI.DetectionInfo'
+        eventCount:
+          type: integer
+          description: The number of events that have been received for this alert
+          format: int64
+        firstEventOccurredAt:
+          type: string
+          description: Date and time of this alert's first event
+        id:
+          type: string
+          description: The unique identifier of this alert
+        lastReceivedEventAt:
+          type: string
+          description: Date and time that the last event related to this alert was received
+        runbook:
+          type: string
+          description: The runbook for this Alert, as extracted from its origin
+        severity:
+          type: string
+          description: The severity of this Alert
+          enum:
+            - CRITICAL
+            - HIGH
+            - MEDIUM
+            - LOW
+            - INFO
+        status:
+          type: string
+          description: The status of this Alert
+          enum:
+            - OPEN
+            - CLOSED
+            - TRIAGED
+            - RESOLVED
+        systemError:
+          $ref: '#/components/schemas/AlertAPI.SystemError'
+        title:
+          type: string
+          description: The title of this alert
+        type:
+          type: string
+          description: The type of this alert
+        updatedBy:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The Actor that last updated the state of this alert
+      required:
+        - id
+        - type
+        - status
+    AlertAPI.BadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    AlertAPI.BulkPatchAlertReq:
+      type: object
+      properties:
+        assignee:
+          type: string
+          description: The ID of the assignee for this alert
+        ids:
+          type: array
+          items:
+            type: string
+          description: The IDs of the alerts to patch
+        status:
+          type: string
+          description: The status of this Alert
+          enum:
+            - OPEN
+            - CLOSED
+            - TRIAGED
+            - RESOLVED
+      required:
+        - ids
+    AlertAPI.Delivery:
+      type: object
+      properties:
+        dispatchedAt:
+          type: string
+        label:
+          type: string
+          description: The label of the alert at where it was delivered (channel name/ID, jira ticket, asana issue, etc)
+        message:
+          type: string
+        outputId:
+          type: string
+        statusCode:
+          type: integer
+          format: int64
+        success:
+          type: boolean
+      required:
+        - dispatchedAt
+        - label
+        - message
+        - statusCode
+        - success
+        - outputId
+    AlertAPI.DetectionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The unique identifier of this Detection
+        type:
+          type: string
+          description: The type of this Detection
+          enum:
+            - RULE
+            - CORRELATION_RULE
+            - POLICY
+            - SCHEDULED_RULE
+    AlertAPI.ListEventsResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: Pagination token for the next page of results
+        results:
+          type: array
+          items: {}
+      required:
+        - results
+    AlertAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: Pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertAPI.Alert'
+      required:
+        - results
+    AlertAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    AlertAPI.PatchAlertReq:
+      type: object
+      properties:
+        assignee:
+          type: string
+          description: The ID of the assignee for this alert
+        status:
+          type: string
+          description: The status of this Alert
+          enum:
+            - OPEN
+            - CLOSED
+            - TRIAGED
+            - RESOLVED
+    AlertAPI.SystemError:
+      type: object
+      properties:
+        detection:
+          $ref: '#/components/schemas/AlertAPI.DetectionInfo'
+        sourceId:
+          type: string
+          description: The source ID of this SystemError
+        sourceType:
+          type: string
+          description: The source type of this SystemError
+        type:
+          type: string
+          description: The type of this SystemError
+    CommentAPI.BadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    CommentAPI.Comment:
+      type: object
+      properties:
+        alertId:
+          type: string
+          description: The alert ID the comment is associated with
+        body:
+          description: The body of the comment
+        createdAt:
+          type: string
+          description: The date the comment was created
+        createdBy:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The actor who created the comment
+        format:
+          type: string
+          description: The format of the comment
+          enum:
+            - PLAIN_TEXT
+            - HTML
+        id:
+          type: string
+          description: The comment ID
+        updatedAt:
+          type: string
+          description: The date the comment was updated
+        updatedBy:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The actor who updated the comment
+    CommentAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: Pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommentAPI.Comment'
+      required:
+        - results
+    CommentAPI.ModifyCommentReq:
+      type: object
+      properties:
+        alertId:
+          type: string
+          description: The alert ID the comment is associated with
+        body:
+          type: string
+          description: The body of the comment
+        format:
+          type: string
+          description: The format of the comment
+          enum:
+            - PLAIN_TEXT
+            - HTML
+      required:
+        - alertId
+        - body
+        - format
+    CommentAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    DataModelAPI.BadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    DataModelAPI.DataModel:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the data model
+        createdAt:
+          type: string
+        description:
+          type: string
+          description: The description of the data model
+        displayName:
+          type: string
+          description: The name used for the data model
+        enabled:
+          type: boolean
+          description: enables/disables a data model
+        id:
+          type: string
+          description: The id of the data model
+        lastModified:
+          type: string
+        logTypes:
+          type: array
+          items:
+            type: string
+          description: 'The log type this data model should associate to. NOTE: only one data model can be assigned to a log type'
+        mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataModelAPI.DataModelMapping'
+    DataModelAPI.DataModelMapping:
+      type: object
+      properties:
+        method:
+          type: string
+          description: the python function name that should be called
+        name:
+          type: string
+          description: the name of the mapping
+        path:
+          type: string
+          description: the json path
+      required:
+        - name
+    DataModelAPI.ExistsError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    DataModelAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataModelAPI.DataModel'
+    DataModelAPI.ModifyDataModel:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the data model
+        description:
+          type: string
+          description: The description of the data model
+        displayName:
+          type: string
+          description: The name used for the data model
+        enabled:
+          type: boolean
+          description: enables/disables a data model
+        id:
+          type: string
+          description: The id of the data model
+        logTypes:
+          type: array
+          items:
+            type: string
+          description: 'The log type this data model should associate to. NOTE: only one data model can be assigned to a log type'
+        mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataModelAPI.DataModelMapping'
+      required:
+        - id
+    DataModelAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    GlobalAPI.BadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    GlobalAPI.ExistsError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    GlobalAPI.Global:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the global
+        createdAt:
+          type: string
+        description:
+          type: string
+          description: The description of the global
+        id:
+          type: string
+          description: The id of the global
+        lastModified:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the global
+    GlobalAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlobalAPI.Global'
+    GlobalAPI.ModifyGlobal:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the global
+        description:
+          type: string
+          description: The description of the global
+        id:
+          type: string
+          description: The id of the global
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the global
+      required:
+        - id
+        - body
+    GlobalAPI.ModifyGlobal2:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the global
+        description:
+          type: string
+          description: The description of the global
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the global
+      required:
+        - body
+    GlobalAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    GlobalAPI.PutGlobalResp:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/GlobalAPI.Global'
+    HttpSourceAPI.BadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    HttpSourceAPI.ExistsError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    HttpSourceAPI.HTTPSource:
+      type: object
+      properties:
+        authBearerToken:
+          type: string
+          description: The authentication bearer token value of the http source. Used for Bearer auth method
+        authHeaderKey:
+          type: string
+          description: The authentication header key of the http source. Used for HMAC and SharedSecret auth methods
+        authHmacAlg:
+          type: string
+          description: The authentication algorithm of the http source. Used for HMAC auth method
+        authMethod:
+          type: string
+          description: The authentication method of the http source
+          enum:
+            - SharedSecret
+            - HMAC
+            - Bearer
+            - Basic
+            - None
+        authPassword:
+          type: string
+          description: The authentication header password of the http source. Used for Basic auth method
+        authSecretValue:
+          type: string
+          description: The authentication header secret value of the http source. Used for HMAC and SharedSecret auth methods
+        authUsername:
+          type: string
+          description: The authentication header username of the http source. Used for Basic auth method
+        integrationId:
+          type: string
+          description: The id of the http source
+        integrationLabel:
+          type: string
+          description: The integration label (name)
+        logStreamType:
+          type: string
+          description: The log stream type
+          enum:
+            - Auto
+            - CloudWatchLogs
+            - JSON
+            - JsonArray
+            - Lines
+        logStreamTypeOptions:
+          $ref: '#/components/schemas/HttpSourceAPI.LogStreamTypeOptions'
+        logTypes:
+          type: array
+          items:
+            type: string
+          description: The log types of the integration
+    HttpSourceAPI.LogStreamTypeOptions:
+      type: object
+      properties:
+        jsonArrayEnvelopeField:
+          type: string
+          description: Path to the array value to extract elements from, only applicable if logStreamType is JsonArray. Leave empty if the input JSON is an array itself
+    HttpSourceAPI.ModifyHTTPSource:
+      type: object
+      properties:
+        authBearerToken:
+          type: string
+          description: The authentication bearer token value of the http source. Used for Bearer auth method
+        authHeaderKey:
+          type: string
+          description: The authentication header key of the http source. Used for HMAC and SharedSecret auth methods
+        authHmacAlg:
+          type: string
+          description: The authentication algorithm of the http source. Used for HMAC auth method
+        authMethod:
+          type: string
+          description: The authentication method of the http source
+          enum:
+            - SharedSecret
+            - HMAC
+            - Bearer
+            - Basic
+            - None
+        authPassword:
+          type: string
+          description: The authentication header password of the http source. Used for Basic auth method
+        authSecretValue:
+          type: string
+          description: The authentication header secret value of the http source. Used for HMAC and SharedSecret auth methods
+        authUsername:
+          type: string
+          description: The authentication header username of the http source. Used for Basic auth method
+        integrationLabel:
+          type: string
+          description: The integration label (name)
+        logStreamType:
+          type: string
+          description: The log stream type
+          enum:
+            - Auto
+            - CloudWatchLogs
+            - JSON
+            - JsonArray
+            - Lines
+        logStreamTypeOptions:
+          $ref: '#/components/schemas/HttpSourceAPI.LogStreamTypeOptions'
+        logTypes:
+          type: array
+          items:
+            type: string
+          description: The log types of the integration
+      required:
+        - integrationLabel
+        - logTypes
+        - logStreamType
+        - authMethod
+    HttpSourceAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    HttpSourceAPI.ServiceError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    PolicyAPI.BadRequestWithTestResultsErr:
+      type: object
+      properties:
+        message:
+          type: string
+        testResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyAPI.TestDetectionRecord'
+      required:
+        - message
+    PolicyAPI.ExistsError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    PolicyAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyAPI.Policy'
+    PolicyAPI.ModifyPolicy:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the policy
+        description:
+          type: string
+          description: The description of the policy
+        displayName:
+          type: string
+          description: The display name of the policy
+        enabled:
+          type: boolean
+          description: Determines whether or not the policy is active
+        id:
+          type: string
+          description: The id of the policy
+        managed:
+          type: boolean
+          description: Determines if the policy is managed by panther
+        reports:
+          type: object
+          description: Reports
+          additionalProperties:
+            items:
+              type: string
+            type: array
+        resourceTypes:
+          type: array
+          items:
+            type: string
+          description: Resource types
+        severity:
+          type: string
+          enum:
+            - INFO
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+        suppressions:
+          type: array
+          items:
+            type: string
+          description: Resources to ignore via a pattern that matches the resource id
+          example:
+            - aws::s3::*
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the policy
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyAPI.UnitTest'
+          description: Unit tests for the Policy. Best practice is to include a positive and negative case
+      required:
+        - id
+        - body
+        - severity
+    PolicyAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    PolicyAPI.Policy:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the policy
+        createdAt:
+          type: string
+        description:
+          type: string
+          description: The description of the policy
+        displayName:
+          type: string
+          description: The display name of the policy
+        enabled:
+          type: boolean
+          description: Determines whether or not the policy is active
+        id:
+          type: string
+          description: The id of the policy
+        lastModified:
+          type: string
+        managed:
+          type: boolean
+          description: Determines if the policy is managed by panther
+        reports:
+          type: object
+          description: Reports
+          additionalProperties:
+            items:
+              type: string
+            type: array
+        resourceTypes:
+          type: array
+          items:
+            type: string
+          description: Resource types
+        severity:
+          type: string
+          enum:
+            - INFO
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+        suppressions:
+          type: array
+          items:
+            type: string
+          description: Resources to ignore via a pattern that matches the resource id
+          example:
+            - aws::s3::*
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the policy
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyAPI.UnitTest'
+          description: Unit tests for the Policy. Best practice is to include a positive and negative case
+    PolicyAPI.TestDetectionRecord:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/PolicyAPI.TestErr'
+        errored:
+          type: boolean
+        functions:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionRecordFunctions'
+        name:
+          type: string
+        passed:
+          type: boolean
+        triggerAlert:
+          type: boolean
+    PolicyAPI.TestDetectionRecordFunctions:
+      type: object
+      properties:
+        alertContext:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionSubRecord'
+        dedup:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionSubRecord'
+        description:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionSubRecord'
+        destinations:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionSubRecord'
+        detection:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionSubRecord'
+        reference:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionSubRecord'
+        runbook:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionSubRecord'
+        severity:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionSubRecord'
+        title:
+          $ref: '#/components/schemas/PolicyAPI.TestDetectionSubRecord'
+    PolicyAPI.TestDetectionSubRecord:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/PolicyAPI.TestErr'
+        output:
+          type: string
+    PolicyAPI.TestErr:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    PolicyAPI.UnitTest:
+      type: object
+      properties:
+        expectedResult:
+          type: boolean
+          description: The expected result
+        mocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyAPI.UnitTestMock'
+          description: mocks
+        name:
+          type: string
+          description: name
+        resource:
+          type: string
+          description: resource
+      required:
+        - name
+        - resource
+        - expectedResult
+    PolicyAPI.UnitTestMock:
+      type: object
+      additionalProperties:
+        type: string
+    QueryAPI.BadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    QueryAPI.ExistsError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    QueryAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: Pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueryAPI.Query'
+    QueryAPI.ModifyQuery:
+      type: object
+      properties:
+        description:
+          type: string
+          description: The description of the query
+        name:
+          type: string
+          description: The name of the query
+        schedule:
+          $ref: '#/components/schemas/QueryAPI.Schedule'
+        sql:
+          type: string
+          description: The raw sql of the query
+      required:
+        - sql
+        - name
+    QueryAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    QueryAPI.Query:
+      type: object
+      properties:
+        createdAt:
+          type: string
+        description:
+          type: string
+          description: The description of the query
+        id:
+          type: string
+          description: The generated ID of the query
+        managed:
+          type: boolean
+          description: Determines if the query is managed by panther
+        name:
+          type: string
+          description: The name of the query
+        schedule:
+          $ref: '#/components/schemas/QueryAPI.Schedule'
+        sql:
+          type: string
+          description: The raw sql of the query
+        updatedAt:
+          type: string
+    QueryAPI.Schedule:
+      type: object
+      properties:
+        cron:
+          type: string
+          description: The cron expression
+        disabled:
+          type: boolean
+          description: Disable the schedule
+        rateMinutes:
+          type: integer
+          format: int64
+        timeoutMinutes:
+          type: integer
+          format: int64
+    RoleAPI.BadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    RoleAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: Pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleAPI.Role'
+      required:
+        - results
+    RoleAPI.ModifyRole:
+      type: object
+      properties:
+        logTypeAccess:
+          type: array
+          items:
+            type: string
+          description: The log types that the role can or cannot access, according to the `logTypeAccessKind` field. This field should be omitted if `logTypeAccessKind` has a value of `ALLOW_ALL` or `DENY_ALL`
+        logTypeAccessKind:
+          type: string
+          description: Defines the role's access to log types. This field is required and has effect only if the datalake RBAC feature is enabled.
+          enum:
+            - ALLOW
+            - ALLOW_ALL
+            - DENY
+            - DENY_ALL
+        name:
+          type: string
+          description: The name of the role
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+              - AlertModify
+              - AlertRead
+              - BulkUpload
+              - BulkUploadValidate
+              - CloudsecSourceModify
+              - CloudsecSourceRead
+              - DataAnalyticsModify
+              - DataAnalyticsRead
+              - DestinationModify
+              - DestinationRead
+              - GeneralSettingsModify
+              - GeneralSettingsRead
+              - LogSourceModify
+              - LogSourceRawDataRead
+              - LogSourceRead
+              - LookupModify
+              - LookupRead
+              - OrganizationAPITokenModify
+              - OrganizationAPITokenRead
+              - PolicyModify
+              - PolicyRead
+              - ResourceModify
+              - ResourceRead
+              - RuleModify
+              - RuleRead
+              - RunPantherAI
+              - SummaryRead
+              - UserModify
+              - UserRead
+      required:
+        - name
+        - permissions
+    RoleAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    RoleAPI.Role:
+      type: object
+      properties:
+        createdAt:
+          type: string
+        id:
+          type: string
+          description: ID of the role
+        logTypeAccess:
+          type: array
+          items:
+            type: string
+          description: The log types that the role can or cannot access, according to the `logTypeAccessKind` field. This field should be omitted if `logTypeAccessKind` has a value of `ALLOW_ALL` or `DENY_ALL`
+        logTypeAccessKind:
+          type: string
+          description: Defines the role's access to log types. This field is required and has effect only if the datalake RBAC feature is enabled.
+          enum:
+            - ALLOW
+            - ALLOW_ALL
+            - DENY
+            - DENY_ALL
+        name:
+          type: string
+          description: The name of the role
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+              - AlertModify
+              - AlertRead
+              - BulkUpload
+              - BulkUploadValidate
+              - CloudsecSourceModify
+              - CloudsecSourceRead
+              - DataAnalyticsModify
+              - DataAnalyticsRead
+              - DestinationModify
+              - DestinationRead
+              - GeneralSettingsModify
+              - GeneralSettingsRead
+              - LogSourceModify
+              - LogSourceRawDataRead
+              - LogSourceRead
+              - LookupModify
+              - LookupRead
+              - OrganizationAPITokenModify
+              - OrganizationAPITokenRead
+              - PolicyModify
+              - PolicyRead
+              - ResourceModify
+              - ResourceRead
+              - RuleModify
+              - RuleRead
+              - RunPantherAI
+              - SummaryRead
+              - UserModify
+              - UserRead
+        updatedAt:
+          type: string
+      required:
+        - name
+        - permissions
+        - logTypeAccessKind
+    RuleAPI.BadRequestWithTestResultsErr:
+      type: object
+      properties:
+        message:
+          type: string
+        testResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleAPI.TestDetectionRecord'
+      required:
+        - message
+    RuleAPI.ExistsError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    RuleAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleAPI.Rule'
+    RuleAPI.ModifyRule:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the rule
+        dedupPeriodMinutes:
+          type: integer
+          description: The amount of time in minutes for grouping alerts
+          default: 60
+          format: int64
+          minimum: 1
+        description:
+          type: string
+          description: The description of the rule
+        displayName:
+          type: string
+          description: The display name of the rule
+        enabled:
+          type: boolean
+          description: Determines whether or not the rule is active
+        id:
+          type: string
+          description: The id of the rule
+        inlineFilters:
+          type: string
+          description: The filter for the rule represented in YAML
+        logTypes:
+          type: array
+          items:
+            type: string
+          description: log types
+        managed:
+          type: boolean
+          description: Determines if the rule is managed by panther
+        reports:
+          type: object
+          description: reports
+          additionalProperties:
+            items:
+              type: string
+            type: array
+        runbook:
+          type: string
+          description: How to handle the generated alert
+        severity:
+          type: string
+          enum:
+            - INFO
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+        summaryAttributes:
+          type: array
+          items:
+            type: string
+          description: A list of fields in the event to create top 5 summaries for
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the rule
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleAPI.UnitTest'
+          description: Unit tests for the Rule. Best practice is to include a positive and negative case
+        threshold:
+          type: integer
+          description: the number of events that must match before an alert is triggered
+          default: 1
+          format: int64
+          minimum: 1
+      required:
+        - id
+        - body
+        - severity
+    RuleAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    RuleAPI.Rule:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the rule
+        createdAt:
+          type: string
+        dedupPeriodMinutes:
+          type: integer
+          description: The amount of time in minutes for grouping alerts
+          default: 60
+          format: int64
+          minimum: 1
+        description:
+          type: string
+          description: The description of the rule
+        displayName:
+          type: string
+          description: The display name of the rule
+        enabled:
+          type: boolean
+          description: Determines whether or not the rule is active
+        id:
+          type: string
+          description: The id of the rule
+        inlineFilters:
+          type: string
+          description: The filter for the rule represented in YAML
+        lastModified:
+          type: string
+        logTypes:
+          type: array
+          items:
+            type: string
+          description: log types
+        managed:
+          type: boolean
+          description: Determines if the rule is managed by panther
+        reports:
+          type: object
+          description: reports
+          additionalProperties:
+            items:
+              type: string
+            type: array
+        runbook:
+          type: string
+          description: How to handle the generated alert
+        severity:
+          type: string
+          enum:
+            - INFO
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+        summaryAttributes:
+          type: array
+          items:
+            type: string
+          description: A list of fields in the event to create top 5 summaries for
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the rule
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleAPI.UnitTest'
+          description: Unit tests for the Rule. Best practice is to include a positive and negative case
+        threshold:
+          type: integer
+          description: the number of events that must match before an alert is triggered
+          default: 1
+          format: int64
+          minimum: 1
+    RuleAPI.TestDetectionRecord:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/RuleAPI.TestErr'
+        errored:
+          type: boolean
+        functions:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionRecordFunctions'
+        name:
+          type: string
+        passed:
+          type: boolean
+        triggerAlert:
+          type: boolean
+    RuleAPI.TestDetectionRecordFunctions:
+      type: object
+      properties:
+        alertContext:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionSubRecord'
+        dedup:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionSubRecord'
+        description:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionSubRecord'
+        destinations:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionSubRecord'
+        detection:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionSubRecord'
+        reference:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionSubRecord'
+        runbook:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionSubRecord'
+        severity:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionSubRecord'
+        title:
+          $ref: '#/components/schemas/RuleAPI.TestDetectionSubRecord'
+    RuleAPI.TestDetectionSubRecord:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/RuleAPI.TestErr'
+        output:
+          type: string
+    RuleAPI.TestErr:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    RuleAPI.UnitTest:
+      type: object
+      properties:
+        expectedResult:
+          type: boolean
+          description: The expected result
+        mocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleAPI.UnitTestMock'
+          description: mocks
+        name:
+          type: string
+          description: name
+        resource:
+          type: string
+          description: resource
+      required:
+        - name
+        - resource
+        - expectedResult
+    RuleAPI.UnitTestMock:
+      type: object
+      additionalProperties:
+        type: string
+    ScheduledRuleAPI.BadRequestWithTestResultsErr:
+      type: object
+      properties:
+        message:
+          type: string
+        testResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionRecord'
+      required:
+        - message
+    ScheduledRuleAPI.ExistsError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    ScheduledRuleAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduledRuleAPI.ScheduledRule'
+    ScheduledRuleAPI.ModifyRule:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the scheduled rule
+        dedupPeriodMinutes:
+          type: integer
+          description: The amount of time in minutes for grouping alerts
+          default: 60
+          format: int64
+          minimum: 1
+        description:
+          type: string
+          description: The description of the scheduled rule
+        displayName:
+          type: string
+          description: The display name of the scheduled rule
+        enabled:
+          type: boolean
+          description: Determines whether or not the scheduled rule is active
+        id:
+          type: string
+          description: The id of the scheduled rule
+        managed:
+          type: boolean
+          description: Determines if the scheduled rule is managed by panther
+        reports:
+          type: object
+          description: reports
+          additionalProperties:
+            items:
+              type: string
+            type: array
+        runbook:
+          type: string
+          description: How to handle the generated alert
+        scheduledQueries:
+          type: array
+          items:
+            type: string
+          description: the queries that this scheduled rule utilizes
+        severity:
+          type: string
+          enum:
+            - INFO
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+        summaryAttributes:
+          type: array
+          items:
+            type: string
+          description: A list of fields in the event to create top 5 summaries for
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the scheduled rule
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduledRuleAPI.UnitTest'
+          description: Unit tests for the Rule. Best practice is to include a positive and negative case
+        threshold:
+          type: integer
+          description: the number of events that must match before an alert is triggered
+          default: 1
+          format: int64
+          minimum: 1
+      required:
+        - id
+        - body
+        - severity
+    ScheduledRuleAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    ScheduledRuleAPI.ScheduledRule:
+      type: object
+      properties:
+        body:
+          type: string
+          description: The python body of the scheduled rule
+        createdAt:
+          type: string
+        dedupPeriodMinutes:
+          type: integer
+          description: The amount of time in minutes for grouping alerts
+          default: 60
+          format: int64
+          minimum: 1
+        description:
+          type: string
+          description: The description of the scheduled rule
+        displayName:
+          type: string
+          description: The display name of the scheduled rule
+        enabled:
+          type: boolean
+          description: Determines whether or not the scheduled rule is active
+        id:
+          type: string
+          description: The id of the scheduled rule
+        lastModified:
+          type: string
+        managed:
+          type: boolean
+          description: Determines if the scheduled rule is managed by panther
+        reports:
+          type: object
+          description: reports
+          additionalProperties:
+            items:
+              type: string
+            type: array
+        runbook:
+          type: string
+          description: How to handle the generated alert
+        scheduledQueries:
+          type: array
+          items:
+            type: string
+          description: the queries that this scheduled rule utilizes
+        severity:
+          type: string
+          enum:
+            - INFO
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+        summaryAttributes:
+          type: array
+          items:
+            type: string
+          description: A list of fields in the event to create top 5 summaries for
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the scheduled rule
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduledRuleAPI.UnitTest'
+          description: Unit tests for the Rule. Best practice is to include a positive and negative case
+        threshold:
+          type: integer
+          description: the number of events that must match before an alert is triggered
+          default: 1
+          format: int64
+          minimum: 1
+    ScheduledRuleAPI.TestDetectionRecord:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestErr'
+        errored:
+          type: boolean
+        functions:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionRecordFunctions'
+        name:
+          type: string
+        passed:
+          type: boolean
+        triggerAlert:
+          type: boolean
+    ScheduledRuleAPI.TestDetectionRecordFunctions:
+      type: object
+      properties:
+        alertContext:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionSubRecord'
+        dedup:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionSubRecord'
+        description:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionSubRecord'
+        destinations:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionSubRecord'
+        detection:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionSubRecord'
+        reference:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionSubRecord'
+        runbook:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionSubRecord'
+        severity:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionSubRecord'
+        title:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestDetectionSubRecord'
+    ScheduledRuleAPI.TestDetectionSubRecord:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ScheduledRuleAPI.TestErr'
+        output:
+          type: string
+    ScheduledRuleAPI.TestErr:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    ScheduledRuleAPI.UnitTest:
+      type: object
+      properties:
+        expectedResult:
+          type: boolean
+          description: The expected result
+        mocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduledRuleAPI.UnitTestMock'
+          description: mocks
+        name:
+          type: string
+          description: name
+        resource:
+          type: string
+          description: resource
+      required:
+        - name
+        - resource
+        - expectedResult
+    ScheduledRuleAPI.UnitTestMock:
+      type: object
+      additionalProperties:
+        type: string
+    SimpleRuleAPI.BadRequestWithTestResultsErr:
+      type: object
+      properties:
+        message:
+          type: string
+        testResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionRecord'
+      required:
+        - message
+    SimpleRuleAPI.ExistsError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    SimpleRuleAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleRuleAPI.SimpleRule'
+    SimpleRuleAPI.ModifyRule:
+      type: object
+      properties:
+        alertContext:
+          type: string
+          description: The alert context represented in YAML
+        alertTitle:
+          type: string
+          description: The alert title represented in YAML
+        dedupPeriodMinutes:
+          type: integer
+          description: The amount of time in minutes for grouping alerts
+          default: 60
+          format: int64
+          minimum: 1
+        description:
+          type: string
+          description: The description of the rule
+        detection:
+          type: string
+          description: The yaml representation of the rule
+        displayName:
+          type: string
+          description: The display name of the rule
+        dynamicSeverities:
+          type: string
+          description: The dynamic severity represented in YAML
+        enabled:
+          type: boolean
+          description: Determines whether or not the rule is active
+        groupBy:
+          type: string
+          description: The key on an event to group by represented in YAML
+        id:
+          type: string
+          description: The id of the rule
+        inlineFilters:
+          type: string
+          description: The filter for the rule represented in YAML
+        logTypes:
+          type: array
+          items:
+            type: string
+          description: log types
+        managed:
+          type: boolean
+          description: Determines if the simple rule is managed by panther
+        pythonBody:
+          type: string
+          description: The python body of the rule
+        reports:
+          type: object
+          description: reports
+          additionalProperties:
+            items:
+              type: string
+            type: array
+        runbook:
+          type: string
+          description: How to handle the generated alert
+        severity:
+          type: string
+          enum:
+            - INFO
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+        summaryAttributes:
+          type: array
+          items:
+            type: string
+          description: A list of fields in the event to create top 5 summaries for
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the simple rule
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleRuleAPI.UnitTest'
+          description: Unit tests for the Rule. Best practice is to include a positive and negative case
+        threshold:
+          type: integer
+          description: the number of events that must match before an alert is triggered
+          default: 1
+          format: int64
+          minimum: 1
+      required:
+        - id
+        - detection
+        - severity
+    SimpleRuleAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    SimpleRuleAPI.SimpleRule:
+      type: object
+      properties:
+        alertContext:
+          type: string
+          description: The alert context represented in YAML
+        alertTitle:
+          type: string
+          description: The alert title represented in YAML
+        createdAt:
+          type: string
+        dedupPeriodMinutes:
+          type: integer
+          description: The amount of time in minutes for grouping alerts
+          default: 60
+          format: int64
+          minimum: 1
+        description:
+          type: string
+          description: The description of the rule
+        detection:
+          type: string
+          description: The yaml representation of the rule
+        displayName:
+          type: string
+          description: The display name of the rule
+        dynamicSeverities:
+          type: string
+          description: The dynamic severity represented in YAML
+        enabled:
+          type: boolean
+          description: Determines whether or not the rule is active
+        groupBy:
+          type: string
+          description: The key on an event to group by represented in YAML
+        id:
+          type: string
+          description: The id of the rule
+        inlineFilters:
+          type: string
+          description: The filter for the rule represented in YAML
+        lastModified:
+          type: string
+        logTypes:
+          type: array
+          items:
+            type: string
+          description: log types
+        managed:
+          type: boolean
+          description: Determines if the simple rule is managed by panther
+        pythonBody:
+          type: string
+          description: The python body of the rule
+        reports:
+          type: object
+          description: reports
+          additionalProperties:
+            items:
+              type: string
+            type: array
+        runbook:
+          type: string
+          description: How to handle the generated alert
+        severity:
+          type: string
+          enum:
+            - INFO
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+        summaryAttributes:
+          type: array
+          items:
+            type: string
+          description: A list of fields in the event to create top 5 summaries for
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags for the simple rule
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleRuleAPI.UnitTest'
+          description: Unit tests for the Rule. Best practice is to include a positive and negative case
+        threshold:
+          type: integer
+          description: the number of events that must match before an alert is triggered
+          default: 1
+          format: int64
+          minimum: 1
+    SimpleRuleAPI.TestDetectionRecord:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestErr'
+        errored:
+          type: boolean
+        functions:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionRecordFunctions'
+        name:
+          type: string
+        passed:
+          type: boolean
+        triggerAlert:
+          type: boolean
+    SimpleRuleAPI.TestDetectionRecordFunctions:
+      type: object
+      properties:
+        alertContext:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionSubRecord'
+        dedup:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionSubRecord'
+        description:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionSubRecord'
+        destinations:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionSubRecord'
+        detection:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionSubRecord'
+        reference:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionSubRecord'
+        runbook:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionSubRecord'
+        severity:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionSubRecord'
+        title:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestDetectionSubRecord'
+    SimpleRuleAPI.TestDetectionSubRecord:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/SimpleRuleAPI.TestErr'
+        output:
+          type: string
+    SimpleRuleAPI.TestErr:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    SimpleRuleAPI.UnitTest:
+      type: object
+      properties:
+        expectedResult:
+          type: boolean
+          description: The expected result
+        mocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleRuleAPI.UnitTestMock'
+          description: mocks
+        name:
+          type: string
+          description: name
+        resource:
+          type: string
+          description: resource
+      required:
+        - name
+        - resource
+        - expectedResult
+    SimpleRuleAPI.UnitTestMock:
+      type: object
+      additionalProperties:
+        type: string
+    UserAPI.BadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    UserAPI.ListResp:
+      type: object
+      properties:
+        next:
+          type: string
+          description: Pagination token for the next page of results
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserAPI.User'
+      required:
+        - results
+    UserAPI.ModifyUser:
+      type: object
+      properties:
+        email:
+          type: string
+          description: The email address of the user
+        familyName:
+          type: string
+          description: The family/last name of the user
+        givenName:
+          type: string
+          description: The given/first name of the user
+        role:
+          $ref: '#/components/schemas/UserAPI.Role'
+      required:
+        - email
+        - givenName
+        - familyName
+        - role
+    UserAPI.NotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    UserAPI.Role:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 'The id of the role. Note: id should be excluded if name is provided during a modify operation'
+        name:
+          type: string
+          description: 'The name of the role. Note: name should be excluded if id is provided during a modify operation'
+    UserAPI.User:
+      type: object
+      properties:
+        createdAt:
+          type: string
+        email:
+          type: string
+          description: The email address of the user
+        enabled:
+          type: boolean
+          description: Whether the user is active or deactivated
+        familyName:
+          type: string
+          description: The family/last name of the user
+        givenName:
+          type: string
+          description: The given/first name of the user
+        id:
+          type: string
+          description: ID of the user
+        lastLoggedInAt:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserAPI.Role'
+        status:
+          type: string
+          description: The Cognito auth-related status of this User
+      required:
+        - email
+        - givenName
+        - familyName
+        - role
+        - enabled
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      name: X-API-Key
+      in: header
+tags:
+  - name: alert
+    description: The alert api handles all operations for alerts
+  - name: comment
+    description: The comment api handles all operations for alerts comments
+  - name: data model
+    description: The data model api handles all operations for data models
+  - name: global
+    description: The global api handles all operations for globals
+  - name: policy
+    description: The policy api handles all operations for policies
+  - name: query
+    description: The query api handles operations for queries
+  - name: rule
+    description: The rule api handles all operations for rules
+  - name: scheduled rule
+    description: The scheduled rule api handles all operations for scheduled rules
+  - name: simple rule
+    description: The simple rule api handles all operations for simple rules
+  - name: http source
+    description: The http source api handles all operations for http sources
+  - name: api token
+    description: The api token api handles all operations for api tokens
+  - name: role
+    description: The role api handles all operations for roles
+  - name: user
+    description: The user api handles all operations for users
+security:
+  - ApiKeyAuth: []

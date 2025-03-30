@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+1. ALWAYS ENSURE COMPLIANCE WITH [panther.graphql](mdc:.prd/resources/panther.graphql) WHEN IMPLEMENTING GRAPHQL ENDPOINTS
+2. OR ALWAYS ENSURE COMPLIANCE WITH [panther_open_api_v3_spec.yaml](mdc:.prd/resources/panther_open_api_v3_spec.yaml) WHEN IMPLEMENTING REST ENDPOINTS

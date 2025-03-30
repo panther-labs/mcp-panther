@@ -1,0 +1,3578 @@
+# Copyright (C) 2022 Panther Labs, Inc.
+#
+# The Panther SaaS is licensed under the terms of the Panther Enterprise Subscription
+# Agreement available at https://panther.com/enterprise-subscription-agreement/.
+# All intellectual property rights in and to the Panther SaaS, including any and all
+# rights to access the Panther SaaS, are governed by the Panther Enterprise Subscription Agreement.
+
+"""
+Used to poll response stream.
+"""
+type AIInferenceStream {
+  """
+  This is set on errors with a useful message
+  """
+  error: String
+
+  """
+  If true, there is no more data
+  """
+  finished: Boolean!
+
+  """
+  AI analysis
+  """
+  responseText: String!
+
+  """
+  The id of the stream where inference responses are written
+  """
+  streamId: ID!
+}
+
+"""
+Request an AI summary for an alert.
+"""
+input AISummarizeAlertInput {
+  """
+  The alert to summarize
+  """
+  alertId: ID!
+
+  """
+  If provided, add this AI summary to the associated conversation
+  """
+  conversationId: ID
+
+  """
+  Caller context
+  """
+  metadata: AISummarizeMetadata
+
+  """
+  The requested output length
+  """
+  outputLength: OutputLength = medium
+
+  """
+  Additional optional prompt to append for added context
+  """
+  prompt: String
+
+  """
+  If true, do not add alert meta data to prompt
+  """
+  skipAlert: Boolean
+
+  """
+  If true, do not add alert comments to prompt
+  """
+  skipAlertComments: Boolean
+
+  """
+  If true, do not add alert events to prompt
+  """
+  skipAlertEvents: Boolean
+}
+
+"""
+Kinds of AI summaries
+"""
+enum AISummarizeKind {
+  """
+  Analyzing a single alert
+  """
+  alert
+
+  """
+  Analyzing an alert listing
+  """
+  alertList
+
+  """
+  Generating a detection tests
+  """
+  detectionTests
+
+  """
+  Analyzing a set of events
+  """
+  events
+
+  """
+  System overview analysis
+  """
+  overview
+
+  """
+  Analyzing a set of query results
+  """
+  queryResults
+}
+
+"""
+Request an AI summary for logs.
+"""
+input AISummarizeLogEventsInput {
+  """
+  If provided, add this AI summary to the associated conversation
+  """
+  conversationId: ID
+
+  """
+  Events to analyze as an array of JSON strings
+  """
+  events: [String!]!
+
+  """
+  Caller context
+  """
+  metadata: AISummarizeMetadata
+
+  """
+  The requested output length
+  """
+  outputLength: OutputLength = large
+
+  """
+  Additional optional prompt to append for added context
+  """
+  prompt: String
+}
+
+"""
+Returns the stream id for polling.
+"""
+type AISummarizeLogEventsOutput {
+  """
+  The id of the stream where inference responses will be written
+  """
+  streamId: ID!
+}
+
+"""
+Describe the context of the caller
+"""
+input AISummarizeMetadata {
+  """
+  The kind of AI request
+  """
+  kind: AISummarizeKind
+
+  """
+  The page of the caller
+  """
+  page: String
+}
+
+"""
+The metadata of an API token that can act upon Panther resources.
+"""
+type APIToken {
+  """
+  The set of CIDR blocks that are allowed to use this API token. If empty, all CIDR blocks are allowed.
+  """
+  allowedCIDRBlocks: [String!]!
+
+  """
+  Date and time when the API token got created
+  """
+  createdAt: DateTime!
+
+  """
+  The physical User that created this API token
+  """
+  createdBy: User!
+
+  """
+  Date and time when the API token will expire. Will be `null` if the token is non-expiring.
+  """
+  expiresAt: DateTime
+
+  """
+  The unique identifier of this token
+  """
+  id: ID!
+
+  """
+  The last time this token was used to authenticate
+  """
+  lastUsedAt: DateTime
+
+  """
+  The name given to this token during its creation
+  """
+  name: String!
+
+  """
+  The set of permissions associated with this token
+  """
+  permissions: [Permission!]!
+
+  """
+  Date and time when the API token last got rotated, if applicable
+  """
+  rotatedAt: DateTime
+
+  """
+  Date and time when the API token last got rotated, if applicable
+  """
+  rotatedBy: Actor
+
+  """
+  Date and time when the API token last got updated
+  """
+  updatedAt: DateTime
+
+  """
+  The physical User that last updated this API token
+  """
+  updatedBy: User
+
+  """
+  The API token value, only populated during create and rotate actions
+  """
+  value: String
+}
+
+"""
+Scan configuration options
+"""
+type AWSScanConfig {
+  """
+  The role used to scan the AWS Account
+  """
+  auditRole: String!
+}
+
+"""
+Input for updating the AWS Scan Config
+"""
+input AWSScanConfigInput {
+  auditRole: String!
+}
+
+"""
+An Actor is an entity that performs a CRUD operation in Panther
+"""
+union Actor = APIToken | User
+
+"""
+Metadata about an actor in the environment
+"""
+type ActorProfile {
+  addresses: [Address!]
+  departments: [String!]
+  displayNames: [String!]
+  emails: [String!]
+  employmentStatus: [String!]
+  entityId: String!
+  firstObservedAt: DateTime
+  jobTitles: [String!]
+  lastLoginAt: DateTime
+  managers: [String!]
+  organizations: [String!]
+  phones: [String!]
+  usernames: [String!]
+}
+
+"""
+A physical address object, typically for an ActorProfile
+"""
+type Address {
+  city: String!
+  countryCode: String!
+  postalCode: String!
+  region: String!
+  streetAddress: String!
+}
+
+"""
+The metadata around an Alert
+"""
+type Alert {
+  """
+  The User assigned to the Alert.  If null, the alert is "unassigned"
+  """
+  assignee: User
+
+  """
+  Date and time when the Alert got created
+  """
+  createdAt: DateTime!
+
+  """
+  The metadata around the alert's delivery attempts
+  """
+  deliveries: [AlertDelivery]!
+
+  """
+  The type of this Alert, as extracted from its origin
+  """
+  description: String!
+
+  """
+  Alert events
+  """
+  events(input: AlertEventsInput): AlertEventsOutput
+
+  """
+  Date and time of this alert's first event
+  """
+  firstEventOccurredAt: DateTime
+
+  """
+  The unique identifier of this Alert
+  """
+  id: ID!
+
+  """
+  Date and time that the last event related to this Alert was received
+  """
+  lastReceivedEventAt: DateTime!
+
+  """
+  The Panther entity that generated (triggered) this alert
+  """
+  origin: AlertOrigin!
+
+  """
+  The reference for this Alert, as extracted from its origin
+  """
+  reference: String!
+
+  """
+  The runbook for this Alert, as extracted from its origin
+  """
+  runbook: String!
+
+  """
+  The severity of this Alert
+  """
+  severity: Severity!
+
+  """
+  The status of this Alert
+  """
+  status: AlertStatus!
+
+  """
+  The title of this Alert
+  """
+  title: String!
+
+  """
+  The type of this Alert
+  """
+  type: AlertType!
+
+  """
+  Date and time when the Alert got last updated
+  """
+  updatedAt: DateTime
+
+  """
+  The Actor that last updated the state of this alert
+  """
+  updatedBy: Actor
+}
+
+"""
+The metadata around a single Alert delivery attempt
+"""
+type AlertDelivery {
+  dispatchedAt: DateTime!
+
+  """
+  The label of the alert at where it was delivered (channel name/ID, jira ticket, asana issue, etc)
+  """
+  label: String!
+  message: String!
+  outputId: ID!
+  statusCode: Int!
+  success: Boolean!
+
+  """
+  The url to where the alert was delivered
+  """
+  url: String!
+}
+
+"""
+The payload to the `events` query
+"""
+input AlertEventsInput {
+  """
+  An opaque string used when paginating across multiple pages of results
+  """
+  cursor: String
+
+  """
+  The size of each page of results. Defaults to 25
+  """
+  pageSize: Int = 25
+}
+
+"""
+The response of the alert events query
+"""
+type AlertEventsOutput {
+  """
+  A list of paginated alert events edges
+  """
+  edges: [AlertEventsOutputEdge!]!
+
+  """
+  Metadata around this page of results
+  """
+  pageInfo: CursorBasedPaginationPageInfo!
+}
+
+"""
+The edge shape of the AlertEventsOutput type
+"""
+type AlertEventsOutputEdge {
+  """
+  An event node
+  """
+  node: JSON!
+}
+
+"""
+The type of items that a list of alerts can be filtered by
+"""
+enum AlertListingType {
+  """
+  Alerts that got created as a result of a detection match from Rules, Policies & Scheduled Rules
+  """
+  ALERT
+
+  """
+  Alerts that got created as a result of a detection error. Includes errors from Rules, Policies & Scheduled Rules
+  """
+  DETECTION_ERROR
+
+  """
+  Alerts that got created as a result of a Panther system error
+  """
+  SYSTEM_ERROR
+}
+
+"""
+The entities that generated this alert
+"""
+union AlertOrigin = DeletedDetection | Detection | SystemError
+
+"""
+The different status that an Alert can have
+"""
+enum AlertStatus {
+  """
+  The alert has been flagged as a false-positive. This is shown as Invalid in the Panther UI.
+  """
+  CLOSED
+
+  """
+  The alert is still open & pending triage
+  """
+  OPEN
+
+  """
+  The alert has been resolved along with the issue that caused it
+  """
+  RESOLVED
+
+  """
+  The alert has been successfully triaged, but it hasn't yet been closed or resolved
+  """
+  TRIAGED
+}
+
+"""
+The different type of alerts that Panther Supports
+"""
+enum AlertType {
+  """
+  Alert that got created due to a Policy failure
+  """
+  POLICY
+
+  """
+  Alert that got created due to a Rule match
+  """
+  RULE
+
+  """
+  Alert that got created due to an error in the python code of the associated Rule
+  """
+  RULE_ERROR
+
+  """
+  Alert that got created due to a Scheduled Rule match
+  """
+  SCHEDULED_RULE
+
+  """
+  Alert that got created due to an error in the python code of the associated Scheduled Rule
+  """
+  SCHEDULED_RULE_ERROR
+
+  """
+  Alert that got created by Panther due to an issue with the data ingestion process
+  """
+  SYSTEM_ERROR
+}
+
+"""
+The available filters of the `alerts` query. You must either specify a particular `detectionId` or a combination of
+`createdAtAfter` & `createdAtBefore` for the query to be issued successfully.
+"""
+input AlertsInput {
+  """
+  A list of userIds to filter alert assignees by
+  """
+  assigneeIds: [ID!]
+
+  """
+  Returns alerts created after this date
+  """
+  createdAtAfter: DateTime
+
+  """
+  Returns alerts created before this date
+  """
+  createdAtBefore: DateTime
+
+  """
+  An opaque string used when paginating across multiple pages of results
+  """
+  cursor: String
+
+  """
+  A detection (rule, scheduled rule or policy) ID that all returned alerts should originate from
+  """
+  detectionId: ID
+
+  """
+  A maximum number of events that the returned alerts must have
+  """
+  eventCountMax: Int
+
+  """
+  A minimum number of events that the returned alerts must have
+  """
+  eventCountMin: Int
+
+  """
+  A list of log source IDs to filter alerts by
+  """
+  logSources: [String!]
+
+  """
+  A list of log type names (custom or not) to filter alerts by
+  """
+  logTypes: [String!]
+
+  """
+  A string/text to look for in the alert's title
+  """
+  nameContains: String
+
+  """
+  The size of each page of results. Defaults to `25`
+  """
+  pageSize: Int = 25
+
+  """
+  A list of AWS resource type names to filter alerts by
+  """
+  resourceTypes: [String!]
+
+  """
+  A list of severities to filter alerts by
+  """
+  severities: [Severity!]
+
+  """
+  The field to used for sorting purposes. Currently, `createdAt` is the only option
+  """
+  sortBy: AlertsSortFieldsEnum
+
+  """
+  The direction to sort alerts by, based on the value of the `sortBy` filter. Defaults to `descending`
+  """
+  sortDir: SortDirEnum = descending
+
+  """
+  A list of statuses to filter alerts by
+  """
+  statuses: [AlertStatus!]
+
+  """
+  Further filter the items returned when `type` is also set.
+
+  - Valid subtypes when `type: ALERT` is set are `POLICY`, `RULE`, and `SCHEDULED_RULE`.
+  - Valid subtypes when `type: DETECTION_ERROR` is set are `RULE_ERROR` and `SCHEDULED_RULE_ERROR`
+  - There are no subtypes for `type: SYSTEM_ERROR`
+  """
+  subtypes: [AlertType!]
+
+  """
+  The type of items that are going to be returned from your query. Defaults to detection alerts.
+  """
+  type: AlertListingType = ALERT
+}
+
+"""
+The response of the `alerts` query
+"""
+type AlertsOutput {
+  """
+  A list of paginated alert edges
+  """
+  edges: [AlertsOutputEdge!]!
+
+  """
+  Metadata around this page of results
+  """
+  pageInfo: AlertsOutputPageInfo!
+}
+
+"""
+The edge shape of the `AlertsOutput` type
+"""
+type AlertsOutputEdge {
+  """
+  An alert node
+  """
+  node: Alert!
+}
+
+"""
+The metadata around a page of results for the `alerts` query
+"""
+type AlertsOutputPageInfo {
+  """
+  The cursor that the next page of results should start from or `null` if this is the last page
+  """
+  endCursor: String
+
+  """
+  A boolean indicating whether more results exist
+  """
+  hasNextPage: Boolean!
+
+  """
+  A boolean indicating whether this is the first page of results or not
+  """
+  hasPreviousPage: Boolean!
+
+  """
+  The cursor that this page of results started from or `null` if this is the first page
+  """
+  startCursor: String
+}
+
+"""
+The supported sorting field when listing alerts
+"""
+enum AlertsSortFieldsEnum {
+  createdAt
+}
+
+"""
+The input to a data lake query cancellation operation
+"""
+input CancelDataLakeQueryInput {
+  """
+  The ID of the query to cancel
+  """
+  id: ID!
+}
+
+"""
+The return value of a data lake or indicator search query cancellation request
+"""
+type CancelDataLakeQueryOutput {
+  """
+  The ID of the query that just got cancelled
+  """
+  id: ID!
+}
+
+"""
+Represents a Cloud Account integration
+"""
+type CloudAccount {
+  """
+  The AWS Account ID of the Cloud Account
+  """
+  awsAccountId: String!
+
+  """
+  Regions to be ignored by scans of this cloud account
+  """
+  awsRegionIgnoreList: [String!]!
+
+  """
+  Account scan configuration options
+  """
+  awsScanConfig: AWSScanConfig
+
+  """
+  The name of the cloudformation stack monitoring the account
+  """
+  awsStackName: String!
+
+  """
+  The time the Cloud Account integration was created
+  """
+  createdAt: DateTime!
+
+  """
+  The user who created the Cloud Account integration
+  """
+  createdBy: Actor
+
+  """
+  The ID of the Cloud Account integration
+  """
+  id: ID!
+
+  """
+  True if the Cloud Account integration can be modified
+  """
+  isEditable: Boolean!
+
+  """
+  True if realtime scanning is enabled for this Cloud Account
+  """
+  isRealtimeScanningEnabled: Boolean!
+
+  """
+  The name of the Cloud Account integration
+  """
+  label: String!
+
+  """
+  The time the Cloud Account integration was last modified
+  """
+  lastModifiedAt: DateTime
+
+  """
+  Resources that match this regex will be ignored by scans of this cloud account
+  """
+  resourceRegexIgnoreList: [String!]!
+
+  """
+  Resource types to be ignored by scans of this cloud account
+  """
+  resourceTypeIgnoreList: [String!]!
+}
+
+"""
+Input for the cloudAccounts query
+"""
+input CloudAccountsInput {
+  cursor: String
+}
+
+"""
+Output for the cloudAccounts query
+"""
+type CloudAccountsOutput {
+  """
+  A list of paginated cloud account edges
+  """
+  edges: [CloudAccountsOutputEdge!]!
+
+  """
+  Metadata around this page of results
+  """
+  pageInfo: CursorBasedPaginationPageInfo!
+}
+
+"""
+The edge shape of the `CloudAccount` type
+"""
+type CloudAccountsOutputEdge {
+  """
+  A Cloud Account Node
+  """
+  node: CloudAccount!
+}
+
+"""
+A comment posted within a Panther alert
+"""
+type Comment {
+  """
+  Body of comment
+  """
+  body: String!
+
+  """
+  Date and time when the Alert got last updated
+  """
+  createdAt: DateTime!
+
+  """
+  The Actor that last updated the state of this alert
+  """
+  createdBy: Actor!
+
+  """
+  The entity that this comment was added to
+  """
+  entity: CommentEntity!
+
+  """
+  The format of the comment's body, as it was originally submitted
+  """
+  format: CommentFormat!
+
+  """
+  Comment identifier
+  """
+  id: ID!
+}
+
+"""
+The available entities that can host a comment
+"""
+union CommentEntity = Alert
+
+"""
+The format that a Comment's body can be submitted as
+"""
+enum CommentFormat {
+  """
+  A string that should be interpreted as HTML
+  """
+  HTML
+
+  """
+  A string that should be interpreted as plain text
+  """
+  PLAIN_TEXT
+}
+
+"""
+The payload to the createComment mutation.
+"""
+input CreateAlertCommentInput {
+  """
+  The alert ID you want to post a comment to
+  """
+  alertId: ID!
+
+  """
+  The comment body
+  """
+  body: String!
+
+  """
+  The format that the comment's body is going to be in. Defaults to plain text.
+  """
+  format: CommentFormat = PLAIN_TEXT
+}
+
+"""
+The response to the mutation createComment.
+"""
+type CreateAlertCommentOutput {
+  comment: Comment!
+}
+
+"""
+Input for the createCloudAccount mutation
+"""
+input CreateCloudAccountInput {
+  """
+  The AWS Account ID of the Cloud Account
+  """
+  awsAccountId: String!
+
+  """
+  Regions to be ignored by scans of this cloud account
+  """
+  awsRegionIgnoreList: [String!]
+
+  """
+  Account scan configuration options
+  """
+  awsScanConfig: AWSScanConfigInput!
+
+  """
+  Label applied to the Cloud Account integration
+  """
+  label: String!
+
+  """
+  Resources that match this regex will be ignored by scans of this cloud account
+  """
+  resourceRegexIgnoreList: [String!]
+
+  """
+  Resource types to be ignored by scans of this cloud account
+  """
+  resourceTypeIgnoreList: [String!]
+}
+
+"""
+Output for the createCloudAccount mutation
+"""
+type CreateCloudAccountOutput {
+  """
+  The cloud account that was created
+  """
+  cloudAccount: CloudAccount!
+}
+
+"""
+The payload to the `createOrUpdateSchema` mutation
+"""
+input CreateOrUpdateSchemaInput {
+  """
+  The description of the schema
+  """
+  description: String
+
+  """
+  A boolean indicating whether the automatic schema field discovery feature is enabled
+  """
+  isFieldDiscoveryEnabled: Boolean
+
+  """
+  The name of the schema
+  """
+  name: String!
+
+  """
+  An optional field that can be used to reference documentation related to the schema
+  """
+  referenceURL: String
+
+  """
+  Revision number for the schema
+  """
+  revision: Int
+
+  """
+  The schema spec in YAML or JSON format
+  """
+  spec: String!
+}
+
+"""
+The response of the 'createOrUpdateSchema' mutation
+"""
+type CreateOrUpdateSchemaOutput {
+  schema: Schema
+}
+
+"""
+The input to the createRole mutation
+"""
+input CreateRoleInput {
+  """
+  The log types that the role can or cannot access, according to the `logTypeAccessKind` field. This field should be omitted if `logTypeAccessKind` has a value of `ALLOW_ALL` or `DENY_ALL`
+  """
+  logTypeAccess: [String!]
+
+  """
+  Defines the role's access to log types. This field is required and has effect only if the datalake RBAC feature is enabled.
+  """
+  logTypeAccessKind: LogTypeAccessKind
+
+  """
+  The name of the role
+  """
+  name: String!
+
+  """
+  An array of the role's permissions
+  """
+  permissions: [Permission!]!
+}
+
+"""
+The output to the createRole mutation
+"""
+type CreateRoleOutput {
+  """
+  The created role
+  """
+  role: Role!
+}
+
+"""
+Input for the createS3LogSource mutation
+"""
+input CreateS3SourceInput {
+  awsAccountId: String!
+  kmsKey: String
+  label: String!
+  logProcessingRole: String!
+  logStreamType: LogStreamType!
+  logStreamTypeOptions: LogStreamTypeOptionsInput
+  managedBucketNotifications: Boolean!
+  s3Bucket: String!
+  s3PrefixLogTypes: [S3PrefixLogTypesInput!]!
+}
+
+"""
+Output for the createS3LogSource mutation
+"""
+type CreateS3SourceOutput {
+  logSource: S3LogIntegration!
+}
+
+"""
+The metadata around a page of results
+"""
+type CursorBasedPaginationPageInfo {
+  """
+  The cursor that the next page of results should start from or `null` if this is the last page
+  """
+  endCursor: String
+
+  """
+  A boolean indicating whether more results exist
+  """
+  hasNextPage: Boolean!
+
+  """
+  A boolean indicating whether this is the first page of results or not
+  """
+  hasPreviousPage: Boolean!
+
+  """
+  The cursor that this page of results started from or `null` if this is the first page
+  """
+  startCursor: String
+}
+
+"""
+A Panther data lake database
+"""
+type DataLakeDatabase {
+  """
+  A description for this database
+  """
+  description: String
+
+  """
+  The name of this database
+  """
+  name: String!
+
+  """
+  The tables that this database has
+  """
+  tables: [DataLakeDatabaseTable!]!
+}
+
+"""
+A table within a Panther data lake database
+"""
+type DataLakeDatabaseTable {
+  """
+  The columns that this table has
+  """
+  columns: [DataLakeDatabaseTableColumn!]!
+
+  """
+  Optional description for this table
+  """
+  description: String
+
+  """
+  Optional display name for table
+  """
+  displayName: String
+
+  """
+  Optional logType
+  """
+  logType: String
+
+  """
+  The name of the table
+  """
+  name: String!
+
+  """
+  Optional count of hits in this table (used in query results)
+  """
+  numMatches: Int
+}
+
+"""
+The column of a Panther data lake table
+"""
+type DataLakeDatabaseTableColumn {
+  """
+  A description for this column
+  """
+  description: String
+
+  """
+  The name of the column
+  """
+  name: String!
+
+  """
+  The column's type. Exact values depend on your choice of data lake.
+  """
+  type: String
+}
+
+"""
+The input used to describe a data lake table
+"""
+input DataLakeDatabaseTableInput {
+  """
+  The name of the database that the table belongs in
+  """
+  databaseName: String!
+
+  """
+  The name of the table
+  """
+  tableName: String!
+}
+
+"""
+The shape of the edges in an edge collection
+"""
+type DataLakeDatabaseTablesEdges {
+  """
+  a node containing the table information
+  """
+  node: DataLakeDatabaseTable!
+}
+
+"""
+The input used to describe a collection of data lake tables
+"""
+input DataLakeDatabaseTablesInput {
+  """
+  The cursor to start from for paginated queries
+  """
+  cursor: String
+
+  """
+  The name of the database that the tables belong in
+  """
+  databaseName: String!
+
+  """
+  The number of results that each page will contain.
+  """
+  pageSize: Int = 25
+}
+
+"""
+The results of a DataLakeDatabaseTables query
+"""
+type DataLakeDatabaseTablesOutput {
+  """
+  A list of paginated edges
+  """
+  edges: [DataLakeDatabaseTablesEdges!]!
+
+  """
+  Metadata around this page of results
+  """
+  pageInfo: DataLakeDatabaseTablesOutputPageInfo!
+}
+
+"""
+The metadata about the page in a Table collection
+"""
+type DataLakeDatabaseTablesOutputPageInfo {
+  """
+  The cursor that the next page of results should start from or `null` if this is the last page
+  """
+  endCursor: String
+
+  """
+  A boolean indicating whether more results exist
+  """
+  hasNextPage: Boolean!
+
+  """
+  A boolean indicating whether this is the first page of results or not
+  """
+  hasPreviousPage: Boolean!
+
+  """
+  The cursor that this page of results started from or `null` if this is the first page
+  """
+  startCursor: String
+}
+
+"""
+The optional input filters to the `dataLakeQueries` query
+"""
+input DataLakeQueriesInput {
+  """
+  Filter queries by their name and/or SQL statement
+  """
+  contains: String
+
+  """
+  An opaque string used when paginating across multiple pages of results
+  """
+  cursor: String
+
+  """
+  Only return queries that are either scheduled or not (i.e. issued by a user). Leave blank to return both.
+  """
+  isScheduled: Boolean
+
+  """
+  Only return queries issued by those user IDs
+  """
+  issuedBy: [ID!]
+
+  """
+  The number of results that each page will contain. Defaults to 25 with a maximum value of 999.
+  """
+  pageSize: Int = 25
+
+  """
+  Field used for sorting purposes. Currently, `startedAt` is the only option
+  """
+  sortBy: DataLakeQueriesSortFields = startedAt
+
+  """
+  The direction to sort results by
+  """
+  sortDir: SortDirEnum = descending
+
+  """
+  Only return queries that started after this fdate
+  """
+  startedAtAfter: DateTime
+
+  """
+  Only return queries that started after this fdate
+  """
+  startedAtBefore: DateTime
+
+  """
+  A list of query statuses to filter queries by
+  """
+  status: [DataLakeQueryStatus!]
+}
+
+"""
+The return value of a `dataLakeQueries` query
+"""
+type DataLakeQueriesOutput {
+  """
+  A list of paginated query edges
+  """
+  edges: [DataLakeQueryEdge!]!
+
+  """
+  Metadata around this page of results
+  """
+  pageInfo: DataLakeQueriesOutputPageInfo!
+}
+
+"""
+The metadata around a page of results for the `dataLakeQueries` query
+"""
+type DataLakeQueriesOutputPageInfo {
+  """
+  The cursor that the next page of results should start from or `null` if this is the last page
+  """
+  endCursor: String
+
+  """
+  A boolean indicating whether more results exist
+  """
+  hasNextPage: Boolean!
+
+  """
+  A boolean indicating whether this is the first page of results or not
+  """
+  hasPreviousPage: Boolean!
+
+  """
+  The cursor that this page of results started from or `null` if this is the first page
+  """
+  startCursor: String
+}
+
+"""
+The available sort values for sorting a paginated list of data lake queries
+"""
+enum DataLakeQueriesSortFields {
+  startedAt
+}
+
+"""
+The metadata around a data lake or indicator search query
+"""
+type DataLakeQuery {
+  """
+  The children queries (subqueries) for queries (e.g., used by the Query Builder). This field is empty for simple queries
+  """
+  children: [DataLakeQuery!]!
+
+  """
+  The datetime at which the query completed or errored. This value is empty if the query is still running
+  """
+  completedAt: DateTime
+
+  """
+  The ID of this query
+  """
+  id: ID!
+
+  """
+  A boolean denoting whether this was a scheduled query or not
+  """
+  isScheduled: Boolean!
+
+  """
+  The entity that issued this query
+  """
+  issuedBy: Actor
+
+  """
+  A message that describes the current status of this query
+  """
+  message: String!
+
+  """
+  The name of this query or empty if it's an ad-hoc query
+  """
+  name: String
+
+  """
+  The results this query yielded. This field is `null` if the query hasn't successfully completed
+  """
+  results(input: DataLakeQueryResultsInput): DataLakeQueryResults
+
+  """
+  The SQL statement that was ran
+  """
+  sql: String!
+
+  """
+  The datetime at which the query started executing
+  """
+  startedAt: DateTime!
+
+  """
+  The current status of this query
+  """
+  status: DataLakeQueryStatus!
+}
+
+"""
+The edge shape of the `DataLakeQueryEdge` type
+"""
+type DataLakeQueryEdge {
+  """
+  A data lake query node
+  """
+  node: DataLakeQuery!
+}
+
+"""
+The edge shape of the `DataLakeQueryResultRecords` type
+"""
+type DataLakeQueryResultEdge {
+  """
+  A data lake record object
+  """
+  id: String
+  node: JSON!
+}
+
+"""
+Pagination metadata for the records returned by a data lake or indicator search query
+"""
+type DataLakeQueryResultRecordsPageInfo {
+  """
+  The cursor that the next page of results should start from or `null` if this is the last page
+  """
+  endCursor: String
+
+  """
+  A boolean indicating whether more results exist
+  """
+  hasNextPage: Boolean!
+
+  """
+  A boolean indicating whether this is the first page of results or not
+  """
+  hasPreviousPage: Boolean!
+
+  """
+  The cursor that this page of results started from or `null` if this is the first page
+  """
+  startCursor: String
+}
+
+"""
+The shape of a data lake query results
+"""
+type DataLakeQueryResults {
+  """
+  Metadata for any actor uuids returned in this query
+  """
+  actorProfiles: [ActorProfile!]!
+
+  """
+  Metadata around the data lake columns returned in this page of results
+  """
+  columnInfo: DataLakeQueryResultsColumnInfo!
+
+  """
+  A list of paginated data lake result edges
+  """
+  edges: [DataLakeQueryResultEdge!]!
+
+  """
+  Metadata around this page of results
+  """
+  pageInfo: DataLakeQueryResultRecordsPageInfo!
+
+  """
+  Stats around the data lake or indicator search query results
+  """
+  stats: DataLakeQueryStats!
+
+  """
+  If true, caller should try again
+  """
+  tryAgain: Boolean!
+}
+
+"""
+Metadata related to the underlying database columns returned as part of a data lake or indicator search query
+"""
+type DataLakeQueryResultsColumnInfo {
+  """
+  The ordered name of the columns as returned by the underlying database
+  """
+  order: [String!]!
+
+  """
+  A mapping of column name to column type. The type of each column is directly related to the underlying database
+  and varies from one backend to another (e.g. Snowflake, etc.)
+  """
+  types: JSON!
+}
+
+"""
+The input to the `results` field of the `DataLakeQuery` type
+"""
+input DataLakeQueryResultsInput {
+  """
+  The pagination cursor used to fetch more pages. `null` if you're fetching the first page of results
+  """
+  cursor: String
+
+  """
+  The number of results that each page will contain. Defaults to the maximum value of 999.
+  """
+  pageSize: Int = 999
+}
+
+"""
+Data lake query execution stats
+"""
+type DataLakeQueryStats {
+  """
+  The amount of data scanned (expressed in bytes) during this data lake or indicator query execution
+  """
+  bytesScanned: Float!
+
+  """
+  The amount of time (expressed in milliseconds) that the data lake or indicator search query ran for
+  """
+  executionTime: Float!
+
+  """
+  The the total number of rows returned by the query
+  """
+  rowCount: Float!
+}
+
+"""
+The available statuses for a data lake or indicator search query
+"""
+enum DataLakeQueryStatus {
+  """
+  The status when the query was cancelled by the user
+  """
+  cancelled
+
+  """
+  The status when the query has errored out
+  """
+  failed
+
+  """
+  The status when the query is running
+  """
+  running
+
+  """
+  The status when the query has successfully completed
+  """
+  succeeded
+}
+
+"""
+A date in UTC with a format of YYYY-MM-DDThh:mm:ss.000Z.
+"""
+scalar DateTime
+
+"""
+Input for the deleteCloudAccount mutation
+"""
+input DeleteCloudAccountInput {
+  id: ID!
+}
+
+"""
+Output for the deleteCloudAccounts mutation
+"""
+type DeleteCloudAccountOutput {
+  id: ID!
+}
+
+"""
+The payload to the `deleteDetections` mutation
+"""
+input DeleteDetectionsInput {
+  """
+  Preview what would be deleted, without deleting any detections
+  """
+  dryRun: Boolean
+
+  """
+  IDs of detections to be deleted
+  """
+  ids: [ID!]!
+
+  """
+  When true, deletes any saved queries associated with the detection
+  """
+  includeSavedQueries: Boolean
+}
+
+"""
+The response of the `deleteDetections` mutation
+"""
+type DeleteDetectionsOutput {
+  """
+  IDs of detections that were deleted
+  If dryRun was set to True in the response, this will include IDs that would have been deleted.
+  """
+  ids: [ID!]!
+
+  """
+  Names of saved queries that were deleted
+  If dryRun was set to True in the request, this will include the names of Saved Queries that would have been deleted.
+  """
+  savedQueryNames: [String!]
+}
+
+"""
+The input to the deleteRole mutation
+"""
+input DeleteRoleInput {
+  """
+  The ID of the role
+  """
+  id: ID!
+}
+
+"""
+The output to the deleteRole mutation
+"""
+type DeleteRoleOutput {
+  """
+  The ID of the deleted role
+  """
+  id: ID!
+}
+
+"""
+The input to the 'deleteSavedQueriesByName' mutation
+"""
+input DeleteSavedQueriesByNameInput {
+  """
+  Preview what would be deleted, without deleting any saved queries
+  """
+  dryRun: Boolean
+
+  """
+  When true, deletes any detections associated with the saved queries
+  """
+  includeDetections: Boolean
+
+  """
+  Saved Query names to be deleted
+  """
+  names: [String!]!
+}
+
+"""
+The output of the 'deleteSavedQueriesByName' mutation
+"""
+type DeleteSavedQueriesByNameOutput {
+  """
+  The IDs of any Detections that were deleted
+  If dryRun was set to True in the response, this will include the IDs of Detections that would have been deleted.
+  """
+  detectionIDs: [ID!]
+
+  """
+  The names of the Saved Queries that were deleted
+  If dryRun was set to True in the response, this will include names of queries that would have been deleted.
+  """
+  names: [String!]!
+}
+
+"""
+Input for the deleteSource mutation
+"""
+input DeleteSourceInput {
+  id: ID!
+}
+
+"""
+Output for the deleteSource mutation
+"""
+type DeleteSourceOutput {
+  id: ID!
+}
+
+"""
+The input for the deleteUser mutation
+"""
+input DeleteUserInput {
+  """
+  The ID of the user to delete
+  """
+  id: ID!
+}
+
+"""
+The return value of the Delete User mutation
+"""
+type DeleteUserOutput {
+  """
+  The deleted Panther User object
+  """
+  id: ID!
+}
+
+"""
+Represents a Detection that has been deleted but still has alerts associated with it
+"""
+type DeletedDetection {
+  """
+  The unique identifier of the Detection that generated this alert
+  """
+  id: ID!
+}
+
+"""
+A Panther detection that generates alerts
+"""
+type Detection {
+  """
+  The date and time that this detection was created
+  """
+  createdAt: DateTime!
+
+  """
+  The actor that created this detection
+  """
+  createdBy: Actor
+
+  """
+  An extended description for this detection
+  """
+  description: String
+
+  """
+  The ID of this detection, which is typically human-readable
+  """
+  id: ID!
+
+  """
+  The publicly visible display name for this detection
+  """
+  name: String!
+
+  """
+  The type of this detection. Can be a Rule, a Scheduled Rule or a Policy
+  """
+  type: DetectionType!
+
+  """
+  The date and time that this detection was last updated
+  """
+  updatedAt: DateTime
+
+  """
+  The actor that was last to modify this detection
+  """
+  updatedBy: Actor
+}
+
+"""
+The response of the `uploadDetectionEntitiesStatus` query
+"""
+type DetectionEntitiesUploadStatusOutput {
+  """
+  The time the detection entities upload was created
+  """
+  createdAt: DateTime!
+
+  """
+  If the detection entities upload failed, the error that occurred
+  """
+  error: String
+
+  """
+  The mode of the detection entities upload
+  """
+  mode: UploadDetectionEntitiesMode!
+
+  """
+  If the detection entities upload succeeded, the result of the upload
+  """
+  result: UploadDetectionEntitiesOutput
+
+  """
+  The current status of the detection entities upload
+  """
+  status: UploadStatus!
+
+  """
+  The time the detection entities upload was last updated
+  """
+  updatedAt: DateTime!
+}
+
+"""
+The types of detections that Panther supports
+"""
+enum DetectionType {
+  CORRELATION_RULE
+  DERIVED_RULE
+  POLICY
+  RULE
+  SCHEDULED_RULE
+}
+
+"""
+The internationalized email address.<blockquote><strong>Note:</strong> Up to 64
+characters are allowed before and 255 characters are allowed after the
+<code>@</code> sign.
+However, the generally accepted maximum length for an email address is 254 characters.
+The pattern verifies that an unquoted <code>@</code> sign exists.</blockquote>
+
+minLength: 3
+maxLength: 254
+pattern: <code>^.+@[^\"\\-].+$</code>.
+"""
+scalar Email
+
+"""
+Error type that can be returned by the API
+"""
+type Error {
+  """
+  The error code that can be used to identify the error
+  """
+  code: ErrorCode
+
+  """
+  A human-readable message that describes the error
+  """
+  message: String!
+}
+
+"""
+The available error codes that can be returned by the API
+"""
+enum ErrorCode {
+  AlreadyExists
+  InvalidInput
+  NotFound
+  ServerError
+}
+
+"""
+The input to an alert actor profile query
+"""
+input ExecuteAlertActorQueryInput {
+  """
+  The ID of the alert to search for actor information
+  """
+  alertId: ID!
+
+  """
+  The limit of the number of results to return
+  """
+  limit: Int = 25
+}
+
+"""
+The return value of an alert actor profile query
+"""
+type ExecuteAlertActorQueryOutput {
+  """
+  The ID of the data lake sql query that started executing
+  """
+  id: ID!
+}
+
+"""
+The input to a data lake query execution
+"""
+input ExecuteDataLakeQueryInput {
+  """
+  The name of the database that the query should be executed against. This is optional you prefix all tables with
+  their corresponding database names in your SQL queries. Defaults to `panther_logs`
+  """
+  databaseName: String = "panther_logs"
+
+  """
+  The SQL code of the data lake query
+  """
+  sql: String!
+}
+
+"""
+The return value of a data lake query execution request
+"""
+type ExecuteDataLakeQueryOutput {
+  """
+  The ID of the data lake sql query that started executing
+  """
+  id: ID!
+}
+
+"""
+The input to the indicator search query
+"""
+input ExecuteIndicatorSearchQueryInput {
+  """
+  The databases to search (if empty all databases will be searched)
+  """
+  databases: [String!]
+
+  """
+  The end of the indicator search period
+  """
+  endTime: DateTime!
+
+  """
+  The type of the indicator to search for
+  """
+  indicatorName: IndicatorType = AutoDetectType
+
+  """
+  An array of indicators to search for
+  """
+  indicators: [String!]!
+
+  """
+  The start of the indicator search period
+  """
+  startTime: DateTime!
+
+  """
+  The tables to search (if empty all tables will be searched)
+  """
+  tables: [String!]
+}
+
+"""
+The return value of a data lake indicator search query execution request
+"""
+type ExecuteIndicatorSearchQueryOutput {
+  """
+  The ID of the indicator search query that started executing
+  """
+  id: ID!
+}
+
+"""
+General Panther configuration settings
+"""
+type GeneralSettingsConfig {
+  """
+  The currently deployed version of Panther
+  """
+  pantherVersion: String
+}
+
+"""
+The response of the 'getSchema' query
+"""
+type GetSchemaOutput {
+  """
+  Error related to the schema
+  """
+  error: Error
+
+  """
+  Schema metadata
+  """
+  schema: Schema
+}
+
+"""
+The available indicator types used in an Indicator Search Query
+"""
+enum IndicatorType {
+  AutoDetectType
+  SimpleSearch
+  TextSearch
+  p_any_actor_ids
+  p_any_aws_account_ids
+  p_any_aws_arns
+  p_any_aws_instance_ids
+  p_any_aws_tags
+  p_any_domain_names
+  p_any_emails
+  p_any_ip_addresses
+  p_any_mac_addresses
+  p_any_md5_hashes
+  p_any_serial_numbers
+  p_any_sha1_hashes
+  p_any_sha256_hashes
+  p_any_trace_ids
+  p_any_usernames
+}
+
+"""
+The input to invite a new User
+"""
+input InviteUserInput {
+  """
+  The email address of the User
+  """
+  email: Email!
+
+  """
+  The family/last name of the User
+  """
+  familyName: String!
+
+  """
+  The given/first name of the User
+  """
+  givenName: String!
+
+  """
+  The ID or Name of the User's role
+  """
+  role: UserRoleInput!
+}
+
+"""
+The return value of the Invite User mutation
+"""
+type InviteUserOutput {
+  """
+  The created Panther User object
+  """
+  user: User!
+}
+
+"""
+A JSON map of key/value pairs
+"""
+scalar JSON
+
+"""
+Represents a Log Source Integration
+"""
+interface LogIntegration {
+  """
+  The time the S3 Log Source was created
+  """
+  createdAtTime: DateTime!
+
+  """
+  The actor who created the S3 Log Source
+  """
+  createdBy: Actor
+
+  """
+  The ID of the Log Source integration
+  """
+  integrationId: ID!
+
+  """
+  The name of the Log Source integration
+  """
+  integrationLabel: String!
+
+  """
+  The type of Log Source integration
+  """
+  integrationType: String!
+
+  """
+  True if the Log Source can be modified
+  """
+  isEditable: Boolean!
+
+  """
+  True if the Log Source is healthy
+  """
+  isHealthy: Boolean!
+
+  """
+  The timestamp of the last event processed
+  """
+  lastEventProcessedAtTime: DateTime
+
+  """
+  The timestamp of the last event received
+  """
+  lastEventReceivedAtTime: DateTime
+
+  """
+  The time the log source was last modified
+  """
+  lastModified: DateTime
+
+  """
+  The log types being ingested
+  """
+  logTypes: [String!]!
+}
+
+"""
+SeriesWithBreakdown, broken down by log source
+"""
+type LogSourceBreakdown {
+  """
+  The name of the Log Source for which the series breakdown is given
+  """
+  logSourceName: String!
+
+  """
+  The metric time series data
+  """
+  metricData: SeriesWithBreakdown!
+}
+
+"""
+Enum representation of Log Stream types
+"""
+enum LogStreamType {
+  Auto
+  CloudWatchLogs
+  JSON
+  JsonArray
+  Lines
+}
+
+"""
+Options for the log stream type
+"""
+type LogStreamTypeOptions {
+  """
+  Path to the array value to extract elements from, only applicable if logStreamType is JsonArray.
+  Leave empty if the input JSON is an array itself
+  """
+  jsonArrayEnvelopeField: String
+}
+
+"""
+Input for the LogStreamTypeOptions
+"""
+input LogStreamTypeOptionsInput {
+  """
+  Path to the array value to extract elements from, only applicable if logStreamType is JsonArray.
+  Leave empty if the input JSON is an array itself
+  """
+  jsonArrayEnvelopeField: String
+}
+
+"""
+The supported types for log types access management
+"""
+enum LogTypeAccessKind {
+  """
+  Allow access to selected log types
+  """
+  ALLOW
+
+  """
+  Allow access to all log types
+  """
+  ALLOW_ALL
+
+  """
+  Deny access to the selected log types
+  """
+  DENY
+
+  """
+  Deny access to all log types
+  """
+  DENY_ALL
+}
+
+"""
+An integer that can accept values that are bigger than 2^32
+"""
+scalar Long
+
+"""
+The input to the `metrics` query
+"""
+input MetricsInput {
+  """
+  The start date for the metrics evaluation
+  """
+  fromDate: DateTime!
+
+  """
+  The interval between metric checks. Used for plotting charts.
+  Leave empty for automatic interval
+  """
+  intervalInMinutes: Int
+
+  """
+  The end date for the metrics evaluation
+  """
+  toDate: DateTime!
+}
+
+"""
+The output to the `metrics` query
+"""
+type MetricsOutput {
+  """
+  The number of alerts corresponding to each rule
+  """
+  alertsPerRule: [SeriesWithEntityID!]
+
+  """
+  The number of alerts corresponding to each severity
+  """
+  alertsPerSeverity: [SeriesWithBreakdown!]!
+
+  """
+  The number of bytes that Panther ingested over the past year, for each individual log type
+  """
+  bytesIngestedPerSource: [Series!]
+
+  """
+  The number of bytes that Panther ingested over the queried time period, for each individual log type
+  """
+  bytesProcessedPerSource: [SeriesWithBreakdown!]!
+
+  """
+  The number of bytes that got queried via Panther for each individual source
+  """
+  bytesQueriedPerSource: [SeriesWithBreakdown!]!
+
+  """
+  The number of events that got processed for each log type
+  """
+  eventsProcessedPerLogType: [SeriesWithBreakdown!]!
+
+  """
+  The latency related to each log type
+  """
+  latencyPerLogType: [Series!]
+
+  """
+  The total number of alerts
+  """
+  totalAlerts: Float!
+
+  """
+  The total number of bytes that Panther ingested over the past year
+  """
+  totalBytesIngested: Float!
+
+  """
+  The total number of bytes that Panther ingested over the queried time period
+  """
+  totalBytesProcessed: Float!
+
+  """
+  The total number of bytes that got queried via Panther
+  """
+  totalBytesQueried: Float!
+
+  """
+  The total number of events (logs) that got processed
+  """
+  totalEventsProcessed: Float!
+}
+
+"""
+The top-level Mutation type. Mutations are used to make requests that create or modify data.
+"""
+type Mutation {
+  """
+  Starts inference in the background writing to inference stream, returns immediately
+  """
+  aiSummarizeAlert(input: AISummarizeAlertInput!): AISummarizeLogEventsOutput!
+
+  """
+  Starts inference in the background writing to inference stream, returns immediately
+  """
+  aiSummarizeLogEvents(input: AISummarizeLogEventsInput!): AISummarizeLogEventsOutput!
+
+  """
+  Cancels a data lake or indicator search query that's currently running
+  """
+  cancelDataLakeQuery(input: CancelDataLakeQueryInput!): CancelDataLakeQueryOutput!
+
+  """
+  Creates a comment on an Alert
+  """
+  createAlertComment(input: CreateAlertCommentInput!): CreateAlertCommentOutput!
+
+  """
+  Creates a Cloud Account
+  """
+  createCloudAccount(input: CreateCloudAccountInput!): CreateCloudAccountOutput!
+  createOrUpdateSchema(input: CreateOrUpdateSchemaInput!): CreateOrUpdateSchemaOutput!
+
+  """
+  Adds a new User role to Panther
+  """
+  createRole(input: CreateRoleInput!): CreateRoleOutput!
+
+  """
+  Creates an S3 Log Source
+  """
+  createS3Source(input: CreateS3SourceInput!): CreateS3SourceOutput!
+
+  """
+  Deletes a Cloud Account by ID
+  """
+  deleteCloudAccount(input: DeleteCloudAccountInput!): DeleteCloudAccountOutput!
+
+  """
+  Delete detections by ID
+  """
+  deleteDetections(input: DeleteDetectionsInput!): DeleteDetectionsOutput!
+
+  """
+  Deletes a user role
+  """
+  deleteRole(input: DeleteRoleInput!): DeleteRoleOutput!
+
+  """
+  Batch deletes a set of saved queries. Returns the names of the deleted queries.
+  """
+  deleteSavedQueriesByName(input: DeleteSavedQueriesByNameInput!): DeleteSavedQueriesByNameOutput!
+
+  """
+  Deletes a Log Source by ID
+  """
+  deleteSource(input: DeleteSourceInput!): DeleteSourceOutput!
+
+  """
+  Deletes a user
+  """
+  deleteUser(input: DeleteUserInput!): DeleteUserOutput!
+
+  """
+  Executes a SQL query to find actor information about a specific alert
+  """
+  executeAlertActorQuery(input: ExecuteAlertActorQueryInput!): ExecuteAlertActorQueryOutput!
+
+  """
+  Executes an SQL query against a selected data lake database
+  """
+  executeDataLakeQuery(input: ExecuteDataLakeQueryInput!): ExecuteDataLakeQueryOutput!
+
+  """
+  Executes an Indicator Search query against Panther's data lake
+  """
+  executeIndicatorSearchQuery(
+    input: ExecuteIndicatorSearchQueryInput!
+  ): ExecuteIndicatorSearchQueryOutput!
+
+  """
+  Invites a new user
+  """
+  inviteUser(input: InviteUserInput!): InviteUserOutput!
+
+  """
+  Allows an API token to rotate itself without any additional permissions
+  """
+  rotateAPIToken: RotateAPITokenOutput!
+
+  """
+  Updates the status of one or more alerts via a list of IDs
+  """
+  updateAlertStatusById(input: UpdateAlertStatusByIdInput!): UpdateAlertStatusByIdOutput!
+
+  """
+  Updates the assignee of one or more alerts through the assignee's email
+  """
+  updateAlertsAssigneeByEmail(
+    input: UpdateAlertsAssigneeByEmailInput!
+  ): UpdateAlertsAssigneeByEmailOutput!
+
+  """
+  Updates the assignee of one or more alerts through the the assignee's ID
+  """
+  updateAlertsAssigneeById(input: UpdateAlertsAssigneeByIdInput!): UpdateAlertsAssigneeByIdOutput!
+
+  """
+  Updates a Cloud Account
+  """
+  updateCloudAccount(input: UpdateCloudAccountInput!): UpdateCloudAccountOutput!
+
+  """
+  Updates a role's name or permissions
+  """
+  updateRole(input: UpdateRoleInput!): UpdateRoleOutput!
+
+  """
+  Updates an S3 Log Source
+  """
+  updateS3Source(input: UpdateS3SourceInput!): UpdateS3SourceOutput!
+  updateSchemaStatus(input: UpdateSchemaStatusInput!): GetSchemaOutput!
+
+  """
+  Updates the information for a user
+  """
+  updateUser(input: UpdateUserInput!): UpdateUserOutput!
+
+  """
+  Bulk updates detection entities via a base-64 encoded zip file
+  """
+  uploadDetectionEntities(input: UploadDetectionEntitiesInput!): UploadDetectionEntitiesOutput
+
+  """
+  Asynchronously bulk updates detection entities via a base-64 encoded zip file
+  """
+  uploadDetectionEntitiesAsync(
+    input: UploadDetectionEntitiesAsyncInput!
+  ): UploadDetectionEntitiesAsyncOutput
+}
+
+"""
+T-shirt sizes for output
+"""
+enum OutputLength {
+  """
+  Large output
+  """
+  large
+
+  """
+  Largest possible output
+  """
+  largest
+
+  """
+  Medium output
+  """
+  medium
+
+  """
+  Small output
+  """
+  small
+
+  """
+  Extra large output
+  """
+  xlarge
+
+  """
+  Extra small output
+  """
+  xsmall
+}
+
+"""
+The available permissions that an API Token or a Role (and thus a User) can hold
+"""
+enum Permission {
+  AlertModify
+  AlertRead
+  BulkUpload
+  CloudsecSourceModify
+  CloudsecSourceRead
+  DataAnalyticsModify
+  DataAnalyticsRead
+  DestinationModify
+  DestinationRead
+  GeneralSettingsModify
+  GeneralSettingsRead
+  LogSourceModify
+  LogSourceRawDataRead
+  LogSourceRead
+  LookupModify
+  LookupRead
+  OrganizationAPITokenModify
+  OrganizationAPITokenRead
+  PolicyModify
+  PolicyRead
+  ResourceModify
+  ResourceRead
+  RuleModify
+  RuleRead
+  RunPantherAI
+  SummaryRead
+  UserModify
+  UserRead
+}
+
+"""
+The top-level Query type. Queries are used to fetch data.
+"""
+type Query {
+  """
+  Returns information about actor profiles in the environment
+  """
+  actorProfileInfo(id: ID!): ActorProfile!
+
+  """
+  Returns the output of an inference call (e.g., aiSummarizeLogEvents).
+  Caller should poll until `finished` is true then check `error`.
+  """
+  aiInferenceStream(streamId: String!): AIInferenceStream!
+
+  """
+  Returns the details of a Panther alert
+  """
+  alert(id: ID!): Alert!
+
+  """
+  Returns a filtered & paginated set of all Panther alerts.
+  """
+  alerts(input: AlertsInput!): AlertsOutput!
+
+  """
+  Used by the client to cache results of previously run AI Summaries. It uses the events
+  as inputs, and returns the related streamId and prompt so the UI doesn't have to repeat
+  an existing AI Summary
+  """
+  cachedAISummaryData(input: AISummarizeLogEventsInput!): AISummarizeLogEventsOutput!
+
+  """
+  Returns a Cloud Account by ID
+  """
+  cloudAccount(id: ID!): CloudAccount
+
+  """
+  Returns all Cloud Accounts
+  """
+  cloudAccounts(input: CloudAccountsInput): CloudAccountsOutput!
+
+  """
+  Retrieves the details of a single data lake database
+  """
+  dataLakeDatabase(name: String!): DataLakeDatabase!
+
+  """
+  Retrieves the details of a table from a single data lake database
+  """
+  dataLakeDatabaseTable(input: DataLakeDatabaseTableInput!): DataLakeDatabaseTable!
+
+  """
+  Retrieves all tables from a single database
+  """
+  dataLakeDatabaseTables(input: DataLakeDatabaseTablesInput!): DataLakeDatabaseTablesOutput!
+
+  """
+  Lists the details of all available data lake databases
+  """
+  dataLakeDatabases: [DataLakeDatabase!]!
+
+  """
+  Returns a paginated list of all your previously executed data lake or indicator search queries
+  """
+  dataLakeQueries(input: DataLakeQueriesInput): DataLakeQueriesOutput!
+
+  """
+  Returns information about previously executed data lake or indicator search query. In the case of a query constructed through the query builder, specifying `root=true` will return the parent execution
+  """
+  dataLakeQuery(id: ID!, root: Boolean = false): DataLakeQuery!
+
+  """
+  Get the status of an asynchronous bulk upload of detection entities
+  """
+  detectionEntitiesUploadStatus(receiptId: ID!): DetectionEntitiesUploadStatusOutput
+
+  """
+  Returns Panther general settings
+  """
+  generalSettings: GeneralSettingsConfig!
+
+  """
+  Returns Data & Alert metrics about your Panther installation
+  """
+  metrics(input: MetricsInput!): MetricsOutput!
+
+  """
+  Returns a role matching the provided ID
+  """
+  roleById(id: ID!): Role!
+
+  """
+  Returns a role matching the provided case-insensitive name
+  """
+  roleByName(name: String!): Role!
+
+  """
+  Returns a list of Panther user roles
+  """
+  roles(input: RolesInput): [Role!]!
+  schemas(input: SchemasInput!): SchemasOutput!
+
+  """
+  Returns a Log Source by ID
+  """
+  source(id: ID!): LogIntegration
+
+  """
+  Returns all Log Sources
+  """
+  sources(input: SourcesInput): SourcesOutput!
+
+  """
+  Returns a single user by Email Address
+  """
+  userByEmail(email: String!): User!
+
+  """
+  Returns a single user by ID
+  """
+  userById(id: ID!): User!
+
+  """
+  Returns a list of Panther user accounts
+  """
+  users: [User!]!
+}
+
+"""
+The Panther component related to the System Error at hand
+"""
+enum RelatedComponent {
+  CLOUD_ACCOUNT
+  DESTINATION
+  DETECTION
+  ENRICHMENT
+  LOG_SOURCE
+  LOOKUP_TABLE
+  SAVED_QUERY
+}
+
+"""
+The details of a Role entity in Panther
+"""
+type Role {
+  """
+  Date and time when the Role got created
+  """
+  createdAt: DateTime!
+
+  """
+  The unique identifier of this Role
+  """
+  id: ID!
+
+  """
+  The set of log types the Role is allowed/denied access to, according to the `logTypeAccessKind` field.
+  Null if logTypeAccessKind is ALLOW_ALL or DENY_ALL.
+  """
+  logTypeAccess: [String!]
+
+  """
+  Indicates whether the Role is allowed or denied to query the selected log types
+  """
+  logTypeAccessKind: LogTypeAccessKind!
+
+  """
+  The name given to this Role
+  """
+  name: String!
+
+  """
+  The set of permissions associated with the Role (and it's holder)
+  """
+  permissions: [Permission!]!
+
+  """
+  Date and time when the Role got last updated
+  """
+  updatedAt: Timestamp!
+
+  """
+  The Actor that last updated this Role
+  """
+  updatedBy: Actor
+}
+
+"""
+The filter input to the Roles query
+"""
+input RolesInput {
+  """
+  A string to search for in the Role name
+  """
+  nameContains: String
+
+  """
+  The sort direction of the results
+  """
+  sortDir: SortDirEnum
+}
+
+"""
+The output of rotating an API token
+"""
+type RotateAPITokenOutput {
+  """
+  The rotated API token
+  """
+  token: APIToken
+}
+
+"""
+Represents an S3 Log Source Integration
+"""
+type S3LogIntegration implements LogIntegration {
+  """
+  The ID of the AWS Account where the S3 Bucket is located
+  """
+  awsAccountId: String!
+
+  """
+  The time the S3 Log Source was created
+  """
+  createdAtTime: DateTime!
+
+  """
+  The actor who created the S3 Log Source
+  """
+  createdBy: Actor
+
+  """
+  The ID of the Log Source integration
+  """
+  integrationId: ID!
+
+  """
+  The name of the Log Source integration
+  """
+  integrationLabel: String!
+
+  """
+  The type of Log Source integration
+  """
+  integrationType: String!
+
+  """
+  True if the Log Source can be modified
+  """
+  isEditable: Boolean!
+
+  """
+  True if the Log Source is healthy
+  """
+  isHealthy: Boolean!
+
+  """
+  KMS key used to access the S3 Bucket
+  """
+  kmsKey: String
+
+  """
+  The timestamp of the last event processed
+  """
+  lastEventProcessedAtTime: DateTime
+
+  """
+  The timestamp of the last event received
+  """
+  lastEventReceivedAtTime: DateTime
+
+  """
+  The time the log source was last modified
+  """
+  lastModified: DateTime
+
+  """
+  The AWS Role used to access the S3 Bucket
+  """
+  logProcessingRole: String
+
+  """
+  The format of the log files being ingested
+  """
+  logStreamType: LogStreamType
+
+  """
+  Options for the log stream type
+  """
+  logStreamTypeOptions: LogStreamTypeOptions
+
+  """
+  The log types being ingested
+  """
+  logTypes: [String!]!
+
+  """
+  True if bucket notifications are being managed by Panther
+  """
+  managedBucketNotifications: Boolean!
+
+  """
+  The S3 Bucket name being ingested
+  """
+  s3Bucket: String!
+
+  """
+  The prefix on the S3 Bucket name being ingested
+  """
+  s3Prefix: String
+
+  """
+  Used to map prefixes to log types
+  """
+  s3PrefixLogTypes: [S3PrefixLogTypes!]!
+
+  """
+  The AWS stack name where Panther's log ingestion infrastructure is deployed
+  """
+  stackName: String!
+}
+
+"""
+Mapping of S3 prefixes to log types
+"""
+type S3PrefixLogTypes {
+  """
+  S3 Prefixes to exclude
+  """
+  excludedPrefixes: [String!]!
+
+  """
+  Log types to map to prefix
+  """
+  logTypes: [String!]!
+
+  """
+  S3 Prefix to map to log types
+  """
+  prefix: String!
+}
+
+"""
+Mapping of S3 prefixes to log types
+"""
+input S3PrefixLogTypesInput {
+  """
+  S3 Prefixes to exclude
+  """
+  excludedPrefixes: [String!]!
+
+  """
+  Log types to map to prefix
+  """
+  logTypes: [String!]!
+
+  """
+  S3 Prefix to map to log types
+  """
+  prefix: String!
+}
+
+"""
+Metadata that represents a schema
+"""
+type Schema {
+  """
+  The time the schema was created
+  """
+  createdAt: String!
+
+  """
+  The description of the schema
+  """
+  description: String
+
+  """
+  The schema discovered spec
+  """
+  discoveredSpec: String!
+
+  """
+  True if the schema is archived
+  """
+  isArchived: Boolean!
+
+  """
+  A boolean indicating whether the automatic schema field discovery feature is enabled
+  """
+  isFieldDiscoveryEnabled: Boolean!
+
+  """
+  True if the schema is managed by a pack
+  """
+  isManaged: Boolean!
+
+  """
+  The name of the schema
+  """
+  name: String!
+
+  """
+  An optional field that can be used to reference documentation related to the schema
+  """
+  referenceURL: String
+
+  """
+  Revision number for the schema
+  """
+  revision: Int!
+
+  """
+  The schema spec in YAML or JSON format
+  """
+  spec: String!
+
+  """
+  The time the schema was last updated
+  """
+  updatedAt: String
+
+  """
+  The Version of the Schema. This is automatically incremented with every in-place change of the schema.
+  """
+  version: Int!
+}
+
+"""
+The payload to the `schemas` query
+"""
+input SchemasInput {
+  """
+  Filter by name or by schema field name
+  """
+  contains: String
+
+  """
+  An opaque string used when paginating across multiple pages of results
+  Currently, pagination is not supported and this value will always be null
+  """
+  cursor: String
+
+  """
+  Filter by archive status. Leave empty to return all schemas
+  """
+  isArchived: Boolean
+
+  """
+  Filter used/not used schemas. Leave empty to return all schemas
+  """
+  isInUse: Boolean
+
+  """
+  Filter by pack managed schemas
+  """
+  isManaged: Boolean
+}
+
+"""
+The response of the 'schemas' query
+"""
+type SchemasOutput {
+  """
+  A list of paginated schema edges
+  """
+  edges: [SchemasOutputEdge!]!
+
+  """
+  Metadata around this page of results
+  Currently, Schemas will only return 1 page of results
+  """
+  pageInfo: SchemasOutputPageInfo!
+}
+
+"""
+The edge shape of the `SchemaOutput` type
+"""
+type SchemasOutputEdge {
+  """
+  A schema node
+  """
+  node: Schema!
+}
+
+"""
+The metadata around a page of results for the `schemas` query
+"""
+type SchemasOutputPageInfo {
+  """
+  The cursor that the next page of results should start from or `null` if this is the last page
+  """
+  endCursor: String
+
+  """
+  A boolean indicating whether more results exist
+  """
+  hasNextPage: Boolean!
+
+  """
+  A boolean indicating whether this is the first page of results or not
+  """
+  hasPreviousPage: Boolean!
+
+  """
+  The cursor that this page of results started from or `null` if this is the first page
+  """
+  startCursor: String
+}
+
+"""
+A simple series represented as a label/value pair
+"""
+type Series {
+  """
+  The label of this particular value
+  """
+  label: String!
+
+  """
+  The value for the label above
+  """
+  value: Float!
+}
+
+"""
+Same as `Series` with the addition of a timestamp breakdown. Useful for plotting charts.
+"""
+type SeriesWithBreakdown {
+  """
+  A key/value pair that breaks down the `value` field to its constituents. Each key is a timestamp and each value is a
+  fraction of the (total) `value` above
+  """
+  breakdown: JSON!
+
+  """
+  The label of this particular value
+  """
+  label: String!
+
+  """
+  The (total) value for the label above
+  """
+  value: Float!
+}
+
+"""
+Same as `Series` with the addition of an Panther Entity ID. The ID can be mapped to any Panther entity, depending on the
+field that uses the type
+"""
+type SeriesWithEntityID {
+  """
+  The ID of an entity. Could be a Detection ID, a Resource ID, an Alert ID, etc. depending on the field that uses this
+  particular type
+  """
+  entityId: ID!
+
+  """
+  The label of this particular value
+  """
+  label: String!
+
+  """
+  The value for the label above
+  """
+  value: Float!
+}
+
+"""
+The available severity levels that can be associated with a detection or an alert
+"""
+enum Severity {
+  CRITICAL
+  HIGH
+  INFO
+  LOW
+  MEDIUM
+}
+
+"""
+The available sorting direction on a listing operation
+"""
+enum SortDirEnum {
+  ascending
+  descending
+}
+
+"""
+Input for the sources query
+"""
+input SourcesInput {
+  cursor: String
+}
+
+"""
+Output for the sources query
+"""
+type SourcesOutput {
+  """
+  A list of paginated log source edges
+  """
+  edges: [SourcesOutputEdge!]!
+
+  """
+  Metadata around this page of results
+  """
+  pageInfo: CursorBasedPaginationPageInfo!
+}
+
+"""
+The edge shape of the `LogIntegration` source type
+"""
+type SourcesOutputEdge {
+  """
+  A Log Source integration Node
+  """
+  node: LogIntegration!
+}
+
+"""
+The details of a System Error in Panther
+"""
+type SystemError {
+  """
+  The component related to the particular system error
+  """
+  relatedComponent: RelatedComponent!
+
+  """
+  The type of this system error
+  """
+  type: SystemErrorType!
+}
+
+"""
+The types of system errors that Panther supports
+"""
+enum SystemErrorType {
+  ALERT_DELIVERY
+  DETECTION_ALERT_LIMIT_EXCEEDED
+  SOURCE_CLASSIFICATION_FAILURES
+  SOURCE_LOG_PROCESSING_ERRORS
+  SOURCE_NO_DATA
+  SOURCE_PERMISSIONS_CHECKS
+  SOURCE_SCANNING_ERRORS
+}
+
+"""
+An [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601#Times) timestamp in UTC.
+"""
+scalar Timestamp
+
+"""
+The payload to the `updateAlertStatusById` mutation
+"""
+input UpdateAlertStatusByIdInput {
+  """
+  A list of alert IDs to update the status for
+  """
+  ids: [ID!]!
+
+  """
+  The new/updated status that those alerts should have
+  """
+  status: AlertStatus!
+}
+
+"""
+The response of the updateAlertStatusById mutation
+"""
+type UpdateAlertStatusByIdOutput {
+  alerts: [Alert!]!
+}
+
+"""
+The payload to the `updateAlertsAssigneeById` mutation.
+"""
+input UpdateAlertsAssigneeByEmailInput {
+  """
+  If `assigneeEmail` is not provided, the alert is considered `Unassigned`.
+  """
+  assigneeEmail: String
+
+  """
+  A list of AlertIds that we are updating.
+  """
+  ids: [ID!]!
+}
+
+"""
+The response of the updateAlertsAssigneeByEmail mutation
+"""
+type UpdateAlertsAssigneeByEmailOutput {
+  alerts: [Alert!]!
+}
+
+"""
+The payload to the `updateAlertsAssigneeById` mutation.
+"""
+input UpdateAlertsAssigneeByIdInput {
+  """
+  If `assigneeId` is not provided, the alert is considered `Unassigned`.
+  """
+  assigneeId: ID
+
+  """
+  A list of AlertIds that we are updating.
+  """
+  ids: [ID!]!
+}
+
+"""
+The response of the updateAlertsAssigneeById mutation
+"""
+type UpdateAlertsAssigneeByIdOutput {
+  alerts: [Alert!]!
+}
+
+"""
+Input for the UpdateCloudAccount mutation
+"""
+input UpdateCloudAccountInput {
+  """
+  Regions to be ignored by scans of this cloud account
+  """
+  awsRegionIgnoreList: [String!]
+
+  """
+  Scan configuration options
+  """
+  awsScanConfig: AWSScanConfigInput!
+
+  """
+  The ID of the cloud account integration
+  """
+  id: String!
+
+  """
+  Label applied to the Cloud Account integration
+  """
+  label: String!
+
+  """
+  Resources that match this regex will be ignored by scans of this cloud account
+  """
+  resourceRegexIgnoreList: [String!]
+
+  """
+  Resource types to be ignored by scans of this cloud account
+  """
+  resourceTypeIgnoreList: [String!]
+}
+
+"""
+Output for the updateCloudAccount mutation
+"""
+type UpdateCloudAccountOutput {
+  """
+  The cloud account after updates have been applied
+  """
+  cloudAccount: CloudAccount!
+}
+
+"""
+The input to the updateRole mutation
+"""
+input UpdateRoleInput {
+  """
+  The ID of the role to update
+  """
+  id: ID!
+
+  """
+  The log types that the role can or cannot access, according to the `logTypeAccessKind` field. This field should be omitted if `logTypeAccessKind` has a value of `ALLOW_ALL` or `DENY_ALL`
+  """
+  logTypeAccess: [String!]
+
+  """
+  Defines the role's access to log types. This field is required and has effect only if the datalake RBAC feature is enabled.
+  """
+  logTypeAccessKind: LogTypeAccessKind
+
+  """
+  A new name for the role
+  """
+  name: String
+
+  """
+  An array of the role's new permissions
+  """
+  permissions: [Permission!]
+}
+
+"""
+The output to the updateRole mutation
+"""
+type UpdateRoleOutput {
+  """
+  The updated role
+  """
+  role: Role!
+}
+
+"""
+Input for the updateS3Source mutation
+"""
+input UpdateS3SourceInput {
+  """
+  The Id of the S3 Log Source
+  """
+  id: String!
+
+  """
+  The KMS key ARN. Only necessary if your bucket has KMS encryption
+  """
+  kmsKey: String!
+
+  """
+  The label of the S3 Log Source
+  """
+  label: String!
+
+  """
+  The IAM role ARN that Panther will assume to process data from this S3 bucket
+  """
+  logProcessingRole: String!
+
+  """
+  The stream type of the S3 Log Source
+  """
+  logStreamType: LogStreamType!
+
+  """
+  Options for the log stream type
+  """
+  logStreamTypeOptions: LogStreamTypeOptionsInput
+
+  """
+  True if bucket notifications should be managed by Panther
+  """
+  managedBucketNotifications: Boolean!
+
+  """
+  The S3 prefix settings of the S3 Log Source
+  """
+  s3PrefixLogTypes: [S3PrefixLogTypesInput!]!
+}
+
+"""
+Output for the updateS3LogSource mutation
+"""
+type UpdateS3SourceOutput {
+  logSource: S3LogIntegration!
+}
+
+"""
+The payload to the `updateSchemaStatus` mutation
+Used to toggle the archive state of a Custom Schema
+"""
+input UpdateSchemaStatusInput {
+  """
+  The new archive state of the schema
+  """
+  isArchived: Boolean!
+
+  """
+  The name of the Custom Schema
+  """
+  name: String!
+}
+
+"""
+The input to the updateUser query
+"""
+input UpdateUserInput {
+  """
+  The email address of the User
+  """
+  email: Email
+
+  """
+  The family/last Name of the User
+  """
+  familyName: String
+
+  """
+  The given/first name of the User
+  """
+  givenName: String
+
+  """
+  The unique identifier of this User
+  """
+  id: ID!
+
+  """
+  The ID or Name of the User's role
+  """
+  role: UserRoleInput
+}
+
+"""
+The return value of the Update User mutation
+"""
+type UpdateUserOutput {
+  """
+  The updated Panther User object
+  """
+  user: User!
+}
+
+"""
+The payload to the `uploadDetectionEntitiesAsync` mutation
+"""
+input UploadDetectionEntitiesAsyncInput {
+  """
+  Base64-encoded zipfile (up to 5MB) containing detection entities
+  """
+  data: String!
+
+  """
+  When true, the upload will be a dry run and no changes will be made
+  It is only applicable for the V2_ZIP mode
+  """
+  dryRun: Boolean = false
+
+  """
+  The mode of the upload. Defaults to CLASSIC_ZIP
+  """
+  mode: UploadDetectionEntitiesMode = CLASSIC_ZIP
+
+  """
+  Version of the panther_analysis_tool being used to upload
+  """
+  patVersion: String
+
+  """
+  Version of the pypanther tool being used to upload
+  """
+  pypantherVersion: String
+}
+
+"""
+The response of the `uploadDetectionEntitiesAsync` mutation
+"""
+type UploadDetectionEntitiesAsyncOutput {
+  """
+  The receipt ID that can be used to check on the status of the upload
+  """
+  receiptId: ID!
+}
+
+"""
+The payload to the `uploadDetectionEntities` mutation
+"""
+input UploadDetectionEntitiesInput {
+  """
+  Base64-encoded zipfile (up to 5MB) containing detection entities
+  """
+  data: String!
+
+  """
+  The mode of the upload. Defaults to CLASSIC_ZIP
+  """
+  mode: UploadDetectionEntitiesMode = CLASSIC_ZIP
+}
+
+"""
+The different modes available for uploading Detection entities
+"""
+enum UploadDetectionEntitiesMode {
+  """
+  Classic ZIP file upload
+  """
+  CLASSIC_ZIP
+
+  """
+  V2 of the detection content, with class based detections
+  """
+  V2_ZIP
+}
+
+"""
+The response of the `uploadDetectionEntities` mutation
+"""
+type UploadDetectionEntitiesOutput {
+  correlationRules: UploadStatistics!
+  dataModels: UploadStatistics!
+  globalHelpers: UploadStatistics!
+  lookupTables: UploadStatistics!
+  policies: UploadStatistics!
+  queries: UploadStatistics!
+  rules: UploadStatistics!
+}
+
+"""
+The statistics about entities uploaded
+"""
+type UploadStatistics {
+  """
+  The number of items deleted
+  """
+  deleted: Int!
+
+  """
+  The IDs of the items deleted
+  """
+  deletedIds: [ID!]
+
+  """
+  The number of items modified
+  """
+  modified: Int!
+
+  """
+  The IDs of the items modified
+  """
+  modifiedIds: [ID!]
+
+  """
+  The number of items added
+  """
+  new: Int!
+
+  """
+  The IDs of the items added
+  """
+  newIds: [ID!]
+
+  """
+  The total number of items uploaded
+  """
+  total: Int!
+
+  """
+  The IDs of the total items uploaded
+  """
+  totalIds: [ID!]
+}
+
+"""
+The different modes available for uploading Detection entities
+"""
+enum UploadStatus {
+  """
+  The detection entities upload has completed
+  """
+  COMPLETED
+
+  """
+  The detection entities upload has failed
+  """
+  FAILED
+
+  """
+  The detection entities upload has not yet been processed
+  """
+  NOT_PROCESSED
+}
+
+"""
+The details around a physical User entity in Panther
+"""
+type User {
+  """
+  Date and time when the User got created
+  """
+  createdAt: DateTime!
+
+  """
+  The email address of the User
+  """
+  email: Email!
+
+  """
+  Whether the user is active or deactivated.
+  """
+  enabled: Boolean!
+
+  """
+  The family/last name of the User
+  """
+  familyName: String
+
+  """
+  The given/first name of the User
+  """
+  givenName: String
+
+  """
+  The unique identifier of this User
+  """
+  id: ID!
+
+  """
+  Date and time when the User last logged in. This value is null if the user has never logged in.
+  """
+  lastLoggedInAt: DateTime
+
+  """
+  The details of the Role that this User has
+  """
+  role: Role!
+
+  """
+  The Cognito auth-related status of this User
+  """
+  status: String!
+}
+
+"""
+The input to select a role by either ID or Name
+"""
+input UserRoleInput {
+  """
+  The role field to search by
+  """
+  kind: UserRoleInputKind!
+
+  """
+  The value of the role field
+  """
+  value: String!
+}
+
+"""
+The role field to search by
+"""
+enum UserRoleInputKind {
+  ID
+  NAME
+}
