@@ -1,8 +1,13 @@
 # Panther MCP Server
 
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 This is a Model Context Protocol (MCP) server for Panther that provides functionality to:
 1. Authenticate with Panther using a Panther API key
 2. Connect to Panther via GraphQL and list alerts from today
+3. List and manage Panther rules
+4. Query Panther's data lake
+5. Monitor log sources
 
 ## Prerequisites
 
@@ -30,14 +35,23 @@ uv pip install -r requirements.txt
 
 This will install MCP with CLI components, which are necessary for the `mcp install` and `mcp dev` commands.
 
-3. Create a `.env` file in the same directory with your Panther API key:
+3. Create a `.env` file in the same directory with your Panther API key and URLs:
 
 ```
+# Panther API key for authentication
+# You can get this from your Panther dashboard
 PANTHER_API_KEY=your_panther_api_key_here
-PANTHER_API_URL=https://api.your-panther-instance.com/public/graphql
+
+# Panther GraphQL API URL
+# Only change this if you're using a custom Panther instance
+PANTHER_GQL_API_URL=https://api.runpanther.com/public/graphql
+
+# Panther REST API URL
+# Only change this if you're using a custom Panther instance
+PANTHER_REST_API_URL=https://api.runpanther.com
 ```
 
-Replace `your_panther_api_key_here` with your actual Panther API key, and optionally update the API URL if you're using a custom Panther instance.
+Replace `your_panther_api_key_here` with your actual Panther API key, and optionally update the API URLs if you're using a custom Panther instance.
 
 ## Project Structure
 
@@ -102,8 +116,13 @@ python -m mcp_panther.server
 
 The server provides the following tools:
 
-1. `authenticate_with_panther`: Tests authentication with Panther using the API key.
-2. `get_todays_alerts`: Retrieves alerts from Panther for the current day.
+1. `list_alerts`: List alerts from Panther with optional date range, severity, and status filters
+2. `get_alert_by_id`: Get detailed information about a specific alert
+3. `list_sources`: List log sources with optional filters
+4. `execute_data_lake_query`: Execute SQL queries against Panther's data lake
+5. `get_data_lake_query_results`: Get results from a previously executed data lake query
+6. `list_rules`: List all Panther rules with optional pagination
+7. `get_rule_by_id`: Get detailed information about a specific rule
 
 ## Available Resources
 
@@ -111,11 +130,18 @@ The server provides the following resources:
 
 1. `config://panther`: Provides configuration information about the Panther API.
 
+## Available Prompts
+
+The server provides the following prompts:
+
+1. `triage_alert`: Helps triage a specific alert by analyzing its details and associated events
+2. `prioritize_alerts`: Helps prioritize alerts based on severity, impact, and related events
+
 ## Troubleshooting
 
 - If you encounter authentication errors, make sure your Panther API key is correct and has the necessary permissions.
 - Check the server logs for detailed error messages.
-- Ensure your Panther API URL is correctly set if you're using a custom Panther instance.
+- Ensure your Panther API URLs are correctly set if you're using a custom Panther instance.
 - If you see an error like `typer is required`, make sure you've installed MCP with CLI components: `pip install mcp[cli]`
 
 ## License

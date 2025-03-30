@@ -10,6 +10,7 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from mcp.server.fastmcp import FastMCP
 from mcp.server import stdio
 from mcp.server.lowlevel.server import Server
+import aiohttp
 
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
@@ -37,9 +38,12 @@ deps = [
 mcp = FastMCP(MCP_SERVER_NAME, dependencies=deps)
 
 # GraphQL endpoint for Panther
-PANTHER_API_URL = os.getenv(
-    "PANTHER_API_URL", "https://api.runpanther.com/public/graphql"
+PANTHER_GQL_API_URL = os.getenv(
+    "PANTHER_GQL_API_URL", "https://api.runpanther.com/public/graphql"
 )
+
+# REST API endpoints for Panther
+PANTHER_REST_API_URL = os.getenv("PANTHER_REST_API_URL", "https://api.runpanther.com")
 
 
 # Get Panther API key from environment variable
@@ -218,7 +222,7 @@ def _get_today_date_range() -> tuple:
 def _create_panther_client() -> Client:
     """Create a Panther GraphQL client with proper configuration"""
     transport = AIOHTTPTransport(
-        url=PANTHER_API_URL,
+        url=PANTHER_GQL_API_URL,
         headers={"X-API-Key": get_panther_api_key()},
         ssl=True,  # Enable SSL verification
     )
@@ -436,7 +440,7 @@ async def list_sources(
 async def execute_data_lake_query(
     sql: str, database_name: str = "panther_logs"
 ) -> Dict[str, Any]:
-    """Execute a Snowflake SQL query against Panther's data lake.
+    """Execute a Snowflake SQL query against Panther's data lake. RECOMMENDED: First query the information_schema.columns table for the PUBLIC table schema and the p_log_type to get the correct column names and types to query.
 
     Args:
         sql: The Snowflake SQL query to execute (tables are named after p_log_type)
@@ -571,19 +575,114 @@ def triage_alert(alert_id: str) -> str:
 
 @mcp.prompt()
 def prioritize_alerts() -> str:
-    return """You are an expert cyber security analyst. Your goal is to prioritize a list of alerts based on severity, impact, and other relevant criteria to decide which alerts to investigate first.
-
-    1. List all alerts in the last 24 hours and logically group them by user, host, or other criteria.
-    2. Triage each group of alerts to understand what happened and what the impact was.
+    return """You are an expert cyber security analyst. Your goal is to prioritize alerts based on severity, impact, and other relevant criteria to decide which alerts to investigate first. Use the following steps to prioritize alerts:
+    1. List all alerts in the last 24 hours and logically group them by user, host, or other similar criteria. Alerts can be related even if they have different titles or log types (for example, if a user logs into Okta and then AWS).
+    2. Triage each group of alerts to understand what happened and what the impact was. Query the data lake to read all associated events (database: panther_rule_matches.public, table: log type from the alert) and use the results to understand the impact.
     3. Create next steps for each group of alerts to investigate and resolve.
     """
+
+
+@mcp.tool()
+async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
+    """List all rules from Panther with optional pagination
+
+    Args:
+        cursor: Optional cursor for pagination from a previous query
+        limit: Optional maximum number of results to return (default: 100)
+    """
+    logger.info("Fetching rules from Panther")
+
+    try:
+        # Prepare headers
+        headers = {
+            "X-API-Key": get_panther_api_key(),
+            "Content-Type": "application/json",
+        }
+
+        # Prepare query parameters
+        params = {"limit": limit}
+        if cursor:
+            params["cursor"] = cursor
+            logger.info(f"Using cursor for pagination: {cursor}")
+
+        # Make the request
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{PANTHER_REST_API_URL}/rules", headers=headers, params=params
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to fetch rules: {error_text}")
+
+                result = await response.json()
+
+        # Extract rules and pagination info
+        rules = result.get("results", [])
+        next_cursor = result.get("next")
+
+        logger.info(f"Successfully retrieved {len(rules)} rules")
+
+        # Format the response
+        return {
+            "success": True,
+            "rules": rules,
+            "total_rules": len(rules),
+            "has_next_page": bool(next_cursor),
+            "next_cursor": next_cursor,
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch rules: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch rules: {str(e)}"}
+
+
+@mcp.tool()
+async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
+    """Get detailed information about a specific Panther rule by ID
+
+    Args:
+        rule_id: The ID of the rule to fetch
+    """
+    logger.info(f"Fetching rule details for ID: {rule_id}")
+
+    try:
+        # Prepare headers
+        headers = {
+            "X-API-Key": get_panther_api_key(),
+            "Content-Type": "application/json",
+        }
+
+        # Make the request
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{PANTHER_REST_API_URL}/rules/{rule_id}", headers=headers
+            ) as response:
+                if response.status == 404:
+                    logger.warning(f"No rule found with ID: {rule_id}")
+                    return {
+                        "success": False,
+                        "message": f"No rule found with ID: {rule_id}",
+                    }
+                elif response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to fetch rule details: {error_text}")
+
+                rule_data = await response.json()
+
+        logger.info(f"Successfully retrieved rule details for ID: {rule_id}")
+
+        # Format the response
+        return {"success": True, "rule": rule_data}
+    except Exception as e:
+        logger.error(f"Failed to fetch rule details: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch rule details: {str(e)}"}
 
 
 @mcp.resource("config://panther")
 def get_panther_config() -> Dict[str, Any]:
     """Get the Panther API configuration"""
     return {
-        "api_url": PANTHER_API_URL,
+        "gql_api_url": PANTHER_GQL_API_URL,
+        "rest_api_url": PANTHER_REST_API_URL,
         "authenticated": bool(os.getenv("PANTHER_API_KEY")),
         "server_name": MCP_SERVER_NAME,
         "tools": [
@@ -592,6 +691,8 @@ def get_panther_config() -> Dict[str, Any]:
             "list_sources",
             "execute_data_lake_query",
             "get_data_lake_query_results",
+            "list_rules",
+            "get_rule_by_id",
         ],
         "prompts": ["triage_alert", "prioritize_alerts"],
     }
