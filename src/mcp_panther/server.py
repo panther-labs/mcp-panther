@@ -2,7 +2,7 @@ import logging
 import os
 import datetime
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from dotenv import load_dotenv
 from gql import Client, gql
@@ -679,13 +679,11 @@ async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
 
 @mcp.resource("config://panther")
 def get_panther_config() -> Dict[str, Any]:
-    """Get the Panther API configuration"""
+    """Get the Panther configuration."""
     return {
         "gql_api_url": PANTHER_GQL_API_URL,
         "rest_api_url": PANTHER_REST_API_URL,
-        "authenticated": bool(os.getenv("PANTHER_API_KEY")),
-        "server_name": MCP_SERVER_NAME,
-        "tools": [
+        "available_tools": [
             "list_alerts",
             "get_alert_by_id",
             "list_sources",
@@ -693,9 +691,185 @@ def get_panther_config() -> Dict[str, Any]:
             "get_data_lake_query_results",
             "list_rules",
             "get_rule_by_id",
+            "get_metrics_alerts_per_severity",
+            "get_metrics_alerts_per_rule",
         ],
-        "prompts": ["triage_alert", "prioritize_alerts"],
+        "available_resources": ["config://panther"],
+        "available_prompts": ["triage_alert", "prioritize_alerts"],
     }
+
+
+async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute a GraphQL query with the given variables.
+
+    Args:
+        query: The GraphQL query to execute
+        variables: The variables to pass to the query
+
+    Returns:
+        The query result as a dictionary
+    """
+    client = _create_panther_client()
+    async with client as session:
+        return await session.execute(query, variable_values=variables)
+
+
+@mcp.tool()
+async def get_metrics_alerts_per_severity(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    interval_in_minutes: Optional[int] = 60,  # Default to 1 hour
+) -> Dict[str, Any]:
+    """Get metrics about alerts grouped by severity over time.
+
+    Args:
+        from_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
+        to_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
+        interval_in_minutes: Optional interval between metric checks (for plotting charts). Defaults to 60 minutes (1 hour).
+
+    Returns:
+        Dict containing:
+        - alerts_per_severity: List of series with breakdown by severity
+        - total_alerts: Total number of alerts in the period
+    """
+    try:
+        # If no dates provided, get today's date range
+        if not from_date and not to_date:
+            from_date, to_date = _get_today_date_range()
+            logger.info(
+                f"No date range provided, using today's date range: {from_date} to {to_date}"
+            )
+        else:
+            logger.info(f"Using provided date range: {from_date} to {to_date}")
+
+        logger.info(
+            f"Fetching alerts per severity metrics from {from_date} to {to_date}"
+        )
+
+        # Prepare the metrics query
+        metrics_query = gql("""
+            query Metrics($input: MetricsInput!) {
+                metrics(input: $input) {
+                    alertsPerSeverity {
+                        label
+                        value
+                        breakdown
+                    }
+                    totalAlerts
+                }
+            }
+        """)
+
+        # Prepare variables
+        variables = {
+            "input": {
+                "fromDate": from_date,
+                "toDate": to_date,
+                "intervalInMinutes": interval_in_minutes,
+            }
+        }
+
+        # Execute query
+        result = await _execute_query(metrics_query, variables)
+
+        if not result or "metrics" not in result:
+            raise Exception("Failed to fetch metrics data")
+
+        metrics_data = result["metrics"]
+
+        return {
+            "success": True,
+            "alerts_per_severity": metrics_data["alertsPerSeverity"],
+            "total_alerts": metrics_data["totalAlerts"],
+            "from_date": from_date,
+            "to_date": to_date,
+            "interval_in_minutes": interval_in_minutes,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to fetch alerts per severity metrics: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch alerts per severity metrics: {str(e)}",
+        }
+
+
+@mcp.tool()
+async def get_metrics_alerts_per_rule(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    interval_in_minutes: Optional[int] = 60,  # Default to 1 hour
+) -> Dict[str, Any]:
+    """Get metrics about alerts grouped by rule over time.
+
+    Args:
+        from_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
+        to_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
+        interval_in_minutes: Optional interval between metric checks (for plotting charts). Defaults to 60 minutes (1 hour).
+
+    Returns:
+        Dict containing:
+        - alerts_per_rule: List of series with rule IDs and alert counts
+        - total_alerts: Total number of alerts in the period
+    """
+    try:
+        # If no dates provided, get today's date range
+        if not from_date and not to_date:
+            from_date, to_date = _get_today_date_range()
+            logger.info(
+                f"No date range provided, using today's date range: {from_date} to {to_date}"
+            )
+        else:
+            logger.info(f"Using provided date range: {from_date} to {to_date}")
+
+        logger.info(f"Fetching alerts per rule metrics from {from_date} to {to_date}")
+
+        # Prepare the metrics query
+        metrics_query = gql("""
+            query Metrics($input: MetricsInput!) {
+                metrics(input: $input) {
+                    alertsPerRule {
+                        entityId
+                        label
+                        value
+                    }
+                    totalAlerts
+                }
+            }
+        """)
+
+        # Prepare variables
+        variables = {
+            "input": {
+                "fromDate": from_date,
+                "toDate": to_date,
+                "intervalInMinutes": interval_in_minutes,
+            }
+        }
+
+        # Execute query
+        result = await _execute_query(metrics_query, variables)
+
+        if not result or "metrics" not in result:
+            raise Exception("Failed to fetch metrics data")
+
+        metrics_data = result["metrics"]
+
+        return {
+            "success": True,
+            "alerts_per_rule": metrics_data["alertsPerRule"],
+            "total_alerts": metrics_data["totalAlerts"],
+            "from_date": from_date,
+            "to_date": to_date,
+            "interval_in_minutes": interval_in_minutes,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to fetch alerts per rule metrics: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch alerts per rule metrics: {str(e)}",
+        }
 
 
 async def main():

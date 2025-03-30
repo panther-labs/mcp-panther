@@ -28,6 +28,7 @@ pip install -r requirements.txt
 # Using uv (recommended)
 uv venv
 source .venv/bin/activate  # On Unix/macOS
+
 # or
 .venv\Scripts\activate  # On Windows
 uv pip install -r requirements.txt
@@ -74,7 +75,7 @@ Replace `your_panther_api_key_here` with your actual Panther API key, and option
 The simplest way to use this server is to install it in the Claude Desktop App:
 
 ```bash
-mcp install src/mcp_panther/server.py
+uv run mcp install src/mcp_panther/server.py
 ```
 
 This will make the Panther MCP server available to Claude directly.
@@ -84,7 +85,7 @@ This will make the Panther MCP server available to Claude directly.
 For testing and development, you can run the MCP server in development mode:
 
 ```bash
-mcp dev src/mcp_panther/server.py
+uv run mcp dev src/mcp_panther/server.py
 ```
 
 This starts the MCP server and provides an interactive web interface to test its functionality.
@@ -94,22 +95,11 @@ This starts the MCP server and provides an interactive web interface to test its
 You can also run the server directly:
 
 ```bash
-python -m mcp_panther.server
+uv run python -m mcp_panther.server
 ```
 
 This will start the server at http://127.0.0.1:8000/
 
-If you're using a virtual environment tool like pipenv or uv, make sure to run the command within the appropriate environment:
-
-```bash
-# Using pipenv
-pipenv run python -m mcp_panther.server
-
-# Using uv
-source .venv/bin/activate  # On Unix/macOS
-# or
-.venv\Scripts\activate  # On Windows
-python -m mcp_panther.server
 ```
 
 ## Available Tools
@@ -143,6 +133,7 @@ The server provides the following prompts:
 - Check the server logs for detailed error messages.
 - Ensure your Panther API URLs are correctly set if you're using a custom Panther instance.
 - If you see an error like `typer is required`, make sure you've installed MCP with CLI components: `pip install mcp[cli]`
+- Ensure you have `npm` and `uv` installed globally on your system.
 
 ## License
 
