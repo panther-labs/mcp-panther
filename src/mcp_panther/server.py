@@ -145,22 +145,22 @@ def _create_panther_client() -> Client:
     )
     return Client(transport=transport, fetch_schema_from_transport=True)
 
-@mcp.tool()
-async def authenticate_with_panther() -> Dict[str, Any]:
-    """Test authentication with Panther using the API key"""
-    logger.info("Testing authentication with Panther")
-    try:
-        client = _create_panther_client()
+# @mcp.tool()
+# async def authenticate_with_panther() -> Dict[str, Any]:
+#     """Test authentication with Panther using the API key"""
+#     logger.info("Testing authentication with Panther")
+#     try:
+#         client = _create_panther_client()
         
-        # Execute the query asynchronously
-        async with client as session:
-            await session.execute(AUTHENTICATE_QUERY)
+#         # Execute the query asynchronously
+#         async with client as session:
+#             await session.execute(AUTHENTICATE_QUERY)
             
-        logger.info("Successfully authenticated with Panther")
-        return {"success": True, "message": "Authentication successful"}
-    except Exception as e:
-        logger.error(f"Authentication failed: {str(e)}")
-        return {"success": False, "message": f"Authentication failed: {str(e)}"}
+#         logger.info("Successfully authenticated with Panther")
+#         return {"success": True, "message": "Authentication successful"}
+#     except Exception as e:
+#         logger.error(f"Authentication failed: {str(e)}")
+#         return {"success": False, "message": f"Authentication failed: {str(e)}"}
 
 @mcp.tool()
 async def get_todays_alerts() -> Dict[str, Any]:
@@ -306,7 +306,7 @@ def get_panther_config() -> Dict[str, Any]:
         "authenticated": bool(os.getenv("PANTHER_API_KEY")),
         "server_name": MCP_SERVER_NAME,
         "tools": [
-            "authenticate_with_panther",
+            # "authenticate_with_panther",
             "get_todays_alerts",
             "get_alerts_with_cursor",
             "get_alert_by_id"
