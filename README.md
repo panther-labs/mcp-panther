@@ -100,8 +100,6 @@ uv run python -m mcp_panther.server
 
 This will start the server at http://127.0.0.1:8000/
 
-```
-
 ## Available Tools
 
 The server provides the following tools:
@@ -136,7 +134,7 @@ The server provides the following prompts:
 ## Troubleshooting
 
 - If you encounter authentication errors, make sure your Panther API key is correct and has the necessary permissions.
-- Check the server logs for detailed error messages.
+- Check the server logs for detailed error messages: `tail -n 20 -F ~/Library/Logs/Claude/mcp*.log`
 - Ensure your Panther API URLs are correctly set if you're using a custom Panther instance.
 - If you see an error like `typer is required`, make sure you've installed MCP with CLI components: `pip install mcp[cli]`
 - Ensure you have `npm` and `uv` installed globally on your system.
