@@ -305,8 +305,18 @@ async def list_alerts(
     severities: list[str] = None,
     statuses: list[str] = None,
     cursor: str = None,
+    detection_id: str = None,
+    event_count_max: int = None,
+    event_count_min: int = None,
+    log_sources: list[str] = None,
+    log_types: list[str] = None,
+    name_contains: str = None,
+    page_size: int = 25,
+    resource_types: list[str] = None,
+    subtypes: list[str] = None,
+    alert_type: str = "ALERT",  # Defaults to ALERT per schema
 ) -> Dict[str, Any]:
-    """List alerts from Panther for a specified date range or the last 24 hours by default
+    """List alerts from Panther with comprehensive filtering options
 
     Args:
         start_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
@@ -314,51 +324,123 @@ async def list_alerts(
         severities: Optional list of severities to filter by (e.g. ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"])
         statuses: Optional list of statuses to filter by (e.g. ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"])
         cursor: Optional cursor for pagination from a previous query
+        detection_id: Optional detection ID to filter alerts by. If provided, date range is not required.
+        event_count_max: Optional maximum number of events that returned alerts must have
+        event_count_min: Optional minimum number of events that returned alerts must have
+        log_sources: Optional list of log source IDs to filter alerts by
+        log_types: Optional list of log type names to filter alerts by
+        name_contains: Optional string to search for in alert titles
+        page_size: Number of results per page (default: 25)
+        resource_types: Optional list of AWS resource type names to filter alerts by
+        subtypes: Optional list of alert subtypes. Valid values depend on alert_type:
+            - When alert_type="ALERT": ["POLICY", "RULE", "SCHEDULED_RULE"]
+            - When alert_type="DETECTION_ERROR": ["RULE_ERROR", "SCHEDULED_RULE_ERROR"]
+            - When alert_type="SYSTEM_ERROR": subtypes are not allowed
+        alert_type: Type of alerts to return (default: "ALERT"). One of:
+            - "ALERT": Regular detection alerts
+            - "DETECTION_ERROR": Alerts from detection errors
+            - "SYSTEM_ERROR": System error alerts
     """
     logger.info("Fetching alerts from Panther")
 
     try:
         client = _create_panther_client()
 
-        # If no dates provided and no cursor, get the last 24 hours
-        if not start_date and not end_date and not cursor:
-            start_date, end_date = _get_today_date_range()
-            logger.info(
-                f"No date range provided, using last 24 hours: {start_date} to {end_date}"
-            )
-        elif not cursor:
-            logger.info(f"Using provided date range: {start_date} to {end_date}")
+        # Validate alert_type and subtypes combination
+        valid_alert_types = ["ALERT", "DETECTION_ERROR", "SYSTEM_ERROR"]
+        if alert_type not in valid_alert_types:
+            raise ValueError(f"alert_type must be one of {valid_alert_types}")
 
-        # Prepare input variables
+        if subtypes:
+            valid_subtypes = {
+                "ALERT": ["POLICY", "RULE", "SCHEDULED_RULE"],
+                "DETECTION_ERROR": ["RULE_ERROR", "SCHEDULED_RULE_ERROR"],
+                "SYSTEM_ERROR": [],
+            }
+            if alert_type == "SYSTEM_ERROR":
+                raise ValueError(
+                    "subtypes are not allowed when alert_type is SYSTEM_ERROR"
+                )
+
+            allowed_subtypes = valid_subtypes[alert_type]
+            invalid_subtypes = [st for st in subtypes if st not in allowed_subtypes]
+            if invalid_subtypes:
+                raise ValueError(
+                    f"Invalid subtypes {invalid_subtypes} for alert_type={alert_type}. "
+                    f"Valid subtypes are: {allowed_subtypes}"
+                )
+
+        # Prepare base input variables
         variables = {
             "input": {
-                "pageSize": 25,  # Default page size
-                "sortBy": "createdAt",  # Sort by creation date
-                "sortDir": "descending",  # Most recent first
+                "pageSize": page_size,
+                "sortBy": "createdAt",
+                "sortDir": "descending",
+                "type": alert_type,
             }
         }
 
-        # Add date filters if provided and no cursor
-        if not cursor:
-            if start_date:
-                variables["input"]["createdAtAfter"] = start_date
-            if end_date:
-                variables["input"]["createdAtBefore"] = end_date
+        # Handle the required filter: either detectionId OR date range
+        if detection_id:
+            variables["input"]["detectionId"] = detection_id
+            logger.info(f"Filtering by detection ID: {detection_id}")
+        else:
+            # If no detection_id, we must have a date range
+            if not start_date or not end_date:
+                start_date, end_date = _get_today_date_range()
+                logger.info(
+                    f"No detection ID and missing date range, using last 24 hours: {start_date} to {end_date}"
+                )
+            else:
+                logger.info(f"Using provided date range: {start_date} to {end_date}")
 
-        # Add cursor if provided
+            variables["input"]["createdAtAfter"] = start_date
+            variables["input"]["createdAtBefore"] = end_date
+
+        # Add optional filters
         if cursor:
+            if not isinstance(cursor, str):
+                raise ValueError(
+                    "Cursor must be a string value from previous response's endCursor"
+                )
             variables["input"]["cursor"] = cursor
             logger.info(f"Using cursor for pagination: {cursor}")
 
-        # Add severity filters if provided
         if severities:
             variables["input"]["severities"] = severities
             logger.info(f"Filtering by severities: {severities}")
 
-        # Add status filters if provided
         if statuses:
             variables["input"]["statuses"] = statuses
             logger.info(f"Filtering by statuses: {statuses}")
+
+        if event_count_max is not None:
+            variables["input"]["eventCountMax"] = event_count_max
+            logger.info(f"Filtering by max event count: {event_count_max}")
+
+        if event_count_min is not None:
+            variables["input"]["eventCountMin"] = event_count_min
+            logger.info(f"Filtering by min event count: {event_count_min}")
+
+        if log_sources:
+            variables["input"]["logSources"] = log_sources
+            logger.info(f"Filtering by log sources: {log_sources}")
+
+        if log_types:
+            variables["input"]["logTypes"] = log_types
+            logger.info(f"Filtering by log types: {log_types}")
+
+        if name_contains:
+            variables["input"]["nameContains"] = name_contains
+            logger.info(f"Filtering by name contains: {name_contains}")
+
+        if resource_types:
+            variables["input"]["resourceTypes"] = resource_types
+            logger.info(f"Filtering by resource types: {resource_types}")
+
+        if subtypes:
+            variables["input"]["subtypes"] = subtypes
+            logger.info(f"Filtering by subtypes: {subtypes}")
 
         logger.debug(f"Query variables: {variables}")
 
@@ -645,7 +727,7 @@ def triage_alert(alert_id: str) -> str:
 @mcp.prompt()
 def prioritize_and_triage_alerts() -> str:
     return """You are an expert cyber security analyst. Your goal is to prioritize alerts based on severity, impact, and other relevant criteria to decide which alerts to investigate first. Use the following steps to prioritize alerts:
-    1. List all alerts in the last 7 days of severities MEDIUM, HIGH, or CRITICAL, and logically group them by user, host, or other similar criteria. Alerts can be related even if they have different titles or log types (for example, if a user logs into Okta and then AWS).
+    1. List all alerts in the last 7 days excluding severities LOW, and logically group them by user, host, or other similar criteria. Alerts can be related even if they have different titles or log types (for example, if a user logs into Okta and then AWS).
     2. Triage each group of alerts to understand what happened and what the impact was. Query the data lake to read all associated events (database: panther_rule_matches.public, table: log type from the alert) and use the results to understand the impact.
     3. For each group, if the alerts are false positives, suggest a rule improvement by reading the Python source, comment on the alert with your analysis, and mark the alert as invalid. If the alerts are true positives, begin pivoting on the available data to understand the root cause and impact.
     """
