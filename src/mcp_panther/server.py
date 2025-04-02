@@ -1123,26 +1123,45 @@ async def get_metrics_alerts_per_rule(
 
 
 @mcp.tool()
-async def update_alert_status(alert_id: str, status: str) -> Dict[str, Any]:
-    """Update the status of a Panther alert.
+async def update_alert_status(alert_ids: list[str], status: str) -> Dict[str, Any]:
+    """Update the status of one or more Panther alerts.
 
     Args:
-        alert_id: The ID of the alert to update
-        status: The new status for the alert (e.g. "OPEN", "TRIAGED", "RESOLVED", "CLOSED")
+        alert_ids: List of alert IDs to update. Can be a single ID or multiple IDs.
+        status: The new status for the alerts. Must be one of:
+            - "OPEN": Alert is newly created and needs investigation
+            - "TRIAGED": Alert is being investigated
+            - "RESOLVED": Alert has been investigated and resolved
+            - "CLOSED": Alert has been closed (no further action needed)
 
     Returns:
         Dict containing:
         - success: Boolean indicating if the update was successful
-        - alerts: List of updated alerts if successful
+        - alerts: List of updated alerts if successful, each containing:
+            - id: The alert ID
+            - status: The new status
+            - updatedAt: Timestamp of the update
         - message: Error message if unsuccessful
+
+    Example:
+        # Update a single alert
+        result = await update_alert_status(["alert-123"], "TRIAGED")
+
+        # Update multiple alerts
+        result = await update_alert_status(["alert-123", "alert-456"], "RESOLVED")
     """
-    logger.info(f"Updating status for alert {alert_id} to {status}")
+    logger.info(f"Updating status for alerts {alert_ids} to {status}")
 
     try:
+        # Validate status
+        valid_statuses = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"]
+        if status not in valid_statuses:
+            raise ValueError(f"Status must be one of {valid_statuses}")
+
         # Prepare variables
         variables = {
             "input": {
-                "ids": [alert_id],
+                "ids": alert_ids,
                 "status": status,
             }
         }
@@ -1155,7 +1174,7 @@ async def update_alert_status(alert_id: str, status: str) -> Dict[str, Any]:
 
         alerts_data = result["updateAlertStatusById"]["alerts"]
 
-        logger.info(f"Successfully updated alert {alert_id} status to {status}")
+        logger.info(f"Successfully updated {len(alerts_data)} alerts to status {status}")
 
         return {
             "success": True,
