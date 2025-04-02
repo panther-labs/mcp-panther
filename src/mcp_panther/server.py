@@ -311,7 +311,7 @@ async def list_alerts(
     log_sources: list[str] = None,
     log_types: list[str] = None,
     name_contains: str = None,
-    page_size: int = 25,
+    page_size: int = 25,  # Default to 25, max is 50
     resource_types: list[str] = None,
     subtypes: list[str] = None,
     alert_type: str = "ALERT",  # Defaults to ALERT per schema
@@ -330,7 +330,7 @@ async def list_alerts(
         log_sources: Optional list of log source IDs to filter alerts by
         log_types: Optional list of log type names to filter alerts by
         name_contains: Optional string to search for in alert titles
-        page_size: Number of results per page (default: 25)
+        page_size: Number of results per page (default: 25, maximum: 50)
         resource_types: Optional list of AWS resource type names to filter alerts by
         subtypes: Optional list of alert subtypes. Valid values depend on alert_type:
             - When alert_type="ALERT": ["POLICY", "RULE", "SCHEDULED_RULE"]
@@ -345,6 +345,15 @@ async def list_alerts(
 
     try:
         client = _create_panther_client()
+
+        # Validate page size
+        if page_size < 1:
+            raise ValueError("page_size must be greater than 0")
+        if page_size > 50:
+            logger.warning(
+                f"page_size {page_size} exceeds maximum of 50, using 50 instead"
+            )
+            page_size = 50
 
         # Validate alert_type and subtypes combination
         valid_alert_types = ["ALERT", "DETECTION_ERROR", "SYSTEM_ERROR"]
