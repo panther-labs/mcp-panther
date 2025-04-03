@@ -761,7 +761,7 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
 
         # Prepare query parameters
         params = {"limit": limit}
-        if cursor:
+        if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
             params["cursor"] = cursor
             logger.info(f"Using cursor for pagination: {cursor}")
 
@@ -772,7 +772,7 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
-                    raise Exception(f"Failed to fetch rules: {error_text}")
+                    raise Exception(f"Failed to fetch rules (HTTP {response.status}): {error_text}")
 
                 result = await response.json()
 
