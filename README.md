@@ -100,23 +100,47 @@ uv run python -m mcp_panther.server
 
 This will start the server at http://127.0.0.1:8000/
 
+## Use Cases
+
+1. Accidental Alert Storms: If a rule is accidentally firing too many alerts, the AI can disable the rule temporarily, provide a fix (to commit to your rule out of band), and close out all the alerts.
+
 ## Available Tools
 
-The server provides the following tools:
+The server provides tools organized by common SIEM workflows:
 
-1. `list_alerts`: List alerts from Panther with optional date range, severity, and status filters
+### Alert Management
+Tools for monitoring, investigating, and managing alerts:
+1. `list_alerts`: List alerts from Panther with comprehensive filtering options:
+   - Filter by date range, severity, status, detection ID, event count, log sources, log types, resource types
+   - Support for alert types: "ALERT", "DETECTION_ERROR", "SYSTEM_ERROR"
+   - Subtype filtering based on alert type:
+     - For "ALERT": ["POLICY", "RULE", "SCHEDULED_RULE"]
+     - For "DETECTION_ERROR": ["RULE_ERROR", "SCHEDULED_RULE_ERROR"]
+     - For "SYSTEM_ERROR": no subtypes allowed
 2. `get_alert_by_id`: Get detailed information about a specific alert
+3. `update_alert_status`: Update the status of a Panther alert (e.g. OPEN, TRIAGED, RESOLVED, CLOSED)
+4. `add_alert_comment`: Add a comment to a Panther alert
+5. `update_alert_assignee_by_id`: Update the assignee of one or more alerts through the assignee's ID
+
+### Data Investigation
+Tools for investigating security events and incidents:
+1. `execute_data_lake_query`: Execute SQL queries against Panther's data lake
+2. `get_data_lake_query_results`: Get results from a previously executed data lake query
 3. `list_sources`: List log sources with optional filters
-4. `execute_data_lake_query`: Execute SQL queries against Panther's data lake
-5. `get_data_lake_query_results`: Get results from a previously executed data lake query
-6. `list_rules`: List all Panther rules with optional pagination
-7. `get_rule_by_id`: Get detailed information about a specific rule
-8. `update_alert_status`: Update the status of a Panther alert (e.g. OPEN, TRIAGED, RESOLVED, CLOSED)
-9. `add_alert_comment`: Add a comment to a Panther alert
-10. `get_metrics_alerts_per_severity`: Get metrics about alerts grouped by severity over time
-11. `get_metrics_alerts_per_rule`: Get metrics about alerts grouped by rule over time
-12. `update_alert_assignee_by_id`: Update the assignee of one or more alerts through the assignee's ID
-13. `list_panther_users`: List all Panther user accounts
+
+### Rule Management
+Tools for managing detection rules and policies:
+1. `list_rules`: List all Panther rules with optional pagination
+2. `get_rule_by_id`: Get detailed information about a specific rule
+
+### Analytics and Reporting
+Tools for analyzing alert patterns and generating reports:
+1. `get_metrics_alerts_per_severity`: Get metrics about alerts grouped by severity over time
+2. `get_metrics_alerts_per_rule`: Get metrics about alerts grouped by rule over time
+
+### User Management
+Tools for managing Panther users and access:
+1. `list_panther_users`: List all Panther user accounts
 
 ## Available Resources
 
@@ -129,7 +153,7 @@ The server provides the following resources:
 The server provides the following prompts:
 
 1. `triage_alert`: Helps triage a specific alert by analyzing its details and associated events
-2. `prioritize_alerts`: Helps prioritize alerts based on severity, impact, and related events
+2. `prioritize_and_triage_alerts`: Helps prioritize alerts based on severity, impact, and related events
 
 ## Troubleshooting
 
