@@ -311,7 +311,7 @@ async def list_alerts(
     log_sources: list[str] = None,
     log_types: list[str] = None,
     name_contains: str = None,
-    page_size: int = 25,
+    page_size: int = 25,  # Default to 25, max is 50
     resource_types: list[str] = None,
     subtypes: list[str] = None,
     alert_type: str = "ALERT",  # Defaults to ALERT per schema
@@ -330,7 +330,7 @@ async def list_alerts(
         log_sources: Optional list of log source IDs to filter alerts by
         log_types: Optional list of log type names to filter alerts by
         name_contains: Optional string to search for in alert titles
-        page_size: Number of results per page (default: 25)
+        page_size: Number of results per page (default: 25, maximum: 50)
         resource_types: Optional list of AWS resource type names to filter alerts by
         subtypes: Optional list of alert subtypes. Valid values depend on alert_type:
             - When alert_type="ALERT": ["POLICY", "RULE", "SCHEDULED_RULE"]
@@ -345,6 +345,15 @@ async def list_alerts(
 
     try:
         client = _create_panther_client()
+
+        # Validate page size
+        if page_size < 1:
+            raise ValueError("page_size must be greater than 0")
+        if page_size > 50:
+            logger.warning(
+                f"page_size {page_size} exceeds maximum of 50, using 50 instead"
+            )
+            page_size = 50
 
         # Validate alert_type and subtypes combination
         valid_alert_types = ["ALERT", "DETECTION_ERROR", "SYSTEM_ERROR"]
@@ -752,7 +761,7 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
 
         # Prepare query parameters
         params = {"limit": limit}
-        if cursor:
+        if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
             params["cursor"] = cursor
             logger.info(f"Using cursor for pagination: {cursor}")
 
@@ -763,7 +772,7 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
-                    raise Exception(f"Failed to fetch rules: {error_text}")
+                    raise Exception(f"Failed to fetch rules (HTTP {response.status}): {error_text}")
 
                 result = await response.json()
 
@@ -928,6 +937,9 @@ def get_panther_config() -> Dict[str, Any]:
             "get_data_lake_query_results",
             "list_rules",
             "get_rule_by_id",
+            "create_rule",
+            "put_rule",
+            "disable_rule",
             "get_metrics_alerts_per_severity",
             "get_metrics_alerts_per_rule",
             "update_alert_status",
@@ -1114,26 +1126,45 @@ async def get_metrics_alerts_per_rule(
 
 
 @mcp.tool()
-async def update_alert_status(alert_id: str, status: str) -> Dict[str, Any]:
-    """Update the status of a Panther alert.
+async def update_alert_status(alert_ids: list[str], status: str) -> Dict[str, Any]:
+    """Update the status of one or more Panther alerts.
 
     Args:
-        alert_id: The ID of the alert to update
-        status: The new status for the alert (e.g. "OPEN", "TRIAGED", "RESOLVED", "CLOSED")
+        alert_ids: List of alert IDs to update. Can be a single ID or multiple IDs.
+        status: The new status for the alerts. Must be one of:
+            - "OPEN": Alert is newly created and needs investigation
+            - "TRIAGED": Alert is being investigated
+            - "RESOLVED": Alert has been investigated and resolved
+            - "CLOSED": Alert has been closed (no further action needed)
 
     Returns:
         Dict containing:
         - success: Boolean indicating if the update was successful
-        - alerts: List of updated alerts if successful
+        - alerts: List of updated alerts if successful, each containing:
+            - id: The alert ID
+            - status: The new status
+            - updatedAt: Timestamp of the update
         - message: Error message if unsuccessful
+
+    Example:
+        # Update a single alert
+        result = await update_alert_status(["alert-123"], "TRIAGED")
+
+        # Update multiple alerts
+        result = await update_alert_status(["alert-123", "alert-456"], "RESOLVED")
     """
-    logger.info(f"Updating status for alert {alert_id} to {status}")
+    logger.info(f"Updating status for alerts {alert_ids} to {status}")
 
     try:
+        # Validate status
+        valid_statuses = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"]
+        if status not in valid_statuses:
+            raise ValueError(f"Status must be one of {valid_statuses}")
+
         # Prepare variables
         variables = {
             "input": {
-                "ids": [alert_id],
+                "ids": alert_ids,
                 "status": status,
             }
         }
@@ -1146,7 +1177,7 @@ async def update_alert_status(alert_id: str, status: str) -> Dict[str, Any]:
 
         alerts_data = result["updateAlertStatusById"]["alerts"]
 
-        logger.info(f"Successfully updated alert {alert_id} status to {status}")
+        logger.info(f"Successfully updated {len(alerts_data)} alerts to status {status}")
 
         return {
             "success": True,
@@ -1206,6 +1237,324 @@ async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
         return {
             "success": False,
             "message": f"Failed to add alert comment: {str(e)}",
+        }
+
+
+@mcp.tool()
+async def create_rule(
+    rule_id: str,
+    body: str,
+    severity: str,
+    description: str = None,
+    display_name: str = None,
+    enabled: bool = True,
+    log_types: list[str] = None,
+    dedup_period_minutes: int = 60,
+    threshold: int = 1,
+    runbook: str = None,
+    tags: list[str] = None,
+    summary_attributes: list[str] = None,
+    inline_filters: str = None,
+    reports: dict = None,
+    tests: list[dict] = None,
+    run_tests_first: bool = True,
+) -> Dict[str, Any]:
+    """Create a new Panther rule.
+
+    Args:
+        rule_id: Unique identifier for the rule
+        body: Python code that implements the rule logic
+        severity: Alert severity level (INFO, LOW, MEDIUM, HIGH, CRITICAL)
+        description: Optional description of what the rule does
+        display_name: Optional display name for the rule
+        enabled: Whether the rule is active (default: True)
+        log_types: Optional list of log types this rule applies to
+        dedup_period_minutes: Time window for alert deduplication (default: 60)
+        threshold: Number of events required to trigger alert (default: 1)
+        runbook: Optional documentation on how to handle alerts
+        tags: Optional list of tags for categorization
+        summary_attributes: Optional list of fields to summarize in alerts
+        inline_filters: Optional YAML filter for the rule
+        reports: Optional mapping of report names to destinations
+        tests: Optional list of unit tests for the rule
+        run_tests_first: Whether to run tests before saving (default: True)
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the creation was successful
+        - rule: Created rule information if successful
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Creating new rule with ID: {rule_id}")
+
+    try:
+        # Validate severity
+        valid_severities = ["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        if severity not in valid_severities:
+            raise ValueError(f"Severity must be one of {valid_severities}")
+
+        # Prepare rule data
+        rule_data = {
+            "id": rule_id,
+            "body": body,
+            "severity": severity,
+            "enabled": enabled,
+            "dedupPeriodMinutes": dedup_period_minutes,
+            "threshold": threshold,
+        }
+
+        # Add optional fields if provided
+        if description:
+            rule_data["description"] = description
+        if display_name:
+            rule_data["displayName"] = display_name
+        if log_types:
+            rule_data["logTypes"] = log_types
+        if runbook:
+            rule_data["runbook"] = runbook
+        if tags:
+            rule_data["tags"] = tags
+        if summary_attributes:
+            rule_data["summaryAttributes"] = summary_attributes
+        if inline_filters:
+            rule_data["inlineFilters"] = inline_filters
+        if reports:
+            rule_data["reports"] = reports
+        if tests:
+            rule_data["tests"] = tests
+
+        # Prepare headers and query parameters
+        headers = {
+            "X-API-Key": get_panther_api_key(),
+            "Content-Type": "application/json",
+        }
+        params = {"run-tests-first": str(run_tests_first).lower()}
+
+        # Make the request
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{PANTHER_REST_API_URL}/rules",
+                headers=headers,
+                params=params,
+                json=rule_data,
+            ) as response:
+                if response.status == 409:
+                    return {
+                        "success": False,
+                        "message": "Rule with this ID already exists",
+                    }
+                elif response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to create rule: {error_text}")
+
+                result = await response.json()
+
+        logger.info(f"Successfully created rule with ID: {rule_id}")
+
+        return {
+            "success": True,
+            "rule": result,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to create rule: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to create rule: {str(e)}",
+        }
+
+
+@mcp.tool()
+async def put_rule(
+    rule_id: str,
+    body: str,
+    severity: str,
+    description: str = None,
+    display_name: str = None,
+    enabled: bool = None,
+    log_types: list[str] = None,
+    dedup_period_minutes: int = None,
+    threshold: int = None,
+    runbook: str = None,
+    tags: list[str] = None,
+    summary_attributes: list[str] = None,
+    inline_filters: str = None,
+    reports: dict = None,
+    tests: list[dict] = None,
+    run_tests_first: bool = True,
+) -> Dict[str, Any]:
+    """Update an existing Panther rule or create a new one if it doesn't exist.
+
+    Args:
+        rule_id: Unique identifier for the rule
+        body: Python code that implements the rule logic
+        severity: Alert severity level (INFO, LOW, MEDIUM, HIGH, CRITICAL)
+        description: Optional description of what the rule does
+        display_name: Optional display name for the rule
+        enabled: Optional boolean to enable/disable the rule
+        log_types: Optional list of log types this rule applies to
+        dedup_period_minutes: Optional time window for alert deduplication
+        threshold: Optional number of events required to trigger alert
+        runbook: Optional documentation on how to handle alerts
+        tags: Optional list of tags for categorization
+        summary_attributes: Optional list of fields to summarize in alerts
+        inline_filters: Optional YAML filter for the rule
+        reports: Optional mapping of report names to destinations
+        tests: Optional list of unit tests for the rule
+        run_tests_first: Whether to run tests before saving (default: True)
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the update was successful
+        - rule: Updated rule information if successful
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Updating rule with ID: {rule_id}")
+
+    try:
+        # Validate severity
+        valid_severities = ["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        if severity not in valid_severities:
+            raise ValueError(f"Severity must be one of {valid_severities}")
+
+        # Prepare rule data
+        rule_data = {
+            "id": rule_id,
+            "body": body,
+            "severity": severity,
+        }
+
+        # Add optional fields if provided
+        if enabled is not None:
+            rule_data["enabled"] = enabled
+        if description:
+            rule_data["description"] = description
+        if display_name:
+            rule_data["displayName"] = display_name
+        if log_types:
+            rule_data["logTypes"] = log_types
+        if dedup_period_minutes:
+            rule_data["dedupPeriodMinutes"] = dedup_period_minutes
+        if threshold:
+            rule_data["threshold"] = threshold
+        if runbook:
+            rule_data["runbook"] = runbook
+        if tags:
+            rule_data["tags"] = tags
+        if summary_attributes:
+            rule_data["summaryAttributes"] = summary_attributes
+        if inline_filters:
+            rule_data["inlineFilters"] = inline_filters
+        if reports:
+            rule_data["reports"] = reports
+        if tests:
+            rule_data["tests"] = tests
+
+        # Prepare headers and query parameters
+        headers = {
+            "X-API-Key": get_panther_api_key(),
+            "Content-Type": "application/json",
+        }
+        params = {"run-tests-first": str(run_tests_first).lower()}
+
+        # Make the request
+        async with aiohttp.ClientSession() as session:
+            async with session.put(
+                f"{PANTHER_REST_API_URL}/rules/{rule_id}",
+                headers=headers,
+                params=params,
+                json=rule_data,
+            ) as response:
+                if response.status not in [200, 201]:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to update rule: {error_text}")
+
+                result = await response.json()
+
+        logger.info(f"Successfully updated rule with ID: {rule_id}")
+
+        return {
+            "success": True,
+            "rule": result,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to update rule: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to update rule: {str(e)}",
+        }
+
+
+@mcp.tool()
+async def disable_rule(rule_id: str) -> Dict[str, Any]:
+    """Disable a Panther rule by setting enabled to false.
+
+    Args:
+        rule_id: The ID of the rule to disable
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the update was successful
+        - rule: Updated rule information if successful
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Disabling rule with ID: {rule_id}")
+
+    try:
+        # First get the current rule to preserve other fields
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{PANTHER_REST_API_URL}/rules/{rule_id}",
+                headers={"X-API-Key": get_panther_api_key()},
+            ) as response:
+                if response.status == 404:
+                    return {
+                        "success": False,
+                        "message": f"Rule with ID {rule_id} not found",
+                    }
+                elif response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to fetch rule: {error_text}")
+
+                rule_data = await response.json()
+
+        # Update only the enabled field
+        rule_data["enabled"] = False
+
+        # Prepare headers and query parameters
+        headers = {
+            "X-API-Key": get_panther_api_key(),
+            "Content-Type": "application/json",
+        }
+        params = {"run-tests-first": "false"}  # Skip tests for simple disable
+
+        # Make the update request
+        async with aiohttp.ClientSession() as session:
+            async with session.put(
+                f"{PANTHER_REST_API_URL}/rules/{rule_id}",
+                headers=headers,
+                params=params,
+                json=rule_data,
+            ) as response:
+                if response.status not in [200, 201]:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to disable rule: {error_text}")
+
+                result = await response.json()
+
+        logger.info(f"Successfully disabled rule with ID: {rule_id}")
+
+        return {
+            "success": True,
+            "rule": result,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to disable rule: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to disable rule: {str(e)}",
         }
 
 
