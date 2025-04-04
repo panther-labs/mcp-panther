@@ -6,7 +6,11 @@ import logging
 from typing import Dict, Any
 
 from ..client import _create_panther_client
-from ..queries import EXECUTE_DATA_LAKE_QUERY, GET_DATA_LAKE_QUERY
+from ..queries import (
+    EXECUTE_DATA_LAKE_QUERY,
+    GET_DATA_LAKE_QUERY,
+    ALL_DATABASE_ENTITIES_QUERY,
+)
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
@@ -53,6 +57,92 @@ async def execute_data_lake_query(
         return {
             "success": False,
             "message": f"Failed to execute data lake query: {str(e)}",
+        }
+
+
+@mcp_tool
+async def get_data_lake_dbs_tables_columns(
+    database: str = None,
+    table: str = None
+) -> Dict[str, Any]:
+    """List all available databases, tables, and columns for querying Panther's data lake. Check this BEFORE running a data lake query.
+
+    Args:
+        database: Optional database name to filter results. Available databases:
+            - panther_logs.public: Contains all log data
+            - panther_cloudsecurity.public: Contains cloud security scanning data
+            - panther_rule_errors.public: Contains rule execution errors
+        table: Optional table name to filter results (e.g. "compliance_history")
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - databases: List of databases, each containing:
+            - name: Database name
+            - description: Database description
+            - tables: List of tables, each containing:
+                - name: Table name
+                - description: Table description
+                - columns: List of columns, each containing:
+                    - name: Column name
+                    - description: Column description
+                    - type: Column data type
+        - message: Error message if unsuccessful
+    """
+    logger.info("Fetching available databases, tables, and columns")
+
+    try:
+        client = _create_panther_client()
+
+        # Execute the query asynchronously
+        async with client as session:
+            result = await session.execute(ALL_DATABASE_ENTITIES_QUERY)
+
+        # Get databases data
+        databases = result.get("dataLakeDatabases", [])
+
+        # Log unique database names
+        unique_dbs = sorted({db["name"] for db in databases})
+        logger.info(f"Available databases from API: {', '.join(unique_dbs)}")
+
+        # Filter by database if specified
+        if database:
+            databases = [db for db in databases if db["name"].lower() == database.lower()]
+            if not databases:
+                return {
+                    "success": False,
+                    "message": f"Database '{database}' not found"
+                }
+
+        # Filter by table if specified
+        if table:
+            for db in databases:
+                db["tables"] = [t for t in db["tables"] if t["name"].lower() == table.lower()]
+            # Only keep databases that have matching tables
+            databases = [db for db in databases if db["tables"]]
+            if not databases:
+                return {
+                    "success": False,
+                    "message": f"Table '{table}' not found in any database"
+                }
+
+        logger.info(f"Successfully retrieved {len(databases)} databases")
+        if database:
+            logger.info(f"Filtered to database: {database}")
+        if table:
+            logger.info(f"Filtered to table: {table}")
+
+        # Format the response
+        return {
+            "success": True,
+            "databases": databases,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to fetch data lake entities: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch data lake entities: {str(e)}",
         }
 
 

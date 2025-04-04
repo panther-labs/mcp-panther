@@ -26,7 +26,6 @@ logging.basicConfig(
 logger = logging.getLogger(MCP_SERVER_NAME)
 
 
-
 # Server dependencies
 deps = [
     "python-dotenv",
