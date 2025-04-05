@@ -115,6 +115,7 @@ async def list_alerts(
             logger.info(f"Filtering by detection ID: {detection_id}")
         else:
             # If no detection_id, we must have a date range
+            # TODO(jn): Add support for relative date ranges
             if not start_date or not end_date:
                 start_date, end_date = _get_today_date_range()
                 logger.info(
