@@ -46,7 +46,9 @@ def register_all_tools(mcp_instance) -> None:
     """
     logger.info(f"Registering {len(_tool_registry)} tools with MCP")
 
-    for tool in _tool_registry:
+    # Sort tools by name
+    sorted_funcs = sorted(_tool_registry, key=lambda f: f.__name__)
+    for tool in sorted_funcs:
         logger.debug(f"Registering tool: {tool.__name__}")
         mcp_instance.tool()(tool)
 
