@@ -212,6 +212,48 @@ query AllDatabaseEntities {
 }
 """)
 
+# Add after ALL_DATABASE_ENTITIES_QUERY
+
+LIST_SCHEMAS_QUERY = gql("""
+query ListSchemas($input: SchemasInput!) {
+    schemas(input: $input) {
+        edges {
+            node {
+                name
+                description
+                revision
+                isArchived
+                isManaged
+                referenceURL
+                createdAt
+                updatedAt
+            }
+        }
+    }
+}
+""")
+
+CREATE_OR_UPDATE_SCHEMA_MUTATION = gql("""
+mutation CreateOrUpdateSchema($input: CreateOrUpdateSchemaInput!) {
+    createOrUpdateSchema(input: $input) {
+        schema {
+            name
+            description
+            spec
+            version
+            revision
+            isArchived
+            isManaged
+            isFieldDiscoveryEnabled
+            referenceURL
+            discoveredSpec
+            createdAt
+            updatedAt
+        }
+    }
+}
+""")
+
 # User Queries
 LIST_USERS_QUERY = gql("""
 query ListUsers {
@@ -256,6 +298,29 @@ query Metrics($input: MetricsInput!) {
             value
         }
         totalAlerts
+    }
+}
+""")
+
+GET_SCHEMA_DETAILS_QUERY = gql("""
+query GetSchemaDetails($name: String!) {
+    schemas(input: { contains: $name }) {
+        edges {
+            node {
+                name
+                description
+                spec
+                version
+                revision
+                isArchived
+                isManaged
+                isFieldDiscoveryEnabled
+                referenceURL
+                discoveredSpec
+                createdAt
+                updatedAt
+            }
+        }
     }
 }
 """)
