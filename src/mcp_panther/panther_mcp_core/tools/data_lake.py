@@ -369,17 +369,13 @@ async def get_schema_details(schema_names: list[str]) -> Dict[str, Any]:
                 continue
 
             edges = schemas_data.get("edges", [])
-            # Only add the schema if it's an exact name match
-            matching_schemas = [
-                edge["node"]
-                for edge in edges
-                if edge["node"]["name"].lower() == name.lower()
-            ]
+            # The query now returns exact matches, so we can use all results
+            matching_schemas = [edge["node"] for edge in edges]
 
             if matching_schemas:
                 all_schemas.extend(matching_schemas)
             else:
-                logger.warning(f"No exact match found for schema {name}")
+                logger.warning(f"No match found for schema {name}")
 
         if not all_schemas:
             return {"success": False, "message": "No matching schemas found"}

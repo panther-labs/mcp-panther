@@ -304,7 +304,7 @@ query Metrics($input: MetricsInput!) {
 
 GET_SCHEMA_DETAILS_QUERY = gql("""
 query GetSchemaDetails($name: String!) {
-    schemas(input: { contains: $name }) {
+    schemas(input: { name: $name }) {
         edges {
             node {
                 name
