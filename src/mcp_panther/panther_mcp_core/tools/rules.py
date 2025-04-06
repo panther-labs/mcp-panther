@@ -52,13 +52,30 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
         rules = result.get("results", [])
         next_cursor = result.get("next")
 
-        logger.info(f"Successfully retrieved {len(rules)} rules")
+        # Keep only specific fields for each rule to limit the amount of data returned
+        filtered_rules_metadata = [
+            {
+                "id": rule["id"],
+                "description": rule.get("description"),
+                "displayName": rule.get("displayName"),
+                "enabled": rule.get("enabled"),
+                "severity": rule.get("severity"),
+                "logTypes": rule.get("logTypes"),
+                "tags": rule.get("tags"),
+                "managed": rule.get("managed"),
+                "createdAt": rule.get("createdAt"),
+                "lastModified": rule.get("lastModified"),
+            }
+            for rule in rules
+        ]
+
+        logger.info(f"Successfully retrieved {len(filtered_rules_metadata)} rules")
 
         # Format the response
         return {
             "success": True,
-            "rules": rules,
-            "total_rules": len(rules),
+            "rules": filtered_rules_metadata,
+            "total_rules": len(filtered_rules_metadata),
             "has_next_page": bool(next_cursor),
             "next_cursor": next_cursor,
         }
@@ -69,7 +86,7 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
 
 @mcp_tool
 async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
-    """Get detailed information about a specific Panther rule by ID
+    """Get detailed information about a Panther rule by ID including the rule body and tests
 
     Args:
         rule_id: The ID of the rule to fetch
