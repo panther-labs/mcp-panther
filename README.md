@@ -92,8 +92,7 @@ Your Panther API key and URL can be configured in two ways:
 2. Using a `.env` file in the root repository directory with the following format:
 
 ```
-PANTHER_GQL_API_URL=https://api.YOUR-INSTANCE.domain/public/graphql
-PANTHER_REST_API_URL=https://api.YOUR-INSTANCE.domain
+PANTHER_INSTANCE_URL=https://YOUR-INSTANCE.domain
 PANTHER_API_KEY=YOUR-API-KEY
 ```
 

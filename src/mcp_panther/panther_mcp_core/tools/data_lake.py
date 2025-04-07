@@ -29,7 +29,7 @@ async def execute_data_lake_query(
     logger.info("Executing data lake query")
 
     try:
-        client = _create_panther_client()
+        client = await _create_panther_client()
 
         # Prepare input variables
         variables = {"input": {"sql": sql, "databaseName": database_name}}
@@ -91,7 +91,7 @@ async def get_data_lake_dbs_tables_columns(
     logger.info("Fetching available databases, tables, and columns")
 
     try:
-        client = _create_panther_client()
+        client = await _create_panther_client()
 
         # Execute the query asynchronously
         async with client as session:
@@ -156,7 +156,7 @@ async def get_data_lake_query_results(query_id: str) -> Dict[str, Any]:
     logger.info(f"Fetching results for query ID: {query_id}")
 
     try:
-        client = _create_panther_client()
+        client = await _create_panther_client()
 
         # Prepare input variables
         variables = {"id": query_id, "root": False}
