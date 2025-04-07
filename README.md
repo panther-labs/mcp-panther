@@ -78,6 +78,22 @@ Use the command, args, and env variables below:
 }
 ```
 
+### Credentials
+
+Your Panther API key and URL can be configured in two ways:
+
+1. Through the MCP Client configuration's `env` key (as shown in the Configuration section above). This will take the highest precedence.
+
+2. Using a `.env` file in the root repository directory with the following format:
+
+```
+PANTHER_GQL_API_URL=https://YOUR-INSTANCE.domain/v1/public/graphql
+PANTHER_REST_API_URL=https://YOUR-INSTANCE.domain/v1
+PANTHER_API_KEY=YOUR-API-KEY
+```
+
+Make sure to replace the placeholder values with your actual Panther instance URLs and API key.
+
 ## Usage
 
 ### Option 1: Install in Claude Desktop App
@@ -116,27 +132,33 @@ The server provides tools organized by common SIEM workflows:
 
 | Category | Tool Name | Description | Sample Prompt |
 |----------|-----------|-------------|---------------|
-| **Alert Management** | `list_alerts` | List alerts with comprehensive filtering options (date range, severity, status, etc.) | "Show me all high severity alerts from the last 24 hours" |
+| **Alert Management** | | | |
+| | `list_alerts` | List alerts with comprehensive filtering options (date range, severity, status, etc.) | "Show me all high severity alerts from the last 24 hours" |
 | | `get_alert_by_id` | Get detailed information about a specific alert | "What's the status of alert 8def456?" |
 | | `update_alert_status` | Update the status of one or more alerts | "Mark alerts abc123 and def456 as resolved" |
 | | `add_alert_comment` | Add a comment to a Panther alert | "Add comment 'Looks pretty bad' to alert abc123" |
 | | `update_alert_assignee_by_id` | Update the assignee of one or more alerts | "Assign alerts abc123 and def456 to John" |
-| **Data Investigation** | `execute_data_lake_query` | Execute SQL queries against Panther's data lake | "Query AWS CloudTrail logs for failed login attempts in the last day" |
+| **Data Investigation** | | | |
+| | `execute_data_lake_query` | Execute SQL queries against Panther's data lake | "Query AWS CloudTrail logs for failed login attempts in the last day" |
 | | `get_data_lake_query_results` | Get results from a previously executed data lake query | "Get results for query ID abc123" |
 | | `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
 | | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
 | | `get_data_lake_dbs_tables_columns` | List databases, tables, and columns in the data lake | "List all available tables in the panther_logs database" |
-| **Rule Management** | `list_rules` | List all Panther rules with optional pagination | "Show me all enabled rules" |
+| **Rule Management** | | | |
+| | `list_rules` | List all Panther rules with optional pagination | "Show me all enabled rules" |
 | | `get_rule_by_id` | Get detailed information about a specific rule | "Get details for rule ID abc123" |
 | | `create_rule` | Create a new Panther rule | "Create a new rule to detect failed logins" |
 | | `put_rule` | Update an existing rule or create a new one | "Update rule abc123 with new severity HIGH" |
 | | `disable_rule` | Disable a rule by setting enabled to false | "Disable rule abc123" |
-| **Schema Management** | `list_schemas` | List available schemas with optional filters | "Show me all AWS-related schemas" |
+| **Schema Management** | | | |
+| | `list_schemas` | List available schemas with optional filters | "Show me all AWS-related schemas" |
 | | `get_schema_details` | Get detailed information for specific schemas | "Get full details for AWS.CloudTrail schema" |
 | | `create_or_update_schema` | Create or update a schema | "Create a new schema for custom log type" |
-| **Analytics and Reporting** | `get_metrics_alerts_per_severity` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
+| **Analytics and Reporting** | | | |
+| | `get_metrics_alerts_per_severity` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
 | | `get_metrics_alerts_per_rule` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
-| **User Management** | `list_panther_users` | List all Panther user accounts | "Show me all active Panther users" |
+| **User Management** | | | |
+| | `list_panther_users` | List all Panther user accounts | "Show me all active Panther users" |
 
 ## Available Resources
 
