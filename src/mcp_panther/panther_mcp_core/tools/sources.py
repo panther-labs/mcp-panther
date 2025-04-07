@@ -13,7 +13,7 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
-async def list_sources(
+async def list_log_sources(
     cursor: str = None,
     log_types: List[str] = None,
     is_healthy: bool = None,
@@ -40,21 +40,6 @@ async def list_sources(
             variables["input"]["cursor"] = cursor
             logger.info(f"Using cursor for pagination: {cursor}")
 
-        # Add log types filter if provided
-        if log_types:
-            variables["input"]["logTypes"] = log_types
-            logger.info(f"Filtering by log types: {log_types}")
-
-        # Add health status filter if provided
-        if is_healthy is not None:
-            variables["input"]["isHealthy"] = is_healthy
-            logger.info(f"Filtering by health status: {is_healthy}")
-
-        # Add integration type filter if provided
-        if integration_type:
-            variables["input"]["integrationType"] = integration_type
-            logger.info(f"Filtering by integration type: {integration_type}")
-
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
@@ -71,6 +56,29 @@ async def list_sources(
 
         # Extract sources from edges
         sources = [edge["node"] for edge in source_edges]
+
+        # Apply post-request filtering
+        if is_healthy is not None:
+            sources = [
+                source for source in sources if source["isHealthy"] == is_healthy
+            ]
+            logger.info(f"Filtered by health status: {is_healthy}")
+
+        if log_types:
+            sources = [
+                source
+                for source in sources
+                if any(log_type in source["logTypes"] for log_type in log_types)
+            ]
+            logger.info(f"Filtered by log types: {log_types}")
+
+        if integration_type:
+            sources = [
+                source
+                for source in sources
+                if source["integrationType"] == integration_type
+            ]
+            logger.info(f"Filtered by integration type: {integration_type}")
 
         logger.info(f"Successfully retrieved {len(sources)} log sources")
 

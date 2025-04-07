@@ -21,52 +21,78 @@ This is a Model Context Protocol (MCP) server for Panther that provides function
 
 2. Install the required dependencies:
 
-```bash
-# Using pip
-pip install -r requirements.txt
+**Using pip**
 
-# Using uv (recommended)
+```bash
+pip install -r requirements.txt
+```
+
+**Using uv (recommended)**
+
+```bash
 uv venv
 source .venv/bin/activate  # On Unix/macOS
+```
 
-# or
+**Using uv on Windows**
+
+```bash
 .venv\Scripts\activate  # On Windows
 uv pip install -r requirements.txt
 ```
 
 This will install MCP with CLI components, which are necessary for the `mcp install` and `mcp dev` commands.
 
-3. Create a `.env` file in the same directory with your Panther API key and URLs:
+## Configuration
+
+Create your API Token on the `/settings/api/tokens/` page (with least privilege) in your Panther instance along with copying the API URL.
+
+Use the command, args, and env variables below:
+
+```json
+{
+  "mcpServers": {
+    "mcp-panther": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with",
+        "aiohttp",
+        "--with",
+        "gql[aiohttp]",
+        "--with",
+        "mcp[cli]",
+        "--with",
+        "python-dotenv",
+        "mcp",
+        "run",
+        "PATH/TO/MCPS/mcp-panther/src/mcp_panther/server.py"
+      ],
+      "env": {
+        "PANTHER_GQL_API_URL": "https://YOUR-INSTANCE.domain/v1/public/graphql",
+        "PANTHER_REST_API_URL": "https://YOUR-INSTANCE.domain/v1",
+        "PANTHER_API_KEY": "YOUR-API-KEY"
+      }
+    }
+  }
+}
+```
+
+### Credentials
+
+Your Panther API key and URL can be configured in two ways:
+
+1. Through the MCP Client configuration's `env` key (as shown in the Configuration section above). This will take the highest precedence.
+
+2. Using a `.env` file in the root repository directory with the following format:
 
 ```
-# Panther API key for authentication
-# You can get this from your Panther dashboard
-PANTHER_API_KEY=your_panther_api_key_here
-
-# Panther GraphQL API URL
-# Only change this if you're using a custom Panther instance
-PANTHER_GQL_API_URL=https://api.runpanther.com/public/graphql
-
-# Panther REST API URL
-# Only change this if you're using a custom Panther instance
-PANTHER_REST_API_URL=https://api.runpanther.com
+PANTHER_GQL_API_URL=https://YOUR-INSTANCE.domain/v1/public/graphql
+PANTHER_REST_API_URL=https://YOUR-INSTANCE.domain/v1
+PANTHER_API_KEY=YOUR-API-KEY
 ```
 
-Replace `your_panther_api_key_here` with your actual Panther API key, and optionally update the API URLs if you're using a custom Panther instance.
-
-## Project Structure
-
-```
-.
-├── src/
-│   └── mcp_panther/
-│       ├── __init__.py
-│       └── server.py
-├── .env.example
-├── pyproject.toml
-├── requirements.txt
-└── LICENSE
-```
+Make sure to replace the placeholder values with your actual Panther instance URLs and API key.
 
 ## Usage
 
@@ -100,47 +126,39 @@ uv run python -m mcp_panther.server
 
 This will start the server at http://127.0.0.1:8000/
 
-## Use Cases
-
-1. Accidental Alert Storms: If a rule is accidentally firing too many alerts, the AI can disable the rule temporarily, provide a fix (to commit to your rule out of band), and close out all the alerts.
-
 ## Available Tools
 
 The server provides tools organized by common SIEM workflows:
 
-### Alert Management
-Tools for monitoring, investigating, and managing alerts:
-1. `list_alerts`: List alerts from Panther with comprehensive filtering options:
-   - Filter by date range, severity, status, detection ID, event count, log sources, log types, resource types
-   - Support for alert types: "ALERT", "DETECTION_ERROR", "SYSTEM_ERROR"
-   - Subtype filtering based on alert type:
-     - For "ALERT": ["POLICY", "RULE", "SCHEDULED_RULE"]
-     - For "DETECTION_ERROR": ["RULE_ERROR", "SCHEDULED_RULE_ERROR"]
-     - For "SYSTEM_ERROR": no subtypes allowed
-2. `get_alert_by_id`: Get detailed information about a specific alert
-3. `update_alert_status`: Update the status of a Panther alert (e.g. OPEN, TRIAGED, RESOLVED, CLOSED)
-4. `add_alert_comment`: Add a comment to a Panther alert
-5. `update_alert_assignee_by_id`: Update the assignee of one or more alerts through the assignee's ID
-
-### Data Investigation
-Tools for investigating security events and incidents:
-1. `execute_data_lake_query`: Execute SQL queries against Panther's data lake
-2. `get_data_lake_query_results`: Get results from a previously executed data lake query
-3. `list_sources`: List log sources with optional filters
-
-### Rule Management
-Tools for managing detection rules and policies:
-1. `list_rules`: List all Panther rules with optional pagination
-2. `get_rule_by_id`: Get detailed information about a specific rule
-
-### Analytics and Reporting
-Tools for analyzing alert patterns and generating reports:
-1. `get_metrics_alerts_per_severity`: Get metrics about alerts grouped by severity over time
-2. `get_metrics_alerts_per_rule`: Get metrics about alerts grouped by rule over time
-
-### User Management
-Tools for managing Panther users and access:
-1. `list_panther_users`: List all Panther user accounts
+| Category | Tool Name | Description | Sample Prompt |
+|----------|-----------|-------------|---------------|
+| **Alert Management** | | | |
+| | `list_alerts` | List alerts with comprehensive filtering options (date range, severity, status, etc.) | "Show me all high severity alerts from the last 24 hours" |
+| | `get_alert_by_id` | Get detailed information about a specific alert | "What's the status of alert 8def456?" |
+| | `update_alert_status` | Update the status of one or more alerts | "Mark alerts abc123 and def456 as resolved" |
+| | `add_alert_comment` | Add a comment to a Panther alert | "Add comment 'Looks pretty bad' to alert abc123" |
+| | `update_alert_assignee_by_id` | Update the assignee of one or more alerts | "Assign alerts abc123 and def456 to John" |
+| **Data Investigation** | | | |
+| | `execute_data_lake_query` | Execute SQL queries against Panther's data lake | "Query AWS CloudTrail logs for failed login attempts in the last day" |
+| | `get_data_lake_query_results` | Get results from a previously executed data lake query | "Get results for query ID abc123" |
+| | `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
+| | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
+| | `get_data_lake_dbs_tables_columns` | List databases, tables, and columns in the data lake | "List all available tables in the panther_logs database" |
+| **Rule Management** | | | |
+| | `list_rules` | List all Panther rules with optional pagination | "Show me all enabled rules" |
+| | `get_rule_by_id` | Get detailed information about a specific rule | "Get details for rule ID abc123" |
+| | `create_rule` | Create a new Panther rule | "Create a new rule to detect failed logins" |
+| | `put_rule` | Update an existing rule or create a new one | "Update rule abc123 with new severity HIGH" |
+| | `disable_rule` | Disable a rule by setting enabled to false | "Disable rule abc123" |
+| **Schema Management** | | | |
+| | `list_schemas` | List available schemas with optional filters | "Show me all AWS-related schemas" |
+| | `get_schema_details` | Get detailed information for specific schemas | "Get full details for AWS.CloudTrail schema" |
+| | `create_or_update_schema` | Create or update a schema | "Create a new schema for custom log type" |
+| **Analytics and Reporting** | | | |
+| | `get_metrics_alerts_per_severity` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
+| | `get_metrics_alerts_per_rule` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
+| **User Management** | | | |
+| | `list_panther_users` | List all Panther user accounts | "Show me all active Panther users" |
 
 ## Available Resources
 

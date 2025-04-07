@@ -18,7 +18,7 @@ logger = logging.getLogger("mcp-panther")
 
 @mcp_tool
 async def execute_data_lake_query(
-    sql: str, database_name: str = "panther_logs"
+    sql: str, database_name: str = "panther_logs.public"
 ) -> Dict[str, Any]:
     """Execute a Snowflake SQL query against Panther's data lake. RECOMMENDED: First query the information_schema.columns table for the PUBLIC table schema and the p_log_type to get the correct column names and types to query.
 
@@ -62,8 +62,7 @@ async def execute_data_lake_query(
 
 @mcp_tool
 async def get_data_lake_dbs_tables_columns(
-    database: str = None,
-    table: str = None
+    database: str = None, table: str = None
 ) -> Dict[str, Any]:
     """List all available databases, tables, and columns for querying Panther's data lake. Check this BEFORE running a data lake query.
 
@@ -107,23 +106,24 @@ async def get_data_lake_dbs_tables_columns(
 
         # Filter by database if specified
         if database:
-            databases = [db for db in databases if db["name"].lower() == database.lower()]
+            databases = [
+                db for db in databases if db["name"].lower() == database.lower()
+            ]
             if not databases:
-                return {
-                    "success": False,
-                    "message": f"Database '{database}' not found"
-                }
+                return {"success": False, "message": f"Database '{database}' not found"}
 
         # Filter by table if specified
         if table:
             for db in databases:
-                db["tables"] = [t for t in db["tables"] if t["name"].lower() == table.lower()]
+                db["tables"] = [
+                    t for t in db["tables"] if t["name"].lower() == table.lower()
+                ]
             # Only keep databases that have matching tables
             databases = [db for db in databases if db["tables"]]
             if not databases:
                 return {
                     "success": False,
-                    "message": f"Table '{table}' not found in any database"
+                    "message": f"Table '{table}' not found in any database",
                 }
 
         logger.info(f"Successfully retrieved {len(databases)} databases")

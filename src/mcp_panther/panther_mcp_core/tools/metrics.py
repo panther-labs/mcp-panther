@@ -18,7 +18,7 @@ async def get_metrics_alerts_per_severity(
     to_date: Optional[str] = None,
     interval_in_minutes: Optional[int] = 60,  # Default to 1 hour
 ) -> Dict[str, Any]:
-    """Get metrics about alerts grouped by severity over time.
+    """Get quick metric counts of alerts grouped by severity over time.
 
     Args:
         from_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
@@ -84,7 +84,7 @@ async def get_metrics_alerts_per_rule(
     to_date: Optional[str] = None,
     interval_in_minutes: Optional[int] = 60,  # Default to 1 hour
 ) -> Dict[str, Any]:
-    """Get metrics about alerts grouped by rule over time.
+    """Get quick metric counts of alerts grouped by rule over time.
 
     Args:
         from_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
