@@ -1,5 +1,7 @@
 # Panther MCP Server
 
+> Note: MCP-PANTHER IS IN ACTIVE DEVELOPMENT! We recommend careful considerations for expensive operations such as data lake queries.
+
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 This is a Model Context Protocol (MCP) server for Panther that provides functionality to:
