@@ -19,3 +19,6 @@ mcp-panther = "mcp_panther:main"
 dev = [
     "ruff>=0.11.2",
 ]
+
+[tool.ruff.lint]
+ignore = ["E402"]

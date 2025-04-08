@@ -64,7 +64,7 @@ async def list_alerts(
     logger.info("Fetching alerts from Panther")
 
     try:
-        client = _create_panther_client()
+        client = await _create_panther_client()
 
         # Validate page size
         if page_size < 1:
@@ -213,7 +213,7 @@ async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
     """Get detailed information about a specific Panther alert by ID"""
     logger.info(f"Fetching alert details for ID: {alert_id}")
     try:
-        client = _create_panther_client()
+        client = await _create_panther_client()
 
         # Prepare input variables
         variables = {"id": alert_id}

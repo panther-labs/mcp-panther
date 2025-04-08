@@ -1,21 +1,51 @@
 import os
 import logging
 import datetime
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional, Union, AnyStr
+import re
+import json
 
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
-
-# GraphQL endpoint for Panther
-PANTHER_GQL_API_URL = os.getenv(
-    "PANTHER_GQL_API_URL", "https://api.runpanther.com/public/graphql"
-)
-
-# REST API endpoints for Panther
-PANTHER_REST_API_URL = os.getenv("PANTHER_REST_API_URL", "https://api.runpanther.com")
+import aiohttp
 
 # Get logger
 logger = logging.getLogger("mcp-panther")
+
+
+async def get_json_from_script_tag(
+    url: str, script_id: str
+) -> Optional[Union[Dict[str, Any], AnyStr]]:
+    """
+    Extract JSON content from a script tag with the specified ID using aiohttp.
+
+    Args:
+        url: The URL to fetch
+        script_id: The ID of the script tag containing JSON
+
+    Returns:
+        Parsed JSON content, raw string if not valid JSON, or None if not found
+    """
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            url, ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE")
+        ) as response:
+            if response.status != 200:
+                raise ValueError(
+                    f"unexpected status code when resolving api info: {response.status}"
+                )
+
+            html_content: str = await response.text()
+
+    # Pattern to match script tag with specific ID and capture its content
+    pattern: str = f"<script[^>]*id=[\"']{script_id}[\"'][^>]*>(.*?)</script>"
+    match: Optional[re.Match] = re.search(pattern, html_content, re.DOTALL)
+
+    if match:
+        json_str: AnyStr = match.group(1).strip()
+        return json.loads(json_str)
+
+    raise ValueError("could not find json info")
 
 
 def get_panther_api_key() -> str:
@@ -26,10 +56,85 @@ def get_panther_api_key() -> str:
     return api_key
 
 
-def _create_panther_client() -> Client:
+def get_panther_instance_url() -> str:
+    """Get the Panther instance URL from environment variable.
+
+    Returns:
+        str: The Panther instance URL from PANTHER_INSTANCE_URL environment variable
+    """
+    result = os.getenv("PANTHER_INSTANCE_URL")
+    if not result:
+        raise ValueError("PANTHER_INSTANCE_URL environment not set")
+
+    return result
+
+
+instance_config: Optional[Dict[str, Any]] = None
+
+
+async def get_instance_config() -> Optional[Dict[str, Any]]:
+    """Retrieve and cache the Panther instance configuration from the instance URL.
+
+    Returns:
+        Optional[Dict[str, Any]]: The Panther instance configuration dictionary if successful,
+                                 None if the instance URL is not set or configuration cannot be fetched.
+    """
+    global instance_config
+    instance_url = get_panther_instance_url()
+    if instance_config is None:
+        info = await get_json_from_script_tag(instance_url, "__PANTHER_CONFIG__")
+        instance_config = info
+
+    return instance_config
+
+
+async def get_panther_rest_api_base() -> str:
+    """Get the base URL for Panther's REST API.
+
+    This function first checks for a REST API URL in environment variables.
+    If not found, it attempts to derive it from the instance configuration.
+
+    Returns:
+        str: The base URL for Panther's REST API endpoints.
+             Returns an empty string if neither environment variable is set
+             nor instance configuration is available.
+    """
+    base = os.getenv("PANTHER_REST_API_URL")
+    if base:
+        return base
+    config = await get_instance_config()
+    if not config:
+        return ""
+
+    base = config.get("WEB_APPLICATION_GRAPHQL_API_ENDPOINT", "")
+    return base.replace("/internal/graphql", "")
+
+
+async def get_panther_gql_endpoint() -> str:
+    """Get the GraphQL endpoint URL for Panther's API.
+
+    This function first checks for a GraphQL API URL in environment variables.
+    If not found, it attempts to construct it from the REST API base URL.
+
+    Returns:
+        str: The complete URL for Panther's GraphQL endpoint.
+             Returns an empty string if neither environment variable is set
+             nor REST API base URL can be determined.
+    """
+    base = os.getenv("PANTHER_GQL_API_URL")
+    if base:
+        return base
+    base = await get_panther_rest_api_base()
+    if not base:
+        return ""
+
+    return base + "/public/graphql"
+
+
+async def _create_panther_client() -> Client:
     """Create a Panther GraphQL client with proper configuration"""
     transport = AIOHTTPTransport(
-        url=PANTHER_GQL_API_URL,
+        url=await get_panther_gql_endpoint(),
         headers={"X-API-Key": get_panther_api_key()},
         ssl=True,  # Enable SSL verification
     )
@@ -66,6 +171,6 @@ async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any
     Returns:
         The query result as a dictionary
     """
-    client = _create_panther_client()
+    client = await _create_panther_client()
     async with client as session:
         return await session.execute(query, variable_values=variables)
