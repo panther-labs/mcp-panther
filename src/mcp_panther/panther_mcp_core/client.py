@@ -31,7 +31,9 @@ async def get_json_from_script_tag(
             url, ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE")
         ) as response:
             if response.status != 200:
-                return None
+                raise ValueError(
+                    f"unexpected status code when resolving api info: {response.status}"
+                )
 
             html_content: str = await response.text()
 
@@ -43,7 +45,7 @@ async def get_json_from_script_tag(
         json_str: AnyStr = match.group(1).strip()
         return json.loads(json_str)
 
-    return None
+    raise ValueError("could not find json info")
 
 
 def get_panther_api_key() -> str:
@@ -58,10 +60,13 @@ def get_panther_instance_url() -> str:
     """Get the Panther instance URL from environment variable.
 
     Returns:
-        str: The Panther instance URL from PANTHER_INSTANCE_URL environment variable,
-             or None if not set.
+        str: The Panther instance URL from PANTHER_INSTANCE_URL environment variable
     """
-    return os.getenv("PANTHER_INSTANCE_URL")
+    result = os.getenv("PANTHER_INSTANCE_URL")
+    if not result:
+        raise ValueError("PANTHER_INSTANCE_URL environment not set")
+
+    return result
 
 
 instance_config: Optional[Dict[str, Any]] = None
@@ -76,12 +81,8 @@ async def get_instance_config() -> Optional[Dict[str, Any]]:
     """
     global instance_config
     instance_url = get_panther_instance_url()
-    if not instance_url:
-        return None
     if instance_config is None:
         info = await get_json_from_script_tag(instance_url, "__PANTHER_CONFIG__")
-        if not info:
-            return None
         instance_config = info
 
     return instance_config
