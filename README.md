@@ -109,7 +109,23 @@ uv run mcp install src/mcp_panther/server.py
 
 This will make the Panther MCP server available to Claude directly.
 
-### Option 2: Run the Development Server
+### Option 2: Use with Goose
+
+You can also use the Panther MCP server with [Goose](https://block.github.io/goose/), Block's open-source AI agent:
+
+> Note: These are instructions for using the Goose CLI. Make sure you have the Goose CLI installed on your system before running these commands.
+
+```bash
+# Install the package with entry points
+uv pip install .
+
+# Start Goose with the MCP server as an extension
+goose session --with-extension "uv run /path/to/mcp-panther/.venv/bin/mcp-panther"
+```
+
+> NOTE: Make sure to adjust the path to your installation directory in the `goose session` command.
+
+### Option 3: Run the Development Server
 
 For testing and development, you can run the MCP server in development mode:
 
@@ -119,7 +135,7 @@ uv run mcp dev src/mcp_panther/server.py
 
 This starts the MCP Inspector server and provides an interactive web interface to test its functionality.
 
-### Option 3: Run as a Standalone Server
+### Option 4: Run as a Standalone Server
 
 You can also run the server directly:
 

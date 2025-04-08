@@ -3,12 +3,9 @@ import sys
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
-from mcp.server import stdio
-from mcp.server.lowlevel.server import Server
 
 # Load environment variables from .env file if it exists
 load_dotenv()
-
 
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
@@ -46,33 +43,3 @@ register_all_prompts(mcp)
 
 # Register all resources with MCP using the registry
 register_all_resources(mcp)
-
-
-async def main():
-    """Main entry point for the MCP server."""
-    try:
-        logger.info("Starting Panther MCP server...")
-        server = Server(mcp)
-        async with stdio.stdio_server() as (read_stream, write_stream):
-            logger.info("Server running with stdio transport")
-            await server.run(
-                read_stream,
-                write_stream,
-                initialization_options={"name": MCP_SERVER_NAME},
-            )
-    except Exception as e:
-        logger.error(f"Server error: {str(e)}", exc_info=True)
-        raise
-
-
-if __name__ == "__main__":
-    try:
-        import asyncio
-
-        logger.info("Starting server from command line...")
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Server stopped by user")
-    except Exception as e:
-        logger.error(f"Fatal error: {str(e)}", exc_info=True)
-        sys.exit(1)
