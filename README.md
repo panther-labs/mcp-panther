@@ -149,6 +149,10 @@ The server provides tools organized by common SIEM workflows:
 | **Rule Management** | | | |
 | | `list_rules` | List all Panther rules with optional pagination | "Show me all enabled rules" |
 | | `get_rule_by_id` | Get detailed information about a specific rule | "Get details for rule ID abc123" |
+| | `list_scheduled_rules` | List all scheduled rules with optional pagination | "List all scheduled rules in Panther" |
+| | `get_scheduled_rule_by_id` | Get detailed information about a specific scheduled rule | "Get details for scheduled rule abc123" |
+| | `list_simple_rules` | List all simple rules with optional pagination | "Show me all simple rules in Panther" |
+| | `get_simple_rule_by_id` | Get detailed information about a specific simple rule | "Get details for simple rule abc123" |
 | | `create_rule` | Create a new Panther rule | "Create a new rule to detect failed logins" |
 | | `put_rule` | Update an existing rule or create a new one | "Update rule abc123 with new severity HIGH" |
 | | `disable_rule` | Disable a rule by setting enabled to false | "Disable rule abc123" |
