@@ -26,21 +26,24 @@ This is a Model Context Protocol (MCP) server for Panther that provides function
 **Using pip**
 
 ```bash
-pip install -r requirements.txt
+pip install .
 ```
 
 **Using uv (recommended)**
 
+On Unix/macOS:
+
 ```bash
 uv venv
-source .venv/bin/activate  # On Unix/macOS
+source .venv/bin/activate
+uv sync
 ```
 
-**Using uv on Windows**
+On Windows:
 
 ```bash
-.venv\Scripts\activate  # On Windows
-uv pip install -r requirements.txt
+.venv\Scripts\activate
+uv sync
 ```
 
 This will install MCP with CLI components, which are necessary for the `mcp install` and `mcp dev` commands.
@@ -71,8 +74,8 @@ Use the command, args, and env variables below:
         "PATH/TO/MCPS/mcp-panther/src/mcp_panther/server.py"
       ],
       "env": {
-        "PANTHER_GQL_API_URL": "https://YOUR-INSTANCE.domain/v1/public/graphql",
-        "PANTHER_REST_API_URL": "https://YOUR-INSTANCE.domain/v1",
+        "PANTHER_GQL_API_URL": "https://api.YOUR-INSTANCE.domain/public/graphql",
+        "PANTHER_REST_API_URL": "https://api.YOUR-INSTANCE.domain",
         "PANTHER_API_KEY": "YOUR-API-KEY"
       }
     }
@@ -89,8 +92,8 @@ Your Panther API key and URL can be configured in two ways:
 2. Using a `.env` file in the root repository directory with the following format:
 
 ```
-PANTHER_GQL_API_URL=https://YOUR-INSTANCE.domain/v1/public/graphql
-PANTHER_REST_API_URL=https://YOUR-INSTANCE.domain/v1
+PANTHER_GQL_API_URL=https://api.YOUR-INSTANCE.domain/public/graphql
+PANTHER_REST_API_URL=https://api.YOUR-INSTANCE.domain
 PANTHER_API_KEY=YOUR-API-KEY
 ```
 
@@ -116,7 +119,7 @@ For testing and development, you can run the MCP server in development mode:
 uv run mcp dev src/mcp_panther/server.py
 ```
 
-This starts the MCP server and provides an interactive web interface to test its functionality.
+This starts the MCP Inspector server and provides an interactive web interface to test its functionality.
 
 ### Option 3: Run as a Standalone Server
 
