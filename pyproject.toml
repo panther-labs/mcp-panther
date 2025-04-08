@@ -20,5 +20,22 @@ dev = [
     "ruff>=0.11.2",
 ]
 
+[tool.ruff]
+# Allow autofix behavior for specified rules
+fix = true
+
+target-version = "py312"
+
 [tool.ruff.lint]
+# Ignore E402 - Module level import not at top of file
 ignore = ["E402"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore imported but unused in __init__.py files
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mcp_panther"]
