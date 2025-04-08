@@ -1,10 +1,10 @@
 """
 Tools for interacting with Panther's helpers.
 """
-
 import logging
+from typing import Any, Dict
+
 import aiohttp
-from typing import Dict, Any
 
 from ..client import get_panther_api_key, get_panther_rest_api_base
 from .registry import mcp_tool

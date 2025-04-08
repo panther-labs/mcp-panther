@@ -3,10 +3,10 @@ Tools for interacting with Panther metrics.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from ..client import _get_today_date_range, _execute_query
-from ..queries import METRICS_ALERTS_PER_SEVERITY_QUERY, METRICS_ALERTS_PER_RULE_QUERY
+from ..client import _execute_query, _get_today_date_range
+from ..queries import METRICS_ALERTS_PER_RULE_QUERY, METRICS_ALERTS_PER_SEVERITY_QUERY
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")

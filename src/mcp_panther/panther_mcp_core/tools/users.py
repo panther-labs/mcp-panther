@@ -3,7 +3,7 @@ Tools for interacting with Panther users.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 from ..client import _execute_query
 from ..queries import LIST_USERS_QUERY

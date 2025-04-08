@@ -3,12 +3,12 @@ Tools for interacting with Panther rules.
 """
 
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 import aiohttp
 
-from .registry import mcp_tool
 from ..client import get_panther_api_key, get_panther_rest_api_base
+from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
 
