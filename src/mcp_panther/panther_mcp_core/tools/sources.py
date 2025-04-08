@@ -30,7 +30,7 @@ async def list_log_sources(
     logger.info("Fetching log sources from Panther")
 
     try:
-        client = _create_panther_client()
+        client = await _create_panther_client()
 
         # Prepare input variables
         variables = {"input": {}}

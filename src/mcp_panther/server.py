@@ -7,11 +7,6 @@ from mcp.server.fastmcp import FastMCP
 # Load environment variables from .env file if it exists
 load_dotenv()
 
-# Import MCP registries
-from mcp_panther.panther_mcp_core.tools.registry import register_all_tools
-from mcp_panther.panther_mcp_core.prompts.registry import register_all_prompts
-from mcp_panther.panther_mcp_core.resources.registry import register_all_resources
-
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
 
@@ -22,6 +17,11 @@ logging.basicConfig(
     stream=sys.stderr,  # Ensure logs go to stderr
 )
 logger = logging.getLogger(MCP_SERVER_NAME)
+
+# Import MCP registries
+from panther_mcp_core.tools.registry import register_all_tools
+from panther_mcp_core.prompts.registry import register_all_prompts
+from panther_mcp_core.resources.registry import register_all_resources
 
 
 # Server dependencies

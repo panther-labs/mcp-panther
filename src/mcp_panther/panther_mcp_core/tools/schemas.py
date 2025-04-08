@@ -47,7 +47,7 @@ async def list_log_type_schemas(
     logger.info("Fetching available schemas")
 
     try:
-        client = _create_panther_client()
+        client = await _create_panther_client()
 
         # Prepare input variables, only including non-None values
         input_vars = {}
@@ -131,7 +131,7 @@ async def get_log_type_schema_details(schema_names: list[str]) -> Dict[str, Any]
     logger.info(f"Fetching detailed schema information for: {', '.join(schema_names)}")
 
     try:
-        client = _create_panther_client()
+        client = await _create_panther_client()
         all_schemas = []
 
         # Query each schema individually to ensure we get exact matches
