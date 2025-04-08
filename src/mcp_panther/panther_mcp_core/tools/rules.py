@@ -62,6 +62,7 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
                 "severity": rule.get("severity"),
                 "logTypes": rule.get("logTypes"),
                 "tags": rule.get("tags"),
+                "reports": rule.get("reports", {}),
                 "managed": rule.get("managed"),
                 "createdAt": rule.get("createdAt"),
                 "lastModified": rule.get("lastModified"),
@@ -442,3 +443,118 @@ async def disable_rule(rule_id: str) -> Dict[str, Any]:
             "success": False,
             "message": f"Failed to disable rule: {str(e)}",
         }
+
+
+@mcp_tool
+async def list_scheduled_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
+    """List all scheduled rules from Panther with optional pagination
+
+    Args:
+        cursor: Optional cursor for pagination from a previous query
+        limit: Optional maximum number of results to return (default: 100)
+    """
+    logger.info("Fetching scheduled rules from Panther")
+
+    try:
+        # Prepare headers
+        headers = {
+            "X-API-Key": get_panther_api_key(),
+            "Content-Type": "application/json",
+        }
+
+        # Prepare query parameters
+        params = {"limit": limit}
+        if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
+            params["cursor"] = cursor
+            logger.info(f"Using cursor for pagination: {cursor}")
+
+        # Make the request
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{PANTHER_REST_API_URL}/scheduled-rules", headers=headers, params=params
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(
+                        f"Failed to fetch scheduled rules (HTTP {response.status}): {error_text}"
+                    )
+
+                result = await response.json()
+
+        # Extract rules and pagination info
+        scheduled_rules = result.get("results", [])
+        next_cursor = result.get("next")
+
+        # Keep only specific fields for each rule to limit the amount of data returned
+        filtered_rules_metadata = [
+            {
+                "id": rule["id"],
+                "description": rule.get("description"),
+                "displayName": rule.get("displayName"),
+                "enabled": rule.get("enabled", False),
+                "severity": rule.get("severity"),
+                "scheduledQueries": rule.get("scheduledQueries", []),
+                "tags": rule.get("tags", []),
+                "reports": rule.get("reports", {}),
+                "managed": rule.get("managed", False),
+                "createdAt": rule.get("createdAt"),
+                "lastModified": rule.get("lastModified"),
+            }
+            for rule in scheduled_rules
+        ]
+
+        logger.info(f"Successfully retrieved {len(filtered_rules_metadata)} scheduled rules")
+
+        # Format the response
+        return {
+            "success": True,
+            "scheduled_rules": filtered_rules_metadata,
+            "total_scheduled_rules": len(filtered_rules_metadata),
+            "has_next_page": bool(next_cursor),
+            "next_cursor": next_cursor,
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch scheduled rules: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch scheduled rules: {str(e)}"}
+
+
+@mcp_tool
+async def get_scheduled_rule_by_id(rule_id: str) -> Dict[str, Any]:
+    """Get detailed information about a Panther scheduled rule by ID including the rule body and tests
+
+    Args:
+        rule_id: The ID of the scheduled rule to fetch
+    """
+    logger.info(f"Fetching scheduled rule details for ID: {rule_id}")
+
+    try:
+        # Prepare headers
+        headers = {
+            "X-API-Key": get_panther_api_key(),
+            "Content-Type": "application/json",
+        }
+
+        # Make the request
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{PANTHER_REST_API_URL}/scheduled-rules/{rule_id}", headers=headers
+            ) as response:
+                if response.status == 404:
+                    logger.warning(f"No scheduled rule found with ID: {rule_id}")
+                    return {
+                        "success": False,
+                        "message": f"No scheduled rule found with ID: {rule_id}",
+                    }
+                elif response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to fetch scheduled rule details: {error_text}")
+
+                rule_data = await response.json()
+
+        logger.info(f"Successfully retrieved scheduled rule details for ID: {rule_id}")
+
+        # Format the response
+        return {"success": True, "scheduled_rule": rule_data}
+    except Exception as e:
+        logger.error(f"Failed to fetch scheduled rule details: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch scheduled rule details: {str(e)}"}
