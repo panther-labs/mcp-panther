@@ -9,11 +9,10 @@ The purpose of this repository is to help Panther users bootstrap their new `mcp
 Before submitting your pull request, make sure to:
 
 - Redact any sensitive information or PII from example logs
-- Format, lint, and test your changes to ensure CI tests pass, using the following commands:
+- Format and lint your changes to ensure CI tests pass, using the following commands:
   ```bash
   make fmt
   make lint
-  make test
   ```
 
 ## Pull Request process
