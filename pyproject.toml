@@ -27,8 +27,11 @@ fix = true
 target-version = "py312"
 
 [tool.ruff.lint]
+# Enable pycodestyle (E), pyflakes (F), isort (I), pep8-naming (N), type-checking (TCH)
+select = ["E", "F", "I", "N", "TCH"]
 # Ignore E402 - Module level import not at top of file
-ignore = ["E402"]
+# Ignore E501 - Line too long
+ignore = ["E402", "E501"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
