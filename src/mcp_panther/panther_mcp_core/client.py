@@ -1,13 +1,13 @@
-import datetime
-import json
-import logging
 import os
+import logging
+import datetime
+from typing import Dict, Any, Tuple, Optional, Union, AnyStr, List
 import re
-from typing import Any, AnyStr, Dict, Optional, Tuple, Union
+import json
 
-import aiohttp
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
+import aiohttp
 
 # Get logger
 logger = logging.getLogger("mcp-panther")
@@ -174,3 +174,223 @@ async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any
     client = await _create_panther_client()
     async with client as session:
         return await session.execute(query, variable_values=variables)
+
+
+class PantherRestClient:
+    """A client for making REST API calls to Panther's API.
+
+    This client handles session management, URL construction, and default headers.
+    It uses aiohttp for making async HTTP requests.
+    """
+
+    def __init__(self):
+        self._session: Optional[aiohttp.ClientSession] = None
+        self._base_url: Optional[str] = None
+        self._headers: Optional[Dict[str, str]] = None
+
+    async def __aenter__(self) -> "PantherRestClient":
+        """Set up the client session when entering an async context."""
+        if not self._session:
+            self._session = aiohttp.ClientSession()
+            self._base_url = await get_panther_rest_api_base()
+            self._headers = {
+                "X-API-Key": get_panther_api_key(),
+                "Content-Type": "application/json",
+            }
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Clean up the client session when exiting an async context."""
+        if self._session:
+            await self._session.close()
+            self._session = None
+
+    def _build_url(self, path: str) -> str:
+        """Construct the full URL for a given path.
+
+        Args:
+            path: The API path (e.g., '/rules' or '/rules/{rule_id}')
+
+        Returns:
+            str: The complete URL with base URL and path
+        """
+        # Remove leading slash if present to avoid double slashes
+        if path.startswith("/"):
+            path = path[1:]
+        return f"{self._base_url}/{path}"
+
+    def _validate_response(
+        self, status: int, expected_codes: List[int], error_text: str
+    ) -> None:
+        """Validate the response status code against expected codes.
+
+        Args:
+            status: The actual response status code
+            expected_codes: List of acceptable status codes
+            error_text: Error text from the response if available
+
+        Raises:
+            Exception: If the status code is not in the expected codes
+        """
+        if status not in expected_codes:
+            raise Exception(f"Request failed (HTTP {status}): {error_text}")
+
+    async def get(
+        self,
+        path: str,
+        params: Optional[Dict[str, Any]] = None,
+        expected_codes: List[int] = [200],
+    ) -> Tuple[Dict[str, Any], int]:
+        """Make a GET request to the Panther API.
+
+        Args:
+            path: The API path (e.g., '/rules' or '/rules/{rule_id}')
+            params: Optional query parameters
+            expected_codes: List of status codes considered successful (default: [200])
+
+        Returns:
+            Tuple[Dict[str, Any], int]: A tuple containing:
+                - The JSON response from the API
+                - The HTTP status code
+
+        Raises:
+            Exception: If the request fails or returns an unexpected status code
+        """
+        if not self._session:
+            raise RuntimeError("Client must be used within an async context manager")
+
+        async with self._session.get(
+            self._build_url(path),
+            headers=self._headers,
+            params=params,
+            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+        ) as response:
+            error_text = await response.text() if response.status >= 400 else ""
+            self._validate_response(response.status, expected_codes, error_text)
+            return await response.json(), response.status
+
+    async def post(
+        self,
+        path: str,
+        json_data: Dict[str, Any],
+        params: Optional[Dict[str, Any]] = None,
+        expected_codes: List[int] = [200, 201],
+    ) -> Tuple[Dict[str, Any], int]:
+        """Make a POST request to the Panther API.
+
+        Args:
+            path: The API path (e.g., '/rules')
+            json_data: The JSON data to send in the request body
+            params: Optional query parameters
+            expected_codes: List of status codes considered successful (default: [200, 201])
+
+        Returns:
+            Tuple[Dict[str, Any], int]: A tuple containing:
+                - The JSON response from the API
+                - The HTTP status code
+
+        Raises:
+            Exception: If the request fails or returns an unexpected status code
+        """
+        if not self._session:
+            raise RuntimeError("Client must be used within an async context manager")
+
+        async with self._session.post(
+            self._build_url(path),
+            headers=self._headers,
+            json=json_data,
+            params=params,
+            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+        ) as response:
+            error_text = await response.text() if response.status >= 400 else ""
+            self._validate_response(response.status, expected_codes, error_text)
+            return await response.json(), response.status
+
+    async def put(
+        self,
+        path: str,
+        json_data: Dict[str, Any],
+        params: Optional[Dict[str, Any]] = None,
+        expected_codes: List[int] = [200, 201],
+    ) -> Tuple[Dict[str, Any], int]:
+        """Make a PUT request to the Panther API.
+
+        Args:
+            path: The API path (e.g., '/rules/{rule_id}')
+            json_data: The JSON data to send in the request body
+            params: Optional query parameters
+            expected_codes: List of status codes considered successful (default: [200, 201])
+
+        Returns:
+            Tuple[Dict[str, Any], int]: A tuple containing:
+                - The JSON response from the API
+                - The HTTP status code
+
+        Raises:
+            Exception: If the request fails or returns an unexpected status code
+        """
+        if not self._session:
+            raise RuntimeError("Client must be used within an async context manager")
+
+        async with self._session.put(
+            self._build_url(path),
+            headers=self._headers,
+            json=json_data,
+            params=params,
+            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+        ) as response:
+            error_text = await response.text() if response.status >= 400 else ""
+            self._validate_response(response.status, expected_codes, error_text)
+            return await response.json(), response.status
+
+    async def delete(
+        self,
+        path: str,
+        params: Optional[Dict[str, Any]] = None,
+        expected_codes: List[int] = [200],
+    ) -> Tuple[Dict[str, Any], int]:
+        """Make a DELETE request to the Panther API.
+
+        Args:
+            path: The API path (e.g., '/rules/{rule_id}')
+            params: Optional query parameters
+            expected_codes: List of status codes considered successful (default: [200])
+
+        Returns:
+            Tuple[Dict[str, Any], int]: A tuple containing:
+                - The JSON response from the API
+                - The HTTP status code
+
+        Raises:
+            Exception: If the request fails or returns an unexpected status code
+        """
+        if not self._session:
+            raise RuntimeError("Client must be used within an async context manager")
+
+        async with self._session.delete(
+            self._build_url(path),
+            headers=self._headers,
+            params=params,
+            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+        ) as response:
+            error_text = await response.text() if response.status >= 400 else ""
+            self._validate_response(response.status, expected_codes, error_text)
+            return await response.json(), response.status
+
+
+_rest_client: Optional[PantherRestClient] = None
+
+
+def get_rest_client() -> PantherRestClient:
+    """Get the singleton instance of PantherRestClient.
+
+    This function lazily instantiates the client on first call
+    and returns the same instance for subsequent calls.
+
+    Returns:
+        PantherRestClient: The singleton instance of the REST client
+    """
+    global _rest_client
+    if _rest_client is None:
+        _rest_client = PantherRestClient()
+    return _rest_client

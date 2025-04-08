@@ -3,11 +3,9 @@ Tools for interacting with Panther's helpers.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Dict, Any
 
-import aiohttp
-
-from ..client import get_panther_api_key, get_panther_rest_api_base
+from ..client import get_rest_client
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
@@ -29,36 +27,23 @@ async def get_global_helper_by_id(helper_id: str) -> Dict[str, Any]:
     logger.info(f"Fetching global helper details for ID: {helper_id}")
 
     try:
-        # Prepare headers
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
+        async with get_rest_client() as client:
+            # Allow 404 as a valid response to handle not found case
+            result, status = await client.get(
+                f"/globals/{helper_id}", expected_codes=[200, 404]
+            )
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{await get_panther_rest_api_base()}/globals/{helper_id}",
-                headers=headers,
-            ) as response:
-                if response.status == 404:
-                    logger.warning(f"No global helper found with ID: {helper_id}")
-                    return {
-                        "success": False,
-                        "message": f"No global helper found with ID: {helper_id}",
-                    }
-                elif response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(
-                        f"Failed to fetch global helper details: {error_text}"
-                    )
-
-                global_helper_data = await response.json()
+            if status == 404:
+                logger.warning(f"No global helper found with ID: {helper_id}")
+                return {
+                    "success": False,
+                    "message": f"No global helper found with ID: {helper_id}",
+                }
 
         logger.info(f"Successfully retrieved global helper details for ID: {helper_id}")
 
         # Format the response
-        return {"success": True, "global_helper": global_helper_data}
+        return {"success": True, "global_helper": result}
     except Exception as e:
         logger.error(f"Failed to fetch global helper details: {str(e)}")
         return {
@@ -78,32 +63,14 @@ async def list_global_helpers(cursor: str = None, limit: int = 100) -> Dict[str,
     logger.info("Fetching global helpers from Panther")
 
     try:
-        # Prepare headers
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
-
         # Prepare query parameters
         params = {"limit": limit}
         if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
             params["cursor"] = cursor
             logger.info(f"Using cursor for pagination: {cursor}")
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{await get_panther_rest_api_base()}/globals",
-                headers=headers,
-                params=params,
-            ) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(
-                        f"Failed to fetch global helpers (HTTP {response.status}): {error_text}"
-                    )
-
-                result = await response.json()
+        async with get_rest_client() as client:
+            result, _ = await client.get("/globals", params=params)
 
         # Extract global helpers and pagination info
         global_helpers = result.get("results", [])
