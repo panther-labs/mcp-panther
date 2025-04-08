@@ -6,10 +6,11 @@ import logging
 import aiohttp
 from typing import Dict, Any
 
-from ..client import get_panther_api_key, PANTHER_REST_API_URL
+from ..client import get_panther_api_key, get_panther_rest_api_base
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
+
 
 @mcp_tool
 async def get_global_helper_by_id(helper_id: str) -> Dict[str, Any]:
@@ -36,7 +37,8 @@ async def get_global_helper_by_id(helper_id: str) -> Dict[str, Any]:
         # Make the request
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{PANTHER_REST_API_URL}/globals/{helper_id}", headers=headers
+                f"{await get_panther_rest_api_base()}/globals/{helper_id}",
+                headers=headers,
             ) as response:
                 if response.status == 404:
                     logger.warning(f"No global helper found with ID: {helper_id}")
@@ -46,7 +48,9 @@ async def get_global_helper_by_id(helper_id: str) -> Dict[str, Any]:
                     }
                 elif response.status != 200:
                     error_text = await response.text()
-                    raise Exception(f"Failed to fetch global helper details: {error_text}")
+                    raise Exception(
+                        f"Failed to fetch global helper details: {error_text}"
+                    )
 
                 global_helper_data = await response.json()
 
@@ -56,7 +60,11 @@ async def get_global_helper_by_id(helper_id: str) -> Dict[str, Any]:
         return {"success": True, "global_helper": global_helper_data}
     except Exception as e:
         logger.error(f"Failed to fetch global helper details: {str(e)}")
-        return {"success": False, "message": f"Failed to fetch global helper details: {str(e)}"}
+        return {
+            "success": False,
+            "message": f"Failed to fetch global helper details: {str(e)}",
+        }
+
 
 @mcp_tool
 async def list_global_helpers(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
@@ -84,7 +92,9 @@ async def list_global_helpers(cursor: str = None, limit: int = 100) -> Dict[str,
         # Make the request
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{PANTHER_REST_API_URL}/globals", headers=headers, params=params
+                f"{await get_panther_rest_api_base()}/globals",
+                headers=headers,
+                params=params,
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
@@ -110,4 +120,7 @@ async def list_global_helpers(cursor: str = None, limit: int = 100) -> Dict[str,
         }
     except Exception as e:
         logger.error(f"Failed to fetch global helpers: {str(e)}")
-        return {"success": False, "message": f"Failed to fetch global helpers: {str(e)}"}
+        return {
+            "success": False,
+            "message": f"Failed to fetch global helpers: {str(e)}",
+        }

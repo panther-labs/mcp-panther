@@ -27,7 +27,6 @@ from panther_mcp_core.prompts.registry import register_all_prompts
 from panther_mcp_core.resources.registry import register_all_resources
 
 
-
 # Server dependencies
 deps = [
     "python-dotenv",
