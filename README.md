@@ -149,6 +149,9 @@ The server provides tools organized by common SIEM workflows:
 | | `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
 | | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
 | | `get_data_lake_dbs_tables_columns` | List databases, tables, and columns in the data lake | "List all available tables in the panther_logs database" |
+| **Global Helpers** | | | |
+| | `get_global_helper_by_id` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
+| | `list_global_helpers` | List all Panther global helpers with optional pagination | "Show me all global helpers for CrowdStrike events" |
 | **Rule Management** | | | |
 | | `list_rules` | List all Panther rules with optional pagination | "Show me all enabled rules" |
 | | `get_rule_by_id` | Get detailed information about a specific rule | "Get details for rule ID abc123" |
