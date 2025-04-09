@@ -11,6 +11,7 @@ from ..queries import (
     GET_DATA_LAKE_QUERY,
     ALL_DATABASE_ENTITIES_QUERY,
     LIST_DATABASES_QUERY,
+    LIST_TABLES_QUERY,
     LIST_TABLES_FOR_DATABASE_QUERY,
     GET_COLUMNS_FOR_TABLE_QUERY
 )
@@ -148,7 +149,6 @@ async def get_data_lake_dbs_tables_columns(
             "message": f"Failed to fetch data lake entities: {str(e)}",
         }
 
-
 @mcp_tool
 async def get_data_lake_query_results(query_id: str) -> Dict[str, Any]:
     """Get the results of a previously executed data lake query.
@@ -275,6 +275,80 @@ async def list_databases() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to fetch database results: {str(e)}")
         return {"success": False, "message": f"Failed to fetch database results: {str(e)}"}
+
+@mcp_tool
+async def list_tables() -> Dict[str, Any]:
+    """List all available tables in Panther's data lake.
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - tables: List of tables, each containing:
+            - name: Table name
+            - description: Table description
+            - log_type: Log type
+            - database: Database name
+        - message: Error message if unsuccessful
+    """
+    logger.info("Fetching available tables")
+
+    all_tables = []
+    cursor = None
+    page_size = 100
+
+    try:
+        client = await _create_panther_client()
+
+        # Execute the query asynchronously
+        async with client as session:
+            databases = await list_databases()
+
+        for database in databases["databases"]:
+            database_name = database["name"]
+            logger.info(f"Fetching tables for database: {database_name}")
+
+            while True:
+                # Prepare input variables
+                variables = {
+                    "databaseName": database_name,
+                    "pageSize": page_size,
+                    "cursor": cursor
+                }
+
+                logger.debug(f"Query variables: {variables}")
+
+                # Execute the query asynchronously
+                async with client as session:
+                    result = await session.execute(
+                        LIST_TABLES_QUERY, variable_values=variables
+                    )
+
+                # Get query data
+                result = result.get("dataLakeDatabaseTables", {})
+                for table in result.get("edges", []):
+                    table["node"]["database"] = database_name
+                    all_tables.append(table["node"])
+
+                # Check if there are more pages
+                page_info = result["pageInfo"]
+                if not page_info["hasNextPage"]:
+                    break
+
+                # Update cursor for next page
+                cursor = page_info["endCursor"]
+
+        # Format the response
+        return {
+            "success": True,
+            "status": "succeeded",
+            "tables": all_tables,
+            "stats": {
+                "table_count": len(all_tables),
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch tables: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch tables: {str(e)}"}
 
 @mcp_tool
 async def get_tables_for_database(database_name: str) -> Dict[str, Any]:

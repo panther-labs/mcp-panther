@@ -221,6 +221,30 @@ query ListDatabases {
 }
 """)
 
+LIST_TABLES_QUERY = gql("""
+query ListTables($databaseName: String!, $pageSize: Int, $cursor: String) {
+  dataLakeDatabaseTables(
+    input: {
+      databaseName: $databaseName
+      pageSize: $pageSize
+      cursor: $cursor
+    }
+  ) {
+    edges {
+      node {
+        name
+        description
+        logType
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+""")
+
 LIST_TABLES_FOR_DATABASE_QUERY = gql("""
 query ListTablesForDatabase($name: String!) {
     dataLakeDatabase(name: $name) {
