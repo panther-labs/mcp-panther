@@ -11,13 +11,24 @@ from mcp_panther.panther_mcp_core.tools.alerts import (
 )
 
 MOCK_ALERT = {
-    "id": "alert-123",
-    "title": "Test Alert",
-    "severity": "HIGH",
+    "id": "df1eb66cede030f1a6d29362ba437178",
+    "assignee": None,
+    "type": "RULE",
+    "title": "Derek Brooks logged into Panther",
+    "createdAt": "2025-04-09T21:21:47Z",
+    "firstEventOccurredAt": "2025-04-09T21:13:38Z",
+    "description": "Derek Brooks logged into Panther and did some stuff",
+    "reference": "https://docs.panther.com/alerts",
+    "runbook": "https://docs.panther.com/alerts/alert-runbooks",
+    "deliveries": [],
+    "deliveryOverflow": False,
+    "lastReceivedEventAt": "2025-04-09T21:21:47Z",
+    "severity": "MEDIUM",
     "status": "OPEN",
-    "createdAt": "2024-03-20T00:00:00Z",
-    "updatedAt": "2024-03-20T00:00:00Z",
+    "updatedBy": None,
+    "updatedAt": None,
 }
+
 
 MOCK_ALERTS_RESPONSE = {
     "alerts": {
@@ -79,8 +90,8 @@ async def test_list_alerts_success(mock_graphql_client):
 
     # Verify the first alert
     first_alert = result["alerts"][0]
-    assert first_alert["id"] == "alert-123"
-    assert first_alert["severity"] == "HIGH"
+    assert first_alert["id"] == MOCK_ALERT["id"]
+    assert first_alert["severity"] == MOCK_ALERT["severity"]
     assert first_alert["status"] == "OPEN"
 
 @pytest.mark.asyncio
@@ -197,12 +208,12 @@ async def test_get_alert_by_id_success(mock_graphql_client):
     """Test successful retrieval of a single alert."""
     mock_graphql_client.execute_return_value = {"alert": MOCK_ALERT}
 
-    result = await get_alert_by_id("alert-123")
+    result = await get_alert_by_id(MOCK_ALERT["id"])
 
     assert result["success"] is True
-    assert result["alert"]["id"] == "alert-123"
-    assert result["alert"]["severity"] == "HIGH"
-    assert result["alert"]["status"] == "OPEN"
+    assert result["alert"]["id"] == MOCK_ALERT["id"]
+    assert result["alert"]["severity"] == MOCK_ALERT["severity"]
+    assert result["alert"]["status"] == MOCK_ALERT["status"]
 
 @pytest.mark.asyncio
 async def test_get_alert_by_id_not_found(mock_graphql_client):
@@ -219,7 +230,7 @@ async def test_get_alert_by_id_error(mock_graphql_client):
     """Test handling of errors when getting alert by ID."""
     mock_graphql_client.execute.side_effect = Exception("Test error")
 
-    result = await get_alert_by_id("alert-123")
+    result = await get_alert_by_id(MOCK_ALERT["id"])
 
     assert result["success"] is False
     assert "Failed to fetch alert details" in result["message"]
@@ -237,7 +248,7 @@ async def test_update_alert_status_success(mock_execute_query):
 
     mock_execute_query.return_value = mock_response
     
-    result = await update_alert_status(["alert-123"], "TRIAGED")
+    result = await update_alert_status([MOCK_ALERT["id"]], "TRIAGED")
 
     assert result["success"] is True
     assert result["alerts"][0]["status"] == "TRIAGED"
@@ -245,13 +256,13 @@ async def test_update_alert_status_success(mock_execute_query):
     # Verify _execute_query was called with correct parameters
     mock_execute_query.assert_called_once()
     call_args = mock_execute_query.call_args
-    assert call_args[0][1]["input"]["ids"] == ["alert-123"]
+    assert call_args[0][1]["input"]["ids"] == [MOCK_ALERT["id"]]
     assert call_args[0][1]["input"]["status"] == "TRIAGED"
 
 @pytest.mark.asyncio
 async def test_update_alert_status_invalid_status():
     """Test handling of invalid status value."""
-    result = await update_alert_status(["alert-123"], "INVALID_STATUS")
+    result = await update_alert_status([MOCK_ALERT["id"]], "INVALID_STATUS")
 
     assert result["success"] is False
     assert "Status must be one of" in result["message"]
@@ -261,7 +272,7 @@ async def test_update_alert_status_error(mock_execute_query):
     """Test handling of errors when updating alert status."""
     mock_execute_query.side_effect = Exception("Test error")
 
-    result = await update_alert_status(["alert-123"], "TRIAGED")
+    result = await update_alert_status([MOCK_ALERT["id"]], "TRIAGED")
 
     assert result["success"] is False
     assert "Failed to update alert status" in result["message"]
@@ -272,7 +283,7 @@ async def test_update_alert_status_with_empty_result(mock_execute_query):
     mock_response = {}  # no updateAlertStatusById in result
     mock_execute_query.return_value = mock_response
 
-    result = await update_alert_status(["alert-123"], "TRIAGED")
+    result = await update_alert_status([MOCK_ALERT["id"]], "TRIAGED")
 
     assert result["success"] is False
     assert "Failed to update alert status" in result["message"]
@@ -291,7 +302,7 @@ async def test_add_alert_comment_success(mock_execute_query):
     
     mock_execute_query.return_value = mock_response
 
-    result = await add_alert_comment("alert-123", "Test comment")
+    result = await add_alert_comment(MOCK_ALERT["id"], "Test comment")
 
     assert result["success"] is True
     assert result["comment"]["body"] == "Test comment"
@@ -301,7 +312,7 @@ async def test_add_alert_comment_error(mock_execute_query):
     """Test handling of errors when adding a comment."""
     mock_execute_query.side_effect = Exception("Test error")
 
-    result = await add_alert_comment("alert-123", "Test comment")
+    result = await add_alert_comment(MOCK_ALERT["id"], "Test comment")
 
     assert result["success"] is False
     assert "Failed to add alert comment" in result["message"]
@@ -312,7 +323,7 @@ async def test_add_alert_comment_with_empty_result(mock_execute_query):
     mock_response = {}  # no createAlertComment in result
     mock_execute_query.return_value = mock_response
 
-    result = await add_alert_comment("alert-123", "Test comment")
+    result = await add_alert_comment(MOCK_ALERT["id"], "Test comment")
 
     assert result["success"] is False
     assert "Failed to add alert comment" in result["message"]
@@ -330,7 +341,7 @@ async def test_update_alert_assignee_success(mock_execute_query):
     
     mock_execute_query.return_value = mock_response
 
-    result = await update_alert_assignee_by_id(["alert-123"], "user-123")
+    result = await update_alert_assignee_by_id([MOCK_ALERT["id"]], "user-123")
 
     assert result["success"] is True
     assert len(result["alerts"]) == 1
@@ -340,7 +351,7 @@ async def test_update_alert_assignee_error(mock_execute_query):
     """Test handling of errors when updating alert assignee."""
     mock_execute_query.side_effect = Exception("Test error")
 
-    result = await update_alert_assignee_by_id(["alert-123"], "user-123")
+    result = await update_alert_assignee_by_id([MOCK_ALERT["id"]], "user-123")
 
     assert result["success"] is False
     assert "Failed to update alert assignee" in result["message"]
@@ -351,7 +362,7 @@ async def test_update_alert_assignee_with_empty_result(mock_execute_query):
     mock_response = {}  # no updateAlertsAssigneeById in result
     mock_execute_query.return_value = mock_response
 
-    result = await update_alert_assignee_by_id(["alert-123"], "user-123")
+    result = await update_alert_assignee_by_id([MOCK_ALERT["id"]], "user-123")
 
     assert result["success"] is False
     assert "Failed to update alert assignee" in result["message"]
