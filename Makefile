@@ -5,3 +5,6 @@ fmt:
 
 lint:
 	ruff check $(dirs)
+
+build-docker:
+	docker build -t mcp-panther .

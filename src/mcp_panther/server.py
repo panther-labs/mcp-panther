@@ -18,10 +18,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger(MCP_SERVER_NAME)
 
-# Import MCP registries
-from panther_mcp_core.prompts.registry import register_all_prompts
-from panther_mcp_core.resources.registry import register_all_resources
-from panther_mcp_core.tools.registry import register_all_tools
+# Support multiple import paths to accommodate different execution contexts:
+# 1. When running as a binary, uvx expects relative imports
+# 2. When running with MCP inspector: `uv run mcp dev src/mcp_panther/server.py`
+# 3. When installing: `uv run mcp install src/mcp_panther/server.py`
+try:
+    # Import MCP registries
+    from panther_mcp_core.prompts.registry import register_all_prompts
+    from panther_mcp_core.resources.registry import register_all_resources
+    from panther_mcp_core.tools.registry import register_all_tools
+except ImportError:
+    # Import MCP registries
+    from .panther_mcp_core.prompts.registry import register_all_prompts
+    from .panther_mcp_core.resources.registry import register_all_resources
+    from .panther_mcp_core.tools.registry import register_all_tools
+
 
 # Server dependencies
 deps = [

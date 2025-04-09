@@ -103,6 +103,33 @@ Use the command, args, and env variables below:
 }
 ```
 
+<details>
+<summary>Docker Configuration</summary>
+
+You will need to run `make build-docker` to build the image
+
+```json
+{
+  "mcpServers": {
+    "mcp-panther": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "mcp-panther"
+      ],
+      "env": {
+        "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
+        "PANTHER_API_KEY": "YOUR-API-KEY"
+      }
+    }
+  }
+}
+```
+
+</details>
+
 ### Credentials
 
 Your Panther API key and URL can be configured in two ways:
