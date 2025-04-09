@@ -213,7 +213,7 @@ query AllDatabaseEntities {
 """)
 
 LIST_DATABASES_QUERY = gql("""
-query {
+query ListDatabases {
     dataLakeDatabases {
         name
         description
@@ -222,7 +222,7 @@ query {
 """)
 
 LIST_TABLES_FOR_DATABASE_QUERY = gql("""
-query DatabaseTables($name: String!) {
+query ListTablesForDatabase($name: String!) {
     dataLakeDatabase(name: $name) {
         name
         description
@@ -231,6 +231,22 @@ query DatabaseTables($name: String!) {
             description
         }
     }
+}
+""")
+
+GET_COLUMNS_FOR_TABLE_QUERY = gql("""
+query GetColumnDetails($databaseName: String!, $tableName: String!) {
+  dataLakeDatabaseTable(input: { databaseName: $databaseName, tableName: $tableName }) {
+    name,
+    displayName,
+    description,
+    logType,
+    columns {
+      name,
+      type,
+      description
+    }
+  }
 }
 """)
 

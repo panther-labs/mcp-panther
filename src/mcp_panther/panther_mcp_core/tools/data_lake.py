@@ -11,7 +11,8 @@ from ..queries import (
     GET_DATA_LAKE_QUERY,
     ALL_DATABASE_ENTITIES_QUERY,
     LIST_DATABASES_QUERY,
-    LIST_TABLES_FOR_DATABASE_QUERY
+    LIST_TABLES_FOR_DATABASE_QUERY,
+    GET_COLUMNS_FOR_TABLE_QUERY
 )
 from .registry import mcp_tool
 
@@ -307,7 +308,7 @@ async def get_tables_for_database(database_name: str) -> Dict[str, Any]:
             )
 
         # Get query data
-        query_data = result.get("dataLakeDatabase", [])
+        query_data = result.get("dataLakeDatabase", {})
         tables = query_data.get("tables", [])
 
         if not tables:
@@ -328,3 +329,64 @@ async def get_tables_for_database(database_name: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to get tables for database: {str(e)}")
         return {"success": False, "message": f"Failed to get tables for database: {str(e)}"}
+
+@mcp_tool
+async def get_table_columns(database_name: str, table_name: str) -> Dict[str, Any]:
+    """Get column details for a specific datalake table.
+
+    Args:
+        database_name: The name of the database where the table is located
+        table_name: The name of the table to get columns for
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - name: Table name
+        - display_name: Table display name
+        - description: Table description
+        - log_type: Log type
+        - columns: List of columns, each containing:
+            - name: Column name
+            - type: Column data type
+            - description: Column description
+        - message: Error message if unsuccessful
+    """
+    table_full_path = f"{database_name}.{table_name}"
+    logger.info(f"Fetching column information for table: {table_full_path}")
+
+    try:
+        client = await _create_panther_client()
+
+        # Prepare input variables
+        variables = {"databaseName": database_name, "tableName": table_name}
+
+        logger.debug(f"Query variables: {variables}")
+
+        # Execute the query asynchronously
+        async with client as session:
+            result = await session.execute(
+                GET_COLUMNS_FOR_TABLE_QUERY, variable_values=variables
+            )
+
+        # Get query data
+        query_data = result.get("dataLakeDatabaseTable", {})
+        columns = query_data.get("columns", [])
+
+        if not columns:
+            logger.warning(f"No columns found for table: {table_full_path}")
+            return {"success": False, "message": f"No tables found for table: {table_full_path}"}
+
+        logger.info(f"Successfully retrieved {len(columns)} columns")
+
+        # Format the response
+        return {
+            "success": True,
+            "status": "succeeded",
+            **query_data,
+            "stats": {
+                "table_count": len(columns),
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get columns for table: {str(e)}")
+        return {"success": False, "message": f"Failed to get columns for table: {str(e)}"}
