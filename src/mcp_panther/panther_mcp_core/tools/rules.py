@@ -3,7 +3,7 @@ Tools for interacting with Panther rules.
 """
 
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 from ..client import get_rest_client
 from .registry import mcp_tool

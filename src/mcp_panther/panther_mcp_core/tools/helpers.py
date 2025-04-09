@@ -3,7 +3,7 @@ Tools for interacting with Panther's helpers.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 from ..client import get_rest_client
 from .registry import mcp_tool
