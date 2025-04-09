@@ -219,21 +219,25 @@ class PantherRestClient:
             path = path[1:]
         return f"{self._base_url}/{path}"
 
-    def _validate_response(
-        self, status: int, expected_codes: List[int], error_text: str
+    async def _validate_response(
+        self, response: aiohttp.ClientResponse, expected_codes: List[int]
     ) -> None:
         """Validate the response status code against expected codes.
 
         Args:
-            status: The actual response status code
+            response: The aiohttp ClientResponse object
             expected_codes: List of acceptable status codes
-            error_text: Error text from the response if available
 
         Raises:
             Exception: If the status code is not in the expected codes
         """
-        if status not in expected_codes:
-            raise Exception(f"Request failed (HTTP {status}): {error_text}")
+        if response.status not in expected_codes:
+            error_text = await response.text() if response.status >= 400 else ""
+            if response.status == 401:
+                raise Exception(
+                    f"Invalid API Key Detected. Please notify user that their API Key is invalid. STOP and wait for user to fix the issue. error: {error_text}"
+                )
+            raise Exception(f"Request failed (HTTP {response.status}): {error_text}")
 
     async def get(
         self,
@@ -265,8 +269,7 @@ class PantherRestClient:
             params=params,
             ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
         ) as response:
-            error_text = await response.text() if response.status >= 400 else ""
-            self._validate_response(response.status, expected_codes, error_text)
+            await self._validate_response(response, expected_codes)
             return await response.json(), response.status
 
     async def post(
@@ -302,8 +305,7 @@ class PantherRestClient:
             params=params,
             ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
         ) as response:
-            error_text = await response.text() if response.status >= 400 else ""
-            self._validate_response(response.status, expected_codes, error_text)
+            await self._validate_response(response, expected_codes)
             return await response.json(), response.status
 
     async def put(
@@ -339,8 +341,43 @@ class PantherRestClient:
             params=params,
             ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
         ) as response:
-            error_text = await response.text() if response.status >= 400 else ""
-            self._validate_response(response.status, expected_codes, error_text)
+            await self._validate_response(response, expected_codes)
+            return await response.json(), response.status
+
+    async def patch(
+        self,
+        path: str,
+        json_data: Dict[str, Any],
+        params: Optional[Dict[str, Any]] = None,
+        expected_codes: List[int] = [200, 201],
+    ) -> Tuple[Dict[str, Any], int]:
+        """Make a PATCH request to the Panther API.
+
+        Args:
+            path: The API path (e.g., '/rules/{rule_id}')
+            json_data: The JSON data to send in the request body
+            params: Optional query parameters
+            expected_codes: List of status codes considered successful (default: [200, 201])
+
+        Returns:
+            Tuple[Dict[str, Any], int]: A tuple containing:
+                - The JSON response from the API
+                - The HTTP status code
+
+        Raises:
+            Exception: If the request fails or returns an unexpected status code
+        """
+        if not self._session:
+            raise RuntimeError("Client must be used within an async context manager")
+
+        async with self._session.patch(
+            self._build_url(path),
+            headers=self._headers,
+            json=json_data,
+            params=params,
+            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+        ) as response:
+            await self._validate_response(response, expected_codes)
             return await response.json(), response.status
 
     async def delete(
@@ -373,8 +410,7 @@ class PantherRestClient:
             params=params,
             ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
         ) as response:
-            error_text = await response.text() if response.status >= 400 else ""
-            self._validate_response(response.status, expected_codes, error_text)
+            await self._validate_response(response, expected_codes)
             return await response.json(), response.status
 
 
