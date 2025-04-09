@@ -18,10 +18,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(MCP_SERVER_NAME)
 
-# Import MCP registries
-from panther_mcp_core.prompts.registry import register_all_prompts
-from panther_mcp_core.resources.registry import register_all_resources
-from panther_mcp_core.tools.registry import register_all_tools
+# we add this check so we can support running our mcp server in
+# as many compatible environments as possible
+try:
+    # Import MCP registries
+    from panther_mcp_core.tools.registry import register_all_tools
+    from panther_mcp_core.prompts.registry import register_all_prompts
+    from panther_mcp_core.resources.registry import register_all_resources
+except ImportError:
+    # Import MCP registries
+    from .panther_mcp_core.tools.registry import register_all_tools
+    from .panther_mcp_core.prompts.registry import register_all_prompts
+    from .panther_mcp_core.resources.registry import register_all_resources
+
+
 
 # Server dependencies
 deps = [
