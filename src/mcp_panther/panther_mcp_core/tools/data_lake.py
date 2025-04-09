@@ -13,7 +13,7 @@ from ..queries import (
     LIST_DATABASES_QUERY,
     LIST_TABLES_QUERY,
     LIST_TABLES_FOR_DATABASE_QUERY,
-    GET_COLUMNS_FOR_TABLE_QUERY
+    GET_COLUMNS_FOR_TABLE_QUERY,
 )
 from .registry import mcp_tool
 
@@ -149,6 +149,7 @@ async def get_data_lake_dbs_tables_columns(
             "message": f"Failed to fetch data lake entities: {str(e)}",
         }
 
+
 @mcp_tool
 async def get_data_lake_query_results(query_id: str) -> Dict[str, Any]:
     """Get the results of a previously executed data lake query.
@@ -232,6 +233,7 @@ async def get_data_lake_query_results(query_id: str) -> Dict[str, Any]:
         logger.error(f"Failed to fetch query results: {str(e)}")
         return {"success": False, "message": f"Failed to fetch query results: {str(e)}"}
 
+
 @mcp_tool
 async def list_databases() -> Dict[str, Any]:
     """List all available datalake databases in Panther.
@@ -270,11 +272,15 @@ async def list_databases() -> Dict[str, Any]:
             "databases": databases,
             "stats": {
                 "database_count": len(databases),
-            }
+            },
         }
     except Exception as e:
         logger.error(f"Failed to fetch database results: {str(e)}")
-        return {"success": False, "message": f"Failed to fetch database results: {str(e)}"}
+        return {
+            "success": False,
+            "message": f"Failed to fetch database results: {str(e)}",
+        }
+
 
 @mcp_tool
 async def list_tables() -> Dict[str, Any]:
@@ -312,7 +318,7 @@ async def list_tables() -> Dict[str, Any]:
                 variables = {
                     "databaseName": database_name,
                     "pageSize": page_size,
-                    "cursor": cursor
+                    "cursor": cursor,
                 }
 
                 logger.debug(f"Query variables: {variables}")
@@ -344,11 +350,12 @@ async def list_tables() -> Dict[str, Any]:
             "tables": all_tables,
             "stats": {
                 "table_count": len(all_tables),
-            }
+            },
         }
     except Exception as e:
         logger.error(f"Failed to fetch tables: {str(e)}")
         return {"success": False, "message": f"Failed to fetch tables: {str(e)}"}
+
 
 @mcp_tool
 async def get_tables_for_database(database_name: str) -> Dict[str, Any]:
@@ -387,7 +394,10 @@ async def get_tables_for_database(database_name: str) -> Dict[str, Any]:
 
         if not tables:
             logger.warning(f"No tables found for database: {database_name}")
-            return {"success": False, "message": f"No tables found for database: {database_name}"}
+            return {
+                "success": False,
+                "message": f"No tables found for database: {database_name}",
+            }
 
         logger.info(f"Successfully retrieved {len(tables)} tables")
 
@@ -398,11 +408,15 @@ async def get_tables_for_database(database_name: str) -> Dict[str, Any]:
             "tables": tables,
             "stats": {
                 "table_count": len(tables),
-            }
+            },
         }
     except Exception as e:
         logger.error(f"Failed to get tables for database: {str(e)}")
-        return {"success": False, "message": f"Failed to get tables for database: {str(e)}"}
+        return {
+            "success": False,
+            "message": f"Failed to get tables for database: {str(e)}",
+        }
+
 
 @mcp_tool
 async def get_table_columns(database_name: str, table_name: str) -> Dict[str, Any]:
@@ -448,7 +462,10 @@ async def get_table_columns(database_name: str, table_name: str) -> Dict[str, An
 
         if not columns:
             logger.warning(f"No columns found for table: {table_full_path}")
-            return {"success": False, "message": f"No tables found for table: {table_full_path}"}
+            return {
+                "success": False,
+                "message": f"No tables found for table: {table_full_path}",
+            }
 
         logger.info(f"Successfully retrieved {len(columns)} columns")
 
@@ -459,8 +476,11 @@ async def get_table_columns(database_name: str, table_name: str) -> Dict[str, An
             **query_data,
             "stats": {
                 "table_count": len(columns),
-            }
+            },
         }
     except Exception as e:
         logger.error(f"Failed to get columns for table: {str(e)}")
-        return {"success": False, "message": f"Failed to get columns for table: {str(e)}"}
+        return {
+            "success": False,
+            "message": f"Failed to get columns for table: {str(e)}",
+        }
