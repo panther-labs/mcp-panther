@@ -3,10 +3,10 @@ Tools for interacting with Panther schemas.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 from ..client import _create_panther_client
-from ..queries import LIST_SCHEMAS_QUERY, GET_SCHEMA_DETAILS_QUERY
+from ..queries import GET_SCHEMA_DETAILS_QUERY, LIST_SCHEMAS_QUERY
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")

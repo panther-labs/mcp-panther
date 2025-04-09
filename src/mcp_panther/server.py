@@ -19,10 +19,9 @@ logging.basicConfig(
 logger = logging.getLogger(MCP_SERVER_NAME)
 
 # Import MCP registries
-from panther_mcp_core.tools.registry import register_all_tools
 from panther_mcp_core.prompts.registry import register_all_prompts
 from panther_mcp_core.resources.registry import register_all_resources
-
+from panther_mcp_core.tools.registry import register_all_tools
 
 # Server dependencies
 deps = [

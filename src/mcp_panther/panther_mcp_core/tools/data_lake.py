@@ -3,13 +3,13 @@ Tools for interacting with Panther's data lake.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 from ..client import _create_panther_client
 from ..queries import (
+    ALL_DATABASE_ENTITIES_QUERY,
     EXECUTE_DATA_LAKE_QUERY,
     GET_DATA_LAKE_QUERY,
-    ALL_DATABASE_ENTITIES_QUERY,
 )
 from .registry import mcp_tool
 
