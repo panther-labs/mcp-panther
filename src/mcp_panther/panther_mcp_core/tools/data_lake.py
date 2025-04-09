@@ -10,6 +10,7 @@ from ..queries import (
     EXECUTE_DATA_LAKE_QUERY,
     GET_DATA_LAKE_QUERY,
     ALL_DATABASE_ENTITIES_QUERY,
+    LIST_DATABASES_QUERY
 )
 from .registry import mcp_tool
 
@@ -228,3 +229,48 @@ async def get_data_lake_query_results(query_id: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to fetch query results: {str(e)}")
         return {"success": False, "message": f"Failed to fetch query results: {str(e)}"}
+
+@mcp_tool
+async def list_databases() -> Dict[str, Any]:
+    """List all available datalake databases in Panther.
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - databases: List of databases, each containing:
+            - name: Database name
+            - description: Database description
+        - message: Error message if unsuccessful
+    """
+
+    logger.info(f"Fetching datalake databases")
+
+    try:
+        client = await _create_panther_client()
+
+        # Execute the query asynchronously
+        async with client as session:
+            result = await session.execute(LIST_DATABASES_QUERY)
+
+        # Get query data
+        databases = result.get("dataLakeDatabases", [])
+
+        if not databases:
+            logger.warning(f"No databases found")
+            return {"success": False, "message": f"No databases found"}
+
+        logger.info(f"Successfully retrieved {len(databases)} results")
+        #results = query_data.get("results", {})
+
+        # Format the response
+        return {
+            "success": True,
+            "status": "succeeded",
+            "databases": databases,
+            "stats": {
+                "database_count": len(databases),
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch database results: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch database results: {str(e)}"}

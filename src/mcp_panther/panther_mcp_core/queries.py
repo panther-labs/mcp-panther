@@ -212,6 +212,15 @@ query AllDatabaseEntities {
 }
 """)
 
+LIST_DATABASES_QUERY = gql("""
+query {
+    dataLakeDatabases {
+        name
+        description
+    }
+}
+""")
+
 # Add after ALL_DATABASE_ENTITIES_QUERY
 
 LIST_SCHEMAS_QUERY = gql("""
