@@ -3,7 +3,7 @@ Tools for interacting with Panther's data lake.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from ..client import _create_panther_client
 from ..queries import (
@@ -22,7 +22,7 @@ logger = logging.getLogger("mcp-panther")
 
 @mcp_tool
 async def execute_data_lake_query(
-    sql: str, database_name: str = "panther_logs.public"
+    sql: str, database_name: Optional[str] = "panther_logs.public"
 ) -> Dict[str, Any]:
     """Execute a Snowflake SQL query against Panther's data lake. RECOMMENDED: First query the information_schema.columns table for the PUBLIC table schema and the p_log_type to get the correct column names and types to query.
 
