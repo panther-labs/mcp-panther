@@ -5,9 +5,7 @@ Tools for interacting with Panther rules.
 import logging
 from typing import Any, Dict, List
 
-import aiohttp
-
-from ..client import get_panther_api_key, get_panther_rest_api_base
+from ..client import get_rest_client
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
@@ -24,32 +22,14 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
     logger.info("Fetching rules from Panther")
 
     try:
-        # Prepare headers
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
-
         # Prepare query parameters
         params = {"limit": limit}
         if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
             params["cursor"] = cursor
             logger.info(f"Using cursor for pagination: {cursor}")
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{await get_panther_rest_api_base()}/rules",
-                headers=headers,
-                params=params,
-            ) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(
-                        f"Failed to fetch rules (HTTP {response.status}): {error_text}  {await get_panther_rest_api_base()}"
-                    )
-
-                result = await response.json()
+        async with get_rest_client() as client:
+            result, _ = await client.get("/rules", params=params)
 
         # Extract rules and pagination info
         rules = result.get("results", [])
@@ -75,7 +55,6 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
 
         logger.info(f"Successfully retrieved {len(filtered_rules_metadata)} rules")
 
-        # Format the response
         return {
             "success": True,
             "rules": filtered_rules_metadata,
@@ -98,33 +77,21 @@ async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
     logger.info(f"Fetching rule details for ID: {rule_id}")
 
     try:
-        # Prepare headers
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
+        async with get_rest_client() as client:
+            # Allow 404 as a valid response to handle not found case
+            result, status = await client.get(
+                f"/rules/{rule_id}", expected_codes=[200, 404]
+            )
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{await get_panther_rest_api_base()}/rules/{rule_id}", headers=headers
-            ) as response:
-                if response.status == 404:
-                    logger.warning(f"No rule found with ID: {rule_id}")
-                    return {
-                        "success": False,
-                        "message": f"No rule found with ID: {rule_id}",
-                    }
-                elif response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to fetch rule details: {error_text}")
-
-                rule_data = await response.json()
+            if status == 404:
+                logger.warning(f"No rule found with ID: {rule_id}")
+                return {
+                    "success": False,
+                    "message": f"No rule found with ID: {rule_id}",
+                }
 
         logger.info(f"Successfully retrieved rule details for ID: {rule_id}")
-
-        # Format the response
-        return {"success": True, "rule": rule_data}
+        return {"success": True, "rule": result}
     except Exception as e:
         logger.error(f"Failed to fetch rule details: {str(e)}")
         return {"success": False, "message": f"Failed to fetch rule details: {str(e)}"}
@@ -213,38 +180,23 @@ async def create_rule(
         if tests:
             rule_data["tests"] = tests
 
-        # Prepare headers and query parameters
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
+        # Prepare query parameters
         params = {"run-tests-first": str(run_tests_first).lower()}
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{await get_panther_rest_api_base()}/rules",
-                headers=headers,
-                params=params,
-                json=rule_data,
-            ) as response:
-                if response.status == 409:
-                    return {
-                        "success": False,
-                        "message": "Rule with this ID already exists",
-                    }
-                elif response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to create rule: {error_text}")
+        async with get_rest_client() as client:
+            # Allow 409 as a valid response to handle conflict case
+            result, status = await client.post(
+                "/rules", json_data=rule_data, params=params, expected_codes=[200, 409]
+            )
 
-                result = await response.json()
+            if status == 409:
+                return {
+                    "success": False,
+                    "message": "Rule with this ID already exists",
+                }
 
         logger.info(f"Successfully created rule with ID: {rule_id}")
-
-        return {
-            "success": True,
-            "rule": result,
-        }
+        return {"success": True, "rule": result}
 
     except Exception as e:
         logger.error(f"Failed to create rule: {str(e)}")
@@ -340,33 +292,16 @@ async def put_rule(
         if tests:
             rule_data["tests"] = tests
 
-        # Prepare headers and query parameters
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
+        # Prepare query parameters
         params = {"run-tests-first": str(run_tests_first).lower()}
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.put(
-                f"{await get_panther_rest_api_base()}/rules/{rule_id}",
-                headers=headers,
-                params=params,
-                json=rule_data,
-            ) as response:
-                if response.status not in [200, 201]:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to update rule: {error_text}")
-
-                result = await response.json()
+        async with get_rest_client() as client:
+            result, _ = await client.put(
+                f"/rules/{rule_id}", json_data=rule_data, params=params
+            )
 
         logger.info(f"Successfully updated rule with ID: {rule_id}")
-
-        return {
-            "success": True,
-            "rule": result,
-        }
+        return {"success": True, "rule": result}
 
     except Exception as e:
         logger.error(f"Failed to update rule: {str(e)}")
@@ -392,53 +327,31 @@ async def disable_rule(rule_id: str) -> Dict[str, Any]:
     logger.info(f"Disabling rule with ID: {rule_id}")
 
     try:
-        # First get the current rule to preserve other fields
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{await get_panther_rest_api_base()}/rules/{rule_id}",
-                headers={"X-API-Key": get_panther_api_key()},
-            ) as response:
-                if response.status == 404:
-                    return {
-                        "success": False,
-                        "message": f"Rule with ID {rule_id} not found",
-                    }
-                elif response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to fetch rule: {error_text}")
+        async with get_rest_client() as client:
+            # First get the current rule to preserve other fields
+            current_rule, status = await client.get(
+                f"/rules/{rule_id}", expected_codes=[200, 404]
+            )
 
-                rule_data = await response.json()
+            if status == 404:
+                return {
+                    "success": False,
+                    "message": f"Rule with ID {rule_id} not found",
+                }
 
-        # Update only the enabled field
-        rule_data["enabled"] = False
+            # Update only the enabled field
+            current_rule["enabled"] = False
 
-        # Prepare headers and query parameters
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
-        params = {"run-tests-first": "false"}  # Skip tests for simple disable
+            # Skip tests for simple disable operation
+            params = {"run-tests-first": "false"}
 
-        # Make the update request
-        async with aiohttp.ClientSession() as session:
-            async with session.put(
-                f"{await get_panther_rest_api_base()}/rules/{rule_id}",
-                headers=headers,
-                params=params,
-                json=rule_data,
-            ) as response:
-                if response.status not in [200, 201]:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to disable rule: {error_text}")
-
-                result = await response.json()
+            # Make the update request
+            result, _ = await client.put(
+                f"/rules/{rule_id}", json_data=current_rule, params=params
+            )
 
         logger.info(f"Successfully disabled rule with ID: {rule_id}")
-
-        return {
-            "success": True,
-            "rule": result,
-        }
+        return {"success": True, "rule": result}
 
     except Exception as e:
         logger.error(f"Failed to disable rule: {str(e)}")
@@ -459,32 +372,14 @@ async def list_scheduled_rules(cursor: str = None, limit: int = 100) -> Dict[str
     logger.info("Fetching scheduled rules from Panther")
 
     try:
-        # Prepare headers
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
-
         # Prepare query parameters
         params = {"limit": limit}
         if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
             params["cursor"] = cursor
             logger.info(f"Using cursor for pagination: {cursor}")
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{await get_panther_rest_api_base()}/scheduled-rules",
-                headers=headers,
-                params=params,
-            ) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(
-                        f"Failed to fetch scheduled rules (HTTP {response.status}): {error_text}"
-                    )
-
-                result = await response.json()
+        async with get_rest_client() as client:
+            result, _ = await client.get("/scheduled-rules", params=params)
 
         # Extract rules and pagination info
         scheduled_rules = result.get("results", [])
@@ -538,36 +433,23 @@ async def get_scheduled_rule_by_id(rule_id: str) -> Dict[str, Any]:
     logger.info(f"Fetching scheduled rule details for ID: {rule_id}")
 
     try:
-        # Prepare headers
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
+        async with get_rest_client() as client:
+            # Allow 404 as a valid response to handle not found case
+            result, status = await client.get(
+                f"/scheduled-rules/{rule_id}", expected_codes=[200, 404]
+            )
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{await get_panther_rest_api_base()}/scheduled-rules/{rule_id}",
-                headers=headers,
-            ) as response:
-                if response.status == 404:
-                    logger.warning(f"No scheduled rule found with ID: {rule_id}")
-                    return {
-                        "success": False,
-                        "message": f"No scheduled rule found with ID: {rule_id}",
-                    }
-                elif response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(
-                        f"Failed to fetch scheduled rule details: {error_text}"
-                    )
-
-                rule_data = await response.json()
+            if status == 404:
+                logger.warning(f"No scheduled rule found with ID: {rule_id}")
+                return {
+                    "success": False,
+                    "message": f"No scheduled rule found with ID: {rule_id}",
+                }
 
         logger.info(f"Successfully retrieved scheduled rule details for ID: {rule_id}")
 
         # Format the response
-        return {"success": True, "scheduled_rule": rule_data}
+        return {"success": True, "scheduled_rule": result}
     except Exception as e:
         logger.error(f"Failed to fetch scheduled rule details: {str(e)}")
         return {
@@ -587,32 +469,14 @@ async def list_simple_rules(cursor: str = None, limit: int = 100) -> Dict[str, A
     logger.info("Fetching simple rules from Panther")
 
     try:
-        # Prepare headers
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
-
         # Prepare query parameters
         params = {"limit": limit}
         if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
             params["cursor"] = cursor
             logger.info(f"Using cursor for pagination: {cursor}")
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{await get_panther_rest_api_base()}/simple-rules",
-                headers=headers,
-                params=params,
-            ) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(
-                        f"Failed to fetch simple rules (HTTP {response.status}): {error_text}"
-                    )
-
-                result = await response.json()
+        async with get_rest_client() as client:
+            result, _ = await client.get("/simple-rules", params=params)
 
         # Extract rules and pagination info
         simple_rules = result.get("results", [])
@@ -663,36 +527,23 @@ async def get_simple_rule_by_id(rule_id: str) -> Dict[str, Any]:
     logger.info(f"Fetching simple rule details for ID: {rule_id}")
 
     try:
-        # Prepare headers
-        headers = {
-            "X-API-Key": get_panther_api_key(),
-            "Content-Type": "application/json",
-        }
+        async with get_rest_client() as client:
+            # Allow 404 as a valid response to handle not found case
+            result, status = await client.get(
+                f"/simple-rules/{rule_id}", expected_codes=[200, 404]
+            )
 
-        # Make the request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{await get_panther_rest_api_base()}/simple-rules/{rule_id}",
-                headers=headers,
-            ) as response:
-                if response.status == 404:
-                    logger.warning(f"No simple rule found with ID: {rule_id}")
-                    return {
-                        "success": False,
-                        "message": f"No simple rule found with ID: {rule_id}",
-                    }
-                elif response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(
-                        f"Failed to fetch simple rule details: {error_text}"
-                    )
-
-                rule_data = await response.json()
+            if status == 404:
+                logger.warning(f"No simple rule found with ID: {rule_id}")
+                return {
+                    "success": False,
+                    "message": f"No simple rule found with ID: {rule_id}",
+                }
 
         logger.info(f"Successfully retrieved simple rule details for ID: {rule_id}")
 
         # Format the response
-        return {"success": True, "simple_rule": rule_data}
+        return {"success": True, "simple_rule": result}
     except Exception as e:
         logger.error(f"Failed to fetch simple rule details: {str(e)}")
         return {
