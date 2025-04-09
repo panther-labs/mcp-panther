@@ -3,7 +3,7 @@ Tools for interacting with Panther's data lake.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from ..client import _create_panther_client
 from ..queries import (
@@ -247,7 +247,7 @@ async def list_databases() -> Dict[str, Any]:
         - message: Error message if unsuccessful
     """
 
-    logger.info(f"Fetching datalake databases")
+    logger.info("Fetching datalake databases")
 
     try:
         client = await _create_panther_client()
@@ -260,8 +260,8 @@ async def list_databases() -> Dict[str, Any]:
         databases = result.get("dataLakeDatabases", [])
 
         if not databases:
-            logger.warning(f"No databases found")
-            return {"success": False, "message": f"No databases found"}
+            logger.warning("No databases found")
+            return {"success": False, "message": "No databases found"}
 
         logger.info(f"Successfully retrieved {len(databases)} results")
 
