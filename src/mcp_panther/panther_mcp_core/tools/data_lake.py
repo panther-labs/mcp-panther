@@ -10,7 +10,8 @@ from ..queries import (
     EXECUTE_DATA_LAKE_QUERY,
     GET_DATA_LAKE_QUERY,
     ALL_DATABASE_ENTITIES_QUERY,
-    LIST_DATABASES_QUERY
+    LIST_DATABASES_QUERY,
+    LIST_TABLES_FOR_DATABASE_QUERY
 )
 from .registry import mcp_tool
 
@@ -260,7 +261,6 @@ async def list_databases() -> Dict[str, Any]:
             return {"success": False, "message": f"No databases found"}
 
         logger.info(f"Successfully retrieved {len(databases)} results")
-        #results = query_data.get("results", {})
 
         # Format the response
         return {
@@ -274,3 +274,57 @@ async def list_databases() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to fetch database results: {str(e)}")
         return {"success": False, "message": f"Failed to fetch database results: {str(e)}"}
+
+@mcp_tool
+async def get_tables_for_database(database_name: str) -> Dict[str, Any]:
+    """Get all tables for a specific datalake database.
+
+    Args:
+        database_name: The name of the database to get tables for
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - tables: List of tables, each containing:
+            - name: Table name
+            - description: Table description
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Fetching tables for database: {database_name}")
+
+    try:
+        client = await _create_panther_client()
+
+        # Prepare input variables
+        variables = {"name": database_name}
+
+        logger.debug(f"Query variables: {variables}")
+
+        # Execute the query asynchronously
+        async with client as session:
+            result = await session.execute(
+                LIST_TABLES_FOR_DATABASE_QUERY, variable_values=variables
+            )
+
+        # Get query data
+        query_data = result.get("dataLakeDatabase", [])
+        tables = query_data.get("tables", [])
+
+        if not tables:
+            logger.warning(f"No tables found for database: {database_name}")
+            return {"success": False, "message": f"No tables found for database: {database_name}"}
+
+        logger.info(f"Successfully retrieved {len(tables)} tables")
+
+        # Format the response
+        return {
+            "success": True,
+            "status": "succeeded",
+            "tables": tables,
+            "stats": {
+                "table_count": len(tables),
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get tables for database: {str(e)}")
+        return {"success": False, "message": f"Failed to get tables for database: {str(e)}"}

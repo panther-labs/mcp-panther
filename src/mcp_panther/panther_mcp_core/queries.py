@@ -221,6 +221,19 @@ query {
 }
 """)
 
+LIST_TABLES_FOR_DATABASE_QUERY = gql("""
+query DatabaseTables($name: String!) {
+    dataLakeDatabase(name: $name) {
+        name
+        description
+        tables {
+            name
+            description
+        }
+    }
+}
+""")
+
 # Add after ALL_DATABASE_ENTITIES_QUERY
 
 LIST_SCHEMAS_QUERY = gql("""
