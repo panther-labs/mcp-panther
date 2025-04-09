@@ -15,9 +15,20 @@ dependencies = [
 [project.scripts]
 mcp-panther = "mcp_panther:main"
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+sources = ["src/mcp_panther"]
+
 [dependency-groups]
 dev = [
     "ruff>=0.11.2",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.5",
+    "pytest-cov>=4.1.0",
+    "pytest-env>=1.1.1",
 ]
 
 [tool.ruff]
@@ -42,3 +53,16 @@ max-complexity = 10
 
 [tool.ruff.lint.isort]
 known-first-party = ["mcp_panther"]
+
+[tool.pytest.ini_options]
+# Configure pytest
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=src/mcp_panther --cov-report=term-missing"
+pythonpath = ["src"]
+env = [
+    "PANTHER_INSTANCE_URL=https://example.com",
+    "PANTHER_API_KEY=test-token"
+]
