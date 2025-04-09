@@ -23,9 +23,10 @@ jobs:
         cache: 'pip'
     
     - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        uses: astral-sh/setup-uv@v5
+        with:
+          cache: true
+
 
     - name: Install dependencies
       run: |
