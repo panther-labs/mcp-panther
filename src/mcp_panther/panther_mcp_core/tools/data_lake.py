@@ -299,7 +299,6 @@ async def list_tables() -> Dict[str, Any]:
     logger.info("Fetching available tables")
 
     all_tables = []
-    cursor = None
     page_size = 100
 
     try:
@@ -312,6 +311,8 @@ async def list_tables() -> Dict[str, Any]:
         for database in databases["databases"]:
             database_name = database["name"]
             logger.info(f"Fetching tables for database: {database_name}")
+
+            cursor = None
 
             while True:
                 # Prepare input variables
@@ -464,7 +465,7 @@ async def get_table_columns(database_name: str, table_name: str) -> Dict[str, An
             logger.warning(f"No columns found for table: {table_full_path}")
             return {
                 "success": False,
-                "message": f"No tables found for table: {table_full_path}",
+                "message": f"No columns found for table: {table_full_path}",
             }
 
         logger.info(f"Successfully retrieved {len(columns)} columns")
