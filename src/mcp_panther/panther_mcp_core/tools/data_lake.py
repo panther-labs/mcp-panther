@@ -7,13 +7,13 @@ from typing import Dict, Any, Optional
 
 from ..client import _create_panther_client
 from ..queries import (
-    EXECUTE_DATA_LAKE_QUERY,
-    GET_DATA_LAKE_QUERY,
     ALL_DATABASE_ENTITIES_QUERY,
-    LIST_DATABASES_QUERY,
-    LIST_TABLES_QUERY,
-    LIST_TABLES_FOR_DATABASE_QUERY,
+    EXECUTE_DATA_LAKE_QUERY,
     GET_COLUMNS_FOR_TABLE_QUERY,
+    GET_DATA_LAKE_QUERY,
+    LIST_DATABASES_QUERY,
+    LIST_TABLES_FOR_DATABASE_QUERY,
+    LIST_TABLES_QUERY,
 )
 from .registry import mcp_tool
 

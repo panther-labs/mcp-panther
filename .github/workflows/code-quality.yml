@@ -1,0 +1,56 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system ruff
+
+      - name: Format and fix code
+        id: format
+        if: github.event_name == 'pull_request'
+        run: |
+          ruff format src
+          ruff check --fix src
+
+          # Check if there are any changes to commit
+          if [ -n "$(git status --porcelain)" ]; then
+            git config --global user.name 'github-actions[bot]'
+            git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+            git add src
+            git commit -m "style: format and fix code with ruff"
+            git push
+          fi
+
+      - name: Check formatting
+        run: |
+          ruff format --check src
+
+      - name: Run linter
+        run: |
+          ruff check src

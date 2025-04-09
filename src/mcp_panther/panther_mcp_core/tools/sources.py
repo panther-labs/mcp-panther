@@ -3,7 +3,7 @@ Tools for interacting with Panther log sources.
 """
 
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 from ..client import _create_panther_client
 from ..queries import GET_SOURCES_QUERY

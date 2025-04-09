@@ -7,8 +7,8 @@ and can be registered with the MCP server using register_all_resources().
 """
 
 import logging
-from typing import Callable, Dict
 from functools import wraps
+from typing import Callable, Dict
 
 logger = logging.getLogger("mcp-panther")
 

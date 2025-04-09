@@ -2,11 +2,12 @@
 Resources for providing configuration information about the Panther MCP server.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 from ..client import get_panther_gql_endpoint, get_panther_rest_api_base
-from ..tools.registry import get_available_tool_names
 from ..prompts.registry import get_available_prompt_names
-from .registry import mcp_resource, get_available_resource_paths
+from ..tools.registry import get_available_tool_names
+from .registry import get_available_resource_paths, mcp_resource
 
 
 @mcp_resource("config://panther")

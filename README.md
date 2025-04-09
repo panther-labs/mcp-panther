@@ -20,33 +20,54 @@ This is a Model Context Protocol (MCP) server for Panther that provides function
 ## Installation
 
 1. Clone this repository or download the files.
+2. Ensure you have Python 3.12 installed. If using pyenv:
+    ```bash
+    pyenv install 3.12
+    ```
 
-2. Install the required dependencies:
+3. Install the required dependencies:
 
-**Using pip**
+    **Using pip (not recommended)**
 
-```bash
-pip install .
-```
+    ```bash
+    pip install .
+    ```
 
-**Using uv (recommended)**
+    **Using uv (recommended)**
 
-On Unix/macOS:
+    1. Install UV using one of the folling methods:
 
-```bash
-uv venv
-source .venv/bin/activate
-uv sync
-```
+        **Using pip**
+        ```bash
+        pip install uv
+        ```
 
-On Windows:
+        **Using curl (Unix/macOS)**
+        ```bash
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        ```
 
-```bash
-.venv\Scripts\activate
-uv sync
-```
+        **On Windows (Powershell):**
+        ```bash
+        powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+        ```
 
-This will install MCP with CLI components, which are necessary for the `mcp install` and `mcp dev` commands.
+    2. Create your virtual environment and install the dependencies using one of the following methods:
+
+        **On Unix/macOS:**
+        ```bash
+        uv venv
+        source .venv/bin/activate
+        uv sync
+        ```
+
+        **On Windows:**
+        ```bash
+        .venv\Scripts\activate
+        uv sync
+        ```
+
+    This will install MCP with CLI components, which are necessary for the `mcp install` and `mcp dev` commands.
 
 ## Configuration
 
