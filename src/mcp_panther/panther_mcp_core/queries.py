@@ -212,6 +212,68 @@ query AllDatabaseEntities {
 }
 """)
 
+LIST_DATABASES_QUERY = gql("""
+query ListDatabases {
+    dataLakeDatabases {
+        name
+        description
+    }
+}
+""")
+
+LIST_TABLES_QUERY = gql("""
+query ListTables($databaseName: String!, $pageSize: Int, $cursor: String) {
+  dataLakeDatabaseTables(
+    input: {
+      databaseName: $databaseName
+      pageSize: $pageSize
+      cursor: $cursor
+    }
+  ) {
+    edges {
+      node {
+        name
+        description
+        logType
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+""")
+
+LIST_TABLES_FOR_DATABASE_QUERY = gql("""
+query ListTablesForDatabase($name: String!) {
+    dataLakeDatabase(name: $name) {
+        name
+        description
+        tables {
+            name
+            description
+        }
+    }
+}
+""")
+
+GET_COLUMNS_FOR_TABLE_QUERY = gql("""
+query GetColumnDetails($databaseName: String!, $tableName: String!) {
+  dataLakeDatabaseTable(input: { databaseName: $databaseName, tableName: $tableName }) {
+    name,
+    displayName,
+    description,
+    logType,
+    columns {
+      name,
+      type,
+      description
+    }
+  }
+}
+""")
+
 # Add after ALL_DATABASE_ENTITIES_QUERY
 
 LIST_SCHEMAS_QUERY = gql("""
