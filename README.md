@@ -193,6 +193,10 @@ uv run python -m mcp_panther.server
 
 This will start the server at http://127.0.0.1:8000/
 
+### Option 5: Install in Cursor
+
+Drop your configuration JSON from above into a new file: `<projectroot>/.cursor/mcp.json`. Cursor will notify you a new MCP server is detected and ask you to enable it.
+
 ## Available Tools
 
 The server provides tools organized by common SIEM workflows:
