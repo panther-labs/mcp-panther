@@ -13,4 +13,4 @@ Optional link to tickets or issues.
 
 ### Notes for Reviewing
 
-Testing steps to help reviewers test code. Include any Feature Flags or Pulumi Configs needed to test.
+Testing steps to help reviewers test code.
