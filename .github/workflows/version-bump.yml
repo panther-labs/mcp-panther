@@ -52,7 +52,7 @@ jobs:
       id: bump_version
       run: |
         # BUMP_TYPE="${{ github.event.inputs.bump_type }}"
-        BUMP_TYPE="major"
+        BUMP_TYPE="minor"
 
         # Read current version from pyproject.toml
         CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
@@ -126,4 +126,4 @@ jobs:
           --body "Automated version bump to prepare for release v$NEW_VERSION" \
           --base main
       env:
-        GH_TOKEN: ${{ secrets.PANTHER_BOT_AUTOMATION_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

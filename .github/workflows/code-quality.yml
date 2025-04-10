@@ -58,7 +58,7 @@ jobs:
             git push
           fi
         env:
-          GH_TOKEN: ${{ secrets.PANTHER_BOT_AUTOMATION_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check formatting
         run: |
