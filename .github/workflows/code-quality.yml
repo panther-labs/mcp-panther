@@ -43,8 +43,8 @@ jobs:
 
           # Check if there are any changes to commit
           if [ -n "$(git status --porcelain)" ]; then
-            git config --global user.name 'github-actions[bot]'
-            git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+            git config --global user.email "github-service-account-automation@panther.io"
+            git config --global user.name "panther-bot-automation"
             git add src
             git commit -m "style: format and fix code with ruff"
             git push
