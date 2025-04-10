@@ -116,6 +116,8 @@ You will need to run `make build-docker` to build the image
       "args": [
         "run",
         "-i",
+        "-e", "PANTHER_INSTANCE_URL",
+        "-e", "PANTHER_API_KEY",
         "--rm",
         "mcp-panther"
       ],

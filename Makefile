@@ -8,3 +8,12 @@ lint:
 
 build-docker:
 	docker build -t mcp-panther .
+
+venv:
+	uv venv
+
+dev: venv
+	. .venv/bin/activate
+
+sync:
+	uv sync
