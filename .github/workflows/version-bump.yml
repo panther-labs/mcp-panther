@@ -101,6 +101,14 @@ jobs:
           exit 1
         fi
 
+    - name: Import GPG key
+      uses: crazy-max/ghaction-import-gpg@v6
+      with:
+        gpg_private_key: ${{ secrets.PANTHER_BOT_GPG_PRIVATE_KEY }}
+        passphrase: ${{ secrets.PANTHER_BOT_GPG_PRIVATE_KEY_PASSPHRASE }}
+        git_user_signingkey: true
+        git_commit_gpgsign: true
+
     - name: Create Branch and Pull Request
       run: |
         NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
@@ -110,7 +118,7 @@ jobs:
         BRANCH_NAME="bump-version-to-$NEW_VERSION"
         git checkout -b "$BRANCH_NAME"
         git add pyproject.toml
-        git commit -m "Bump version to $NEW_VERSION"
+        git commit -S -m "Bump version to $NEW_VERSION"
         git push --set-upstream origin "$BRANCH_NAME"
 
         gh pr create \
@@ -118,4 +126,4 @@ jobs:
           --body "Automated version bump to prepare for release v$NEW_VERSION" \
           --base main
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        GH_TOKEN: ${{ secrets.PANTHER_BOT_AUTOMATION_TOKEN }}
