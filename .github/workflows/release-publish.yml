@@ -1,13 +1,6 @@
 name: Release and Publish to PyPI
 
 on:
-  # Temp for testing...
-  push:
-    branches: [ "broox-release-workflow" ]
-  pull_request:
-    branches: [ main ]
-
-  # The real trigger
   workflow_dispatch:
     inputs:
       create_release_notes:
@@ -66,12 +59,11 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # if [ "${{ github.event.inputs.create_release_notes }}" == "true" ]; then
-        #   GENERATE_NOTES="--generate-notes"
-        # else
-        #   GENERATE_NOTES=""
-        # fi
-        GENERATE_NOTES="--generate-notes"
+        if [ "${{ github.event.inputs.create_release_notes }}" == "true" ]; then
+          GENERATE_NOTES="--generate-notes"
+        else
+          GENERATE_NOTES=""
+        fi
 
         gh release create v$VERSION \
           --title "v$VERSION" \
