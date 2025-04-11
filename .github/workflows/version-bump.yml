@@ -1,13 +1,6 @@
 name: Version Bump PR
 
 on:
-  # Temp for testing...
-  push:
-    branches: [ "broox-unit-tests" ]
-  pull_request:
-    branches: [ main ]
-  
-  # The real trigger
   workflow_dispatch:
     inputs:
       bump_type:
