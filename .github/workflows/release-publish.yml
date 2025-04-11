@@ -1,0 +1,88 @@
+name: Release and Publish to PyPI
+
+on:
+  # Temp for testing...
+  push:
+    branches: [ "broox-release-workflow" ]
+  pull_request:
+    branches: [ main ]
+
+  # The real trigger
+  workflow_dispatch:
+    inputs:
+      create_release_notes:
+        description: 'Auto-generate release notes'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  release_publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out the repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        cache: true
+
+    - name: Install dependencies for testing
+      run: |
+        uv pip install --system -e ".[dev]"
+
+    - name: Run tests
+      run: |
+        pytest tests/
+
+    - name: Install dependencies for release
+      run: |
+        uv pip install --system toml
+
+    - name: Get version
+      id: get_version
+      run: |
+        VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Build package
+      run: |
+        mkdir -p dist
+        pip install build
+        python -m build
+
+    - name: Create GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # if [ "${{ github.event.inputs.create_release_notes }}" == "true" ]; then
+        #   GENERATE_NOTES="--generate-notes"
+        # else
+        #   GENERATE_NOTES=""
+        # fi
+        GENERATE_NOTES="--generate-notes"
+
+        gh release create v$VERSION \
+          --title "v$VERSION" \
+          $GENERATE_NOTES \
+          --draft=false \
+          dist/*
+
+    - name: Publish to PyPI
+      run: |
+        uv pip install --system twine
+        twine upload dist/*
+      env:
+        TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
