@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import re
-from typing import AnyStr, Dict, List, Optional, Tuple, Union, Any
+from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
 
 import aiohttp
 from gql import Client, gql
