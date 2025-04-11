@@ -44,8 +44,7 @@ jobs:
     - name: Bump version
       id: bump_version
       run: |
-        # BUMP_TYPE="${{ github.event.inputs.bump_type }}"
-        BUMP_TYPE="minor"
+        BUMP_TYPE="${{ github.event.inputs.bump_type }}"
 
         # Read current version from pyproject.toml
         CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
