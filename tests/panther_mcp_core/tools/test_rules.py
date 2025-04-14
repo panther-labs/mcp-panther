@@ -1,0 +1,612 @@
+import pytest
+from mcp_panther.panther_mcp_core.tools.rules import (
+    list_rules,
+    get_rule_by_id,
+    create_rule,
+    put_rule,
+    disable_rule,
+    list_scheduled_rules,
+    get_scheduled_rule_by_id,
+    list_simple_rules,
+    get_simple_rule_by_id,
+)
+from tests.utils.helpers import patch_rest_client
+
+MOCK_RULE = {
+    "id": "New.sign-in",
+    "body": "def rule(event):\n    # Return True to match the log event and trigger an alert.\n    return event.get(\"actionName\") == \"SIGN_IN\"\n\ndef title(event):\n    # (Optional) Return a string which will be shown as the alert title.\n    # If no 'dedup' function is defined, the return value of this method will act as deduplication string.\n\n    default_name = \"A user\"\n    id = None\n    email = None\n    name = None\n\n    actor = event.get(\"actor\")\n    if actor:\n        id = actor.get(\"id\")\n        name = actor.get(\"name\")\n        attributes = actor.get(\"attributes\")\n        email = attributes.get(\"email\")\n\n    display_name = name or email or id or default_name\n\n    return f\"{display_name} logged into Panther\"",
+    "dedupPeriodMinutes": 60,
+    "description": "",
+    "displayName": "New sign-in",
+    "enabled": True,
+    "logTypes": ["Panther.Audit"],
+    "managed": False,
+    "runbook": "",
+    "severity": "MEDIUM",
+    "threshold": 1,
+    "createdAt": "2024-11-14T17:09:49.841715953Z",
+    "lastModified": "2024-11-14T17:09:49.841716265Z",
+    "tags": ["Authentication", "Login"],
+    "tests": [
+      {
+        "expectedResult": False,
+        "name": "Random Event",
+        "resource": "{\"actionName\":\"SIGN_OUT\",\"actor\":{\"attributes\":{\"email\":\"derek@example.com\"},\"id\":\"1337\",\"name\":\"Derek\"}}"
+      },
+      {
+        "expectedResult": False,
+        "name": "Sign In Test",
+        "resource": "{\"actionName\":\"SIGN_IN\",\"actor\":{\"attributes\":{\"email\":\"derek@example.com\"},\"id\":\"1337\",\"name\":\"Derek\"}}"
+      }
+    ],
+    "reports": {"SOC2": ["CC6.1", "CC6.3"], "PCI DSS": ["Requirement 10.2"]},
+    "summaryAttributes": ["actor.name", "actor.attributes.email"],
+}
+
+
+MOCK_RULE_HIGH_SEVERITY = {
+    **MOCK_RULE,
+    "id": "High.severity", 
+    "displayName": "Another rule with high severity",
+    "severity": "HIGH",
+}
+
+MOCK_RULES_RESPONSE = {
+    "results": [MOCK_RULE, MOCK_RULE_HIGH_SEVERITY],
+    "next": "next-page-token"
+}
+
+RULES_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.rules"
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_rules_success(mock_rest_client):
+    """Test successful listing of rules."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    result = await list_rules()
+
+    assert result["success"] is True
+    assert len(result["rules"]) == 2
+    assert result["total_rules"] == 2
+    assert result["has_next_page"] is True
+    assert result["next_cursor"] == "next-page-token"
+
+    first_rule = result["rules"][0]
+    assert first_rule["id"] == MOCK_RULE["id"]
+    assert first_rule["severity"] == MOCK_RULE["severity"]
+    assert first_rule["displayName"] == MOCK_RULE["displayName"]
+    assert first_rule["enabled"] is True
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_rules_with_pagination(mock_rest_client):
+    """Test listing rules with pagination."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    await list_rules(cursor="some-cursor", limit=50)
+
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == "/rules"
+    assert kwargs["params"]["cursor"] == "some-cursor"
+    assert kwargs["params"]["limit"] == 50
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_rules_error(mock_rest_client):
+    """Test handling of errors when listing rules."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+
+    result = await list_rules()
+
+    assert result["success"] is False
+    assert "Failed to fetch rules" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_rule_by_id_success(mock_rest_client):
+    """Test successful retrieval of a single rule."""
+    mock_rest_client.get.return_value = (MOCK_RULE, 200)
+
+    result = await get_rule_by_id(MOCK_RULE["id"])
+
+    assert result["success"] is True
+    assert result["rule"]["id"] == MOCK_RULE["id"]
+    assert result["rule"]["severity"] == MOCK_RULE["severity"]
+    assert result["rule"]["body"] == MOCK_RULE["body"]
+    assert len(result["rule"]["tests"]) == 2
+
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == f"/rules/{MOCK_RULE['id']}"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_rule_by_id_not_found(mock_rest_client):
+    """Test handling of non-existent rule."""
+    mock_rest_client.get.return_value = ({}, 404)
+
+    result = await get_rule_by_id("nonexistent-rule")
+
+    assert result["success"] is False
+    assert "No rule found with ID" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_rule_by_id_error(mock_rest_client):
+    """Test handling of errors when getting rule by ID."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+
+    result = await get_rule_by_id(MOCK_RULE["id"])
+
+    assert result["success"] is False
+    assert "Failed to fetch rule details" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_create_rule_with_all_options(mock_rest_client):
+    """Test creation of a rule with all optional parameters."""
+    rule_data = {
+        "rule_id": "test.all.options",
+        "body": "def rule(event):\n    return True",
+        "severity": "CRITICAL",
+        "description": "Test rule with all options",
+        "display_name": "Test All Options",
+        "enabled": False,
+        "log_types": ["Custom.Log", "AWS.CloudTrail"],
+        "dedup_period_minutes": 120,
+        "threshold": 5,
+        "runbook": "Follow these steps to investigate...",
+        "tags": ["test", "complete"],
+        "summary_attributes": ["sourceIp", "userName"],
+        "inline_filters": "key: value",
+        "reports": {"PCI": ["1.1", "1.2"]},
+        "tests": [
+            {
+                "name": "Test Case",
+                "expectedResult": True,
+                "data": {"test": "data"}
+            }
+        ],
+        "run_tests_first": False
+    }
+    mock_rest_client.post.return_value = (MOCK_RULE, 201)
+
+    result = await create_rule(**rule_data)
+
+    assert result["success"] is True
+
+    mock_rest_client.post.assert_called_once()
+    args, kwargs = mock_rest_client.post.call_args
+
+    assert args[0] == "/rules"
+    assert kwargs["json_data"]["id"] == rule_data["rule_id"]
+    assert kwargs["json_data"]["severity"] == rule_data["severity"]
+    assert kwargs["json_data"]["description"] == rule_data["description"]
+    assert kwargs["json_data"]["displayName"] == rule_data["display_name"]
+    assert kwargs["json_data"]["enabled"] is False
+    assert kwargs["json_data"]["logTypes"] == rule_data["log_types"]
+    assert kwargs["json_data"]["dedupPeriodMinutes"] == rule_data["dedup_period_minutes"]
+    assert kwargs["json_data"]["threshold"] == rule_data["threshold"]
+    assert kwargs["json_data"]["runbook"] == rule_data["runbook"]
+    assert kwargs["json_data"]["tags"] == rule_data["tags"]
+    assert kwargs["json_data"]["summaryAttributes"] == rule_data["summary_attributes"]
+    assert kwargs["json_data"]["inlineFilters"] == rule_data["inline_filters"]
+    assert kwargs["json_data"]["reports"] == rule_data["reports"]
+    assert kwargs["json_data"]["tests"] == rule_data["tests"]
+    assert kwargs["params"]["run-tests-first"] == "false"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_create_rule_already_exists(mock_rest_client):
+    """Test creation of a rule that already exists."""
+    mock_rest_client.post.return_value = ({}, 409)
+
+    result = await create_rule(
+        rule_id="New.sign-in",
+        body=MOCK_RULE["body"],
+        severity="MEDIUM"
+    )
+
+    assert result["success"] is False
+    assert "Rule with this ID already exists" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_create_rule_invalid_severity():
+    """Test creation of a rule with invalid severity."""
+    result = await create_rule(
+        rule_id="test.rule",
+        body="def rule(event):\n    return True",
+        severity="INVALID"
+    )
+
+    assert result["success"] is False
+    assert "Severity must be one of" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_create_rule_error(mock_rest_client):
+    """Test handling of errors when creating a rule."""
+    mock_rest_client.post.side_effect = Exception("Test error")
+
+    result = await create_rule(
+        rule_id="test.rule",
+        body="def rule(event):\n    return True",
+        severity="HIGH"
+    )
+
+    assert result["success"] is False
+    assert "Failed to create rule" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_put_rule_with_all_options(mock_rest_client):
+    """Test updating a rule with all optional parameters."""
+    rule_data = {
+        "rule_id": "test.update.all.options",
+        "body": "def rule(event):\n    return True",
+        "severity": "INFO",
+        "description": "Updated test rule",
+        "display_name": "Updated Test Rule",
+        "enabled": True,
+        "log_types": ["AWS.S3"],
+        "dedup_period_minutes": 180,
+        "threshold": 3,
+        "runbook": "Updated runbook instructions",
+        "tags": ["updated", "test"],
+        "summary_attributes": ["sourceIp", "userName", "eventName"],
+        "inline_filters": "updated: filter",
+        "reports": {"SOC2": ["CC1.1"]},
+        "tests": [
+            {
+                "name": "Updated Test Case",
+                "expectedResult": False,
+                "data": {"updated": "data"}
+            }
+        ],
+        "run_tests_first": False
+    }
+
+    mock_rest_client.put.return_value = (MOCK_RULE, 200)
+    result = await put_rule(**rule_data)
+
+    assert result["success"] is True
+
+    mock_rest_client.put.assert_called_once()
+    args, kwargs = mock_rest_client.put.call_args
+
+    assert args[0] == f"/rules/{rule_data['rule_id']}"
+    assert kwargs["json_data"]["id"] == rule_data["rule_id"]
+    assert kwargs["json_data"]["severity"] == rule_data["severity"]
+    assert kwargs["json_data"]["description"] == rule_data["description"]
+    assert kwargs["json_data"]["displayName"] == rule_data["display_name"]
+    assert kwargs["json_data"]["enabled"] is True
+    assert kwargs["json_data"]["logTypes"] == rule_data["log_types"]
+    assert kwargs["json_data"]["dedupPeriodMinutes"] == rule_data["dedup_period_minutes"]
+    assert kwargs["json_data"]["threshold"] == rule_data["threshold"]
+    assert kwargs["json_data"]["runbook"] == rule_data["runbook"]
+    assert kwargs["json_data"]["tags"] == rule_data["tags"]
+    assert kwargs["json_data"]["summaryAttributes"] == rule_data["summary_attributes"]
+    assert kwargs["json_data"]["inlineFilters"] == rule_data["inline_filters"]
+    assert kwargs["json_data"]["reports"] == rule_data["reports"]
+    assert kwargs["json_data"]["tests"] == rule_data["tests"]
+    assert kwargs["params"]["run-tests-first"] == "false"
+
+
+@pytest.mark.asyncio
+async def test_put_rule_invalid_severity():
+    """Test update of a rule with invalid severity."""
+    result = await put_rule(
+        rule_id="New.sign-in",
+        body=MOCK_RULE["body"],
+        severity="INVALID"
+    )
+
+    assert result["success"] is False
+    assert "Severity must be one of" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_put_rule_error(mock_rest_client):
+    """Test handling of errors when updating a rule."""
+    mock_rest_client.put.side_effect = Exception("Test error")
+
+    result = await put_rule(
+        rule_id="New.sign-in",
+        body=MOCK_RULE["body"],
+        severity="HIGH"
+    )
+
+    assert result["success"] is False
+    assert "Failed to update rule" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_disable_rule_success(mock_rest_client):
+    """Test successful disabling of a rule."""
+    # For the disable_rule test, we need two responses:
+    # 1. GET to fetch current rule data
+    # 2. PUT to update with enabled=False
+    mock_rest_client.get.return_value = (MOCK_RULE, 200)
+    disabled_rule = {**MOCK_RULE, "enabled": False}
+    mock_rest_client.put.return_value = (disabled_rule, 200)
+
+    result = await disable_rule(MOCK_RULE["id"])
+
+    assert result["success"] is True
+    assert result["rule"]["enabled"] is False
+
+    mock_rest_client.put.assert_called_once()
+    args, kwargs = mock_rest_client.put.call_args
+    assert args[0] == f"/rules/{MOCK_RULE['id']}"
+    assert kwargs["json_data"]["enabled"] is False
+    assert kwargs["params"]["run-tests-first"] == "false"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_disable_rule_not_found(mock_rest_client):
+    """Test disabling a non-existent rule."""
+    mock_rest_client.get.return_value = ({}, 404)
+
+    result = await disable_rule("nonexistent-rule")
+
+    assert result["success"] is False
+    assert "Rule with ID nonexistent-rule not found" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_disable_rule_error(mock_rest_client):
+    """Test handling of errors when disabling a rule."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+
+    result = await disable_rule(MOCK_RULE["id"])
+
+    assert result["success"] is False
+    assert "Failed to disable rule" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_scheduled_rules_success(mock_rest_client):
+    """Test successful listing of scheduled rules."""
+    mock_scheduled_rule_base = {
+        **MOCK_RULE,
+        "id": "scheduled.data.exfiltration",
+        "displayName": "Scheduled Data Exfiltration Check",
+        "scheduledQueries": ["SELECT * FROM data_movement WHERE bytes_transferred > 1000000 AND destination_ip NOT IN (trusted_ips)"]
+    }
+
+    mock_scheduled_rule_variation = {
+        **mock_scheduled_rule_base,
+        "id": "scheduled.unused.credentials", 
+        "displayName": "Scheduled Unused Credentials Check",
+        "scheduledQueries": ["SELECT * FROM credential_usage WHERE last_used < NOW() - INTERVAL '90 days'"]
+    }
+
+    mock_scheduled_rules = {
+        "results": [mock_scheduled_rule_base, mock_scheduled_rule_variation],
+        "next": "next-token"
+    }
+    mock_rest_client.get.return_value = (mock_scheduled_rules, 200)
+
+    result = await list_scheduled_rules()
+
+    assert result["success"] is True
+    assert len(result["scheduled_rules"]) == 2
+    assert result["total_scheduled_rules"] == 2
+    assert result["has_next_page"] is True
+
+    mock_rest_client.get.assert_called_once()
+    args, _ = mock_rest_client.get.call_args
+    assert args[0] == "/scheduled-rules"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_scheduled_rules_error(mock_rest_client):
+    """Test handling of errors when listing scheduled rules."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+
+    result = await list_scheduled_rules()
+
+    assert result["success"] is False
+    assert "Failed to fetch scheduled rules" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_scheduled_rules_with_pagination(mock_rest_client):
+    """Test pagination for listing scheduled rules."""
+    scheduled_rules_response = {
+        "results": [
+            {
+                "id": "scheduled.test.rule",
+                "displayName": "Test Scheduled Rule",
+                "scheduledQueries": ["SELECT * FROM test"]
+            }
+        ],
+        "next": "next-scheduled-token"
+    }
+    mock_rest_client.get.return_value = (scheduled_rules_response, 200)
+
+    await list_scheduled_rules(cursor="some-cursor", limit=25)
+
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == "/scheduled-rules"
+    assert kwargs["params"]["cursor"] == "some-cursor"
+    assert kwargs["params"]["limit"] == 25
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_scheduled_rule_by_id_success(mock_rest_client):
+    """Test successful retrieval of a single scheduled rule."""
+    scheduled_rule = {
+        **MOCK_RULE,
+        "id": "scheduled.data.exfiltration",
+        "displayName": "Scheduled Data Exfiltration Check",
+        "scheduledQueries": ["SELECT * FROM data_movement WHERE bytes_transferred > 1000000 AND destination_ip NOT IN (trusted_ips)"]
+    }
+    mock_rest_client.get.return_value = (scheduled_rule, 200)
+
+    result = await get_scheduled_rule_by_id(scheduled_rule["id"])
+
+    assert result["success"] is True
+    assert result["scheduled_rule"]["id"] == scheduled_rule["id"]
+    assert "scheduledQueries" in result["scheduled_rule"]
+    assert len(result["scheduled_rule"]["scheduledQueries"]) == 1
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_scheduled_rule_by_id_not_found(mock_rest_client):
+    """Test handling of non-existent scheduled rule."""
+    mock_rest_client.get.return_value = ({}, 404)
+
+    result = await get_scheduled_rule_by_id("nonexistent.scheduled.rule")
+
+    assert result["success"] is False
+    assert "No scheduled rule found with ID" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_scheduled_rule_by_id_error(mock_rest_client):
+    """Test handling of errors when getting scheduled rule by ID."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+
+    result = await get_scheduled_rule_by_id("scheduled.rule.id")
+
+    assert result["success"] is False
+    assert "Failed to fetch scheduled rule details" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_simple_rules_success(mock_rest_client):
+    """Test successful listing of simple rules."""
+    simple_rule_base = {
+        **MOCK_RULE,
+        "id": "simple.ip.blocklist",
+        "displayName": "Simple IP Blocklist Rule",
+        "description": "Alerts on traffic from known malicious IPs",
+    }
+
+    simple_rule_variation = {
+        **simple_rule_base,
+        "id": "simple.domain.blocklist", 
+        "displayName": "Simple Domain Blocklist Rule",
+        "description": "Alerts on traffic to known malicious domains",
+    }
+
+    mock_simple_rules = {
+        "results": [simple_rule_base, simple_rule_variation],
+        "next": "next-token"
+    }
+    mock_rest_client.get.return_value = (mock_simple_rules, 200)
+
+    result = await list_simple_rules()
+
+    assert result["success"] is True
+    assert len(result["simple_rules"]) == 2
+    assert result["total_simple_rules"] == 2
+    assert result["has_next_page"] is True
+
+    mock_rest_client.get.assert_called_once()
+    args, _ = mock_rest_client.get.call_args
+    assert args[0] == "/simple-rules"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_simple_rules_with_pagination(mock_rest_client):
+    """Test pagination for listing simple rules."""
+    simple_rules_response = {
+        "results": [
+            {
+                "id": "simple.test.rule",
+                "displayName": "Test Simple Rule"
+            }
+        ],
+        "next": "next-simple-token"
+    }
+    mock_rest_client.get.return_value = (simple_rules_response, 200)
+
+    await list_simple_rules(cursor="simple-cursor", limit=30)
+
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == "/simple-rules"
+    assert kwargs["params"]["cursor"] == "simple-cursor"
+    assert kwargs["params"]["limit"] == 30
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_simple_rules_error(mock_rest_client):
+    """Test handling of errors when listing simple rules."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+
+    result = await list_simple_rules()
+
+    assert result["success"] is False
+    assert "Failed to fetch simple rules" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_simple_rule_by_id_success(mock_rest_client):
+    """Test successful retrieval of a single simple rule."""
+    simple_rule = {
+        **MOCK_RULE,
+        "id": "simple.ip.blocklist",
+        "displayName": "Simple IP Blocklist Rule",
+        "description": "Alerts on traffic from known malicious IPs",
+    }
+    mock_rest_client.get.return_value = (simple_rule, 200)
+
+    result = await get_simple_rule_by_id(simple_rule["id"])
+
+    assert result["success"] is True
+    assert result["simple_rule"]["id"] == simple_rule["id"]
+    assert result["simple_rule"]["displayName"] == simple_rule["displayName"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_simple_rule_by_id_not_found(mock_rest_client):
+    """Test handling of non-existent simple rule."""
+    mock_rest_client.get.return_value = ({}, 404)
+
+    result = await get_simple_rule_by_id("nonexistent.simple.rule")
+
+    assert result["success"] is False
+    assert "No simple rule found with ID" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_simple_rule_by_id_error(mock_rest_client):
+    """Test handling of errors when getting simple rule by ID."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+
+    result = await get_simple_rule_by_id("simple.rule.id")
+
+    assert result["success"] is False
+    assert "Failed to fetch simple rule details" in result["message"]
