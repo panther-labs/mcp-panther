@@ -7,7 +7,6 @@ from typing import Any, Dict, Optional
 
 from ..client import _create_panther_client
 from ..queries import (
-    ALL_DATABASE_ENTITIES_QUERY,
     EXECUTE_DATA_LAKE_QUERY,
     GET_COLUMNS_FOR_TABLE_QUERY,
     GET_DATA_LAKE_QUERY,
@@ -61,92 +60,6 @@ async def execute_data_lake_query(
         return {
             "success": False,
             "message": f"Failed to execute data lake query: {str(e)}",
-        }
-
-
-@mcp_tool
-async def get_data_lake_dbs_tables_columns(
-    database: str = None, table: str = None
-) -> Dict[str, Any]:
-    """List all available databases, tables, and columns for querying Panther's data lake. Check this BEFORE running a data lake query.
-
-    Args:
-        database: Optional database name to filter results. Available databases:
-            - panther_logs.public: Contains all log data
-            - panther_cloudsecurity.public: Contains cloud security scanning data
-            - panther_rule_errors.public: Contains rule execution errors
-        table: Optional table name to filter results (e.g. "compliance_history")
-
-    Returns:
-        Dict containing:
-        - success: Boolean indicating if the query was successful
-        - databases: List of databases, each containing:
-            - name: Database name
-            - description: Database description
-            - tables: List of tables, each containing:
-                - name: Table name
-                - description: Table description
-                - columns: List of columns, each containing:
-                    - name: Column name
-                    - description: Column description
-                    - type: Column data type
-        - message: Error message if unsuccessful
-    """
-    logger.info("Fetching available databases, tables, and columns")
-
-    try:
-        client = await _create_panther_client()
-
-        # Execute the query asynchronously
-        async with client as session:
-            result = await session.execute(ALL_DATABASE_ENTITIES_QUERY)
-
-        # Get databases data
-        databases = result.get("dataLakeDatabases", [])
-
-        # Log unique database names
-        unique_dbs = sorted({db["name"] for db in databases})
-        logger.info(f"Available databases from API: {', '.join(unique_dbs)}")
-
-        # Filter by database if specified
-        if database:
-            databases = [
-                db for db in databases if db["name"].lower() == database.lower()
-            ]
-            if not databases:
-                return {"success": False, "message": f"Database '{database}' not found"}
-
-        # Filter by table if specified
-        if table:
-            for db in databases:
-                db["tables"] = [
-                    t for t in db["tables"] if t["name"].lower() == table.lower()
-                ]
-            # Only keep databases that have matching tables
-            databases = [db for db in databases if db["tables"]]
-            if not databases:
-                return {
-                    "success": False,
-                    "message": f"Table '{table}' not found in any database",
-                }
-
-        logger.info(f"Successfully retrieved {len(databases)} databases")
-        if database:
-            logger.info(f"Filtered to database: {database}")
-        if table:
-            logger.info(f"Filtered to table: {table}")
-
-        # Format the response
-        return {
-            "success": True,
-            "databases": databases,
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to fetch data lake entities: {str(e)}")
-        return {
-            "success": False,
-            "message": f"Failed to fetch data lake entities: {str(e)}",
         }
 
 
@@ -283,8 +196,10 @@ async def list_databases() -> Dict[str, Any]:
 
 
 @mcp_tool
-async def list_tables() -> Dict[str, Any]:
-    """List all available tables in Panther's data lake.
+async def list_tables_for_database(database: str) -> Dict[str, Any]:
+    """List all available tables in a Panther Database.
+
+    Required: Only use valid database names obtained from list_databases
 
     Returns:
         Dict containing:
@@ -303,46 +218,37 @@ async def list_tables() -> Dict[str, Any]:
 
     try:
         client = await _create_panther_client()
+        logger.info(f"Fetching tables for database: {database}")
+        cursor = None
 
-        # Execute the query asynchronously
-        async with client as session:
-            databases = await list_databases()
+        while True:
+            # Prepare input variables
+            variables = {
+                "databaseName": database,
+                "pageSize": page_size,
+                "cursor": cursor,
+            }
 
-        for database in databases["databases"]:
-            database_name = database["name"]
-            logger.info(f"Fetching tables for database: {database_name}")
+            logger.debug(f"Query variables: {variables}")
 
-            cursor = None
+            # Execute the query asynchronously
+            async with client as session:
+                result = await session.execute(
+                    LIST_TABLES_QUERY, variable_values=variables
+                )
 
-            while True:
-                # Prepare input variables
-                variables = {
-                    "databaseName": database_name,
-                    "pageSize": page_size,
-                    "cursor": cursor,
-                }
+            # Get query data
+            result = result.get("dataLakeDatabaseTables", {})
+            for table in result.get("edges", []):
+                all_tables.append(table["node"])
 
-                logger.debug(f"Query variables: {variables}")
+            # Check if there are more pages
+            page_info = result["pageInfo"]
+            if not page_info["hasNextPage"]:
+                break
 
-                # Execute the query asynchronously
-                async with client as session:
-                    result = await session.execute(
-                        LIST_TABLES_QUERY, variable_values=variables
-                    )
-
-                # Get query data
-                result = result.get("dataLakeDatabaseTables", {})
-                for table in result.get("edges", []):
-                    table["node"]["database"] = database_name
-                    all_tables.append(table["node"])
-
-                # Check if there are more pages
-                page_info = result["pageInfo"]
-                if not page_info["hasNextPage"]:
-                    break
-
-                # Update cursor for next page
-                cursor = page_info["endCursor"]
+            # Update cursor for next page
+            cursor = page_info["endCursor"]
 
         # Format the response
         return {

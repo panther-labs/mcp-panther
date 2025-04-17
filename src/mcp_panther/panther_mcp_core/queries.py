@@ -194,24 +194,6 @@ query GetDataLakeQuery($id: ID!, $root: Boolean = false) {
 }
 """)
 
-ALL_DATABASE_ENTITIES_QUERY = gql("""
-query AllDatabaseEntities {
-  dataLakeDatabases {
-    name
-    description
-    tables {
-      name
-      description
-      columns {
-        name
-        description
-        type
-      }
-    }
-  }
-}
-""")
-
 LIST_DATABASES_QUERY = gql("""
 query ListDatabases {
     dataLakeDatabases {
