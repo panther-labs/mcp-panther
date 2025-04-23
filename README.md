@@ -208,7 +208,7 @@ The server provides tools organized by common SIEM workflows:
 | **Alert Management** | | | |
 | | `list_alerts` | List alerts with comprehensive filtering options (date range, severity, status, etc.) | "Show me all high severity alerts from the last 24 hours" |
 | | `get_alert_by_id` | Get detailed information about a specific alert | "What's the status of alert 8def456?" |
-| | `get_alert_events` | Get the most recent events for a given alert | "Show me events associated with alert 8def456" |
+| | `get_alert_events` | Get a small sampling of events for a given alert | "Show me events associated with alert 8def456" |
 | | `update_alert_status` | Update the status of one or more alerts | "Mark alerts abc123 and def456 as resolved" |
 | | `add_alert_comment` | Add a comment to a Panther alert | "Add comment 'Looks pretty bad' to alert abc123" |
 | | `update_alert_assignee_by_id` | Update the assignee of one or more alerts | "Assign alerts abc123 and def456 to John" |

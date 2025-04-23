@@ -376,8 +376,8 @@ async def test_get_alert_events_success(mock_rest_client):
     assert result["success"] is True
     assert len(result["events"]) == 2
     assert result["total_events"] == 2
-    assert result["events"][0]["id"] == "event-1"
-    assert result["events"][1]["id"] == "event-2"
+    assert result["events"][0]["p_row_id"] == "event-1"
+    assert result["events"][1]["p_row_id"] == "event-2"
     
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
@@ -417,8 +417,8 @@ async def test_get_alert_events_invalid_limit():
 @pytest.mark.asyncio
 @patch_rest_client(ALERTS_MODULE_PATH)
 async def test_get_alert_events_limit_exceeds_max(mock_rest_client):
-    """Test that limit is capped at 50 when a larger value is provided."""
-    mock_events = [{"p_row_id": f"event-{i}"} for i in range(1, 50)]
+    """Test that limit is capped at 10 when a larger value is provided."""
+    mock_events = [{"p_row_id": f"event-{i}"} for i in range(1, 10)]
     mock_response = {"results": mock_events}
     
     mock_rest_client.get.return_value = (mock_response, 200)
@@ -430,4 +430,4 @@ async def test_get_alert_events_limit_exceeds_max(mock_rest_client):
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
     assert args[0] == f"/alerts/{MOCK_ALERT['id']}/events"
-    assert kwargs["params"]["limit"] == 50
+    assert kwargs["params"]["limit"] == 10

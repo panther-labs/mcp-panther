@@ -410,13 +410,14 @@ async def update_alert_assignee_by_id(
 @mcp_tool
 async def get_alert_events(alert_id: str, limit: int = 10) -> Dict[str, Any]:
     """
-    Get the most recent events for a specific Panther alert by ID.
+    Get events for a specific Panther alert by ID.
+    We make a best effort to return the first events for an alert, but order is not guaranteed.
 
     This tool does not support pagination to prevent long-running, expensive queries.
 
     Args:
         alert_id: The ID of the alert to get events for
-        limit: Maximum number of events to return (default: 10, maximum: 50)
+        limit: Maximum number of events to return (default: 10, maximum: 10)
 
     Returns:
         Dict containing:
@@ -425,13 +426,14 @@ async def get_alert_events(alert_id: str, limit: int = 10) -> Dict[str, Any]:
         - message: Error message if unsuccessful
     """
     logger.info(f"Fetching events for alert ID: {alert_id}")
+    max_limit = 10
 
     try:
         if limit < 1:
             raise ValueError("limit must be greater than 0")
-        if limit > 50:
-            logger.warning(f"limit {limit} exceeds maximum of 50, using 50 instead")
-            limit = 50
+        if limit > max_limit:
+            logger.warning(f"limit {limit} exceeds maximum of {max_limit}, using {max_limit} instead")
+            limit = max_limit
 
         params = {"limit": limit}
 
