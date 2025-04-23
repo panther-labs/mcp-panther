@@ -23,12 +23,7 @@ logger = logging.getLogger("mcp-panther")
 async def execute_data_lake_query(
     sql: str, database_name: Optional[str] = "panther_logs.public"
 ) -> Dict[str, Any]:
-    """Execute a Snowflake SQL query against Panther's data lake. RECOMMENDED: First query the information_schema.columns table for the PUBLIC table schema and the p_log_type to get the correct column names and types to query.
-
-    Args:
-        sql: The Snowflake SQL query to execute (tables are named after p_log_type)
-        database_name: Optional database name to execute against ("panther_logs.public": all logs, "panther_rule_matches.public": rule matches)
-    """
+    """Execute a performant Snowflake SQL query against Panther's data lake. REQUIRED: USE THE get_table_columns TOOL FIRST to get the correct table schema. THE QUERY MUST ALSO INCLUDE A FILTER ON p_event_time WITH A MAX TIME DURATION OF 90 DAYS."""
     logger.info("Executing data lake query")
 
     try:
