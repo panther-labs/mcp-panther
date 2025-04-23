@@ -77,23 +77,23 @@ def handle_signals():
 @click.option(
     "--transport",
     type=click.Choice(["stdio", "sse"]),
-    default="stdio",
+    default=os.environ.get("MCP_TRANSPORT", default="stdio"),
     help="Transport type (stdio or sse)",
 )
-@click.option("--port", default=3000, help="Port to use for SSE transport")
-@click.option("--host", default="127.0.0.1", help="Host to bind to for SSE transport")
+@click.option(
+    "--port",
+    default=int(os.environ.get("MCP_PORT", default="3000")),
+    help="Port to use for SSE transport",
+)
+@click.option(
+    "--host",
+    default=os.environ.get("MCP_HOST", default="127.0.0.1"),
+    help="Host to bind to for SSE transport",
+)
 def main(transport: str, port: int, host: str):
     """Run the Panther MCP server with the specified transport"""
     # Set up signal handling
     handle_signals()
-
-    # Environment variable can override the transport
-    env_transport = os.environ.get("MCP_TRANSPORT")
-    if env_transport in ["stdio", "sse"]:
-        transport = env_transport
-
-    host = os.environ.get("MCP_HOST", default=host)
-    port = os.environ.get("MCP_PORT", default=port)
 
     if transport == "sse":
         # Create the Starlette app
