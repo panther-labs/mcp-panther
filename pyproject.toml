@@ -10,6 +10,9 @@ dependencies = [
     "mcp[cli]>=1.6.0",
     "pip-system-certs>=0.1.0",
     "python-dotenv>=1.1.0",
+    "click>=8.1.0",
+    "uvicorn>=0.24.0",
+    "starlette>=0.35.0",
 ]
 
 [project.optional-dependencies]
@@ -22,7 +25,7 @@ dev = [
 ]
 
 [project.scripts]
-mcp-panther = "mcp_panther:main"
+mcp-panther = "mcp_panther.server:main"
 
 [tool.ruff]
 # Allow autofix behavior for specified rules
