@@ -23,6 +23,83 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
+async def get_temporal_alert_groups(
+    start_date: datetime, end_date: datetime, time_window: int = 30
+):
+    """Gather a summary of multiple alerts within a given date range. This is helpful for prioritizing alerts and identifying relationships.
+
+    This tool performs alert correlation by identifying related security events that occur in the same specific time window.
+    It takes security alerts between the specified dates and groups them by day, a time bucket, log type, source IP, email, and username to find patterns of related activity.
+    For each group, it counts alerts, collects alert IDs, rule IDs, timestamps, and severity levels, then sorts the results chronologically with the most recent events first.
+
+    Args:
+        start_date: The start date as a datetime object
+        end_date: The end date as a datetime object
+        time_window: The time window in minutes to group distinct events by (must be 1, 5, 15, 30, or 60)
+
+    Example:
+        start = datetime(2025, 4, 22, 22, 37, 41)  # 2025-04-22 22:37:41Z
+    """
+    if time_window not in [1, 5, 15, 30, 60]:
+        raise ValueError("Time window must be 1, 5, 15, 30, or 60")
+
+    # Convert datetime objects to the required format: YYYY-MM-DD HH:MM:SSZ
+    start_date_str = start_date.strftime("%Y-%m-%d %H:%M:%SZ")
+    end_date_str = end_date.strftime("%Y-%m-%d %H:%M:%SZ")
+
+    query = f"""
+WITH alert_data AS (
+    SELECT
+        alertId,
+        title,
+        severity,
+        detectionId,
+        detectionDisplayName,
+        firstEventTime,
+        creationTime
+    FROM
+        panther_signals.public.signal_alerts
+    WHERE
+        p_occurs_between('{start_date_str}', '{end_date_str}')
+)
+
+SELECT
+    DATE_TRUNC('DAY', cs.p_event_time) AS event_day,
+    DATE_TRUNC('MINUTE', DATEADD('MINUTE', {time_window} * FLOOR(EXTRACT(MINUTE FROM cs.p_event_time) / {time_window}), 
+        DATE_TRUNC('HOUR', cs.p_event_time))) AS time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses AS source_ips,
+    cs.p_any_emails AS emails,
+    cs.p_any_usernames AS usernames,
+    COUNT(DISTINCT cs.p_alert_id) AS alert_count,
+    ARRAY_AGG(DISTINCT cs.p_alert_id) AS alert_ids,
+    ARRAY_AGG(DISTINCT cs.p_rule_id) AS rule_ids,
+    MIN(cs.p_event_time) AS first_event,
+    MAX(cs.p_event_time) AS last_event,
+    LISTAGG(DISTINCT a.severity, ', ') AS severities
+FROM
+    panther_signals.public.correlation_signals cs
+JOIN
+    alert_data a ON cs.p_alert_id = a.alertId
+GROUP BY
+    event_day,
+    time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses,
+    cs.p_any_emails,
+    cs.p_any_usernames
+HAVING
+    COUNT(DISTINCT cs.p_alert_id) > 0
+ORDER BY
+    event_day DESC,
+    time_{time_window}_minute DESC,
+    alert_count DESC
+LIMIT 1000
+"""
+    return await execute_data_lake_query(query, "panther_signals.public")
+
+
+@mcp_tool
 async def execute_data_lake_query(
     sql: str, database_name: Optional[str] = "panther_logs.public"
 ) -> Dict[str, Any]:
