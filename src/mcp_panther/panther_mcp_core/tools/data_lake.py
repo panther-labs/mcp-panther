@@ -386,3 +386,44 @@ async def get_table_columns(database_name: str, table_name: str) -> Dict[str, An
             "success": False,
             "message": f"Failed to get columns for table: {str(e)}",
         }
+
+
+@mcp_tool
+async def get_sample_log_events(log_type: str) -> Dict[str, Any]:
+    """Get a sample of 10 log events for a specific log type from the panther_logs.public database.
+
+    This function constructs a SQL query to fetch recent sample events and executes it against
+    the data lake. The query automatically filters events from the last 7 days to ensure quick results.
+
+    Args:
+        log_type: The log type to query (this is also typically the table name)
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - query_id: ID of the executed query for retrieving results
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Fetching sample log events for log type: {log_type}")
+
+    database_name = "panther_logs.public"
+    table_name = log_type
+
+    try:
+        sql = f"""
+        SELECT *
+        FROM {database_name}.{table_name}
+        WHERE p_event_time >= DATEADD(day, -7, CURRENT_TIMESTAMP())
+        ORDER BY p_event_time DESC
+        LIMIT 10
+        """
+
+        result = await execute_data_lake_query(sql=sql, database_name=database_name)
+
+        return result
+    except Exception as e:
+        logger.error(f"Failed to fetch sample log events: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch sample log events: {str(e)}",
+        }

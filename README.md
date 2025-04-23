@@ -215,6 +215,7 @@ The server provides tools organized by common SIEM workflows:
 | **Data Investigation** | | | |
 | | `execute_data_lake_query` | Execute SQL queries against Panther's data lake | "Query AWS CloudTrail logs for failed login attempts in the last day" |
 | | `get_data_lake_query_results` | Get results from a previously executed data lake query | "Get results for query ID abc123" |
+| | `get_sample_log_events` | Get a sample of 10 recent events for a specific log type | "Show me sample events from AWS_CLOUDTRAIL logs" |
 | | `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
 | | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
 | | `list_databases` | List all available data lake databases in Panther | "List all available databases" |
