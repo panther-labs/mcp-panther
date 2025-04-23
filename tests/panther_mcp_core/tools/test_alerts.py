@@ -1,6 +1,6 @@
 import pytest
 
-from tests.utils.helpers import patch_graphql_client, patch_execute_query
+from tests.utils.helpers import patch_graphql_client, patch_execute_query, patch_rest_client
 
 from mcp_panther.panther_mcp_core.tools.alerts import (
     list_alerts,
@@ -8,6 +8,7 @@ from mcp_panther.panther_mcp_core.tools.alerts import (
     update_alert_status,
     add_alert_comment,
     update_alert_assignee_by_id,
+    get_alert_events,
 )
 
 MOCK_ALERT = {
@@ -357,3 +358,76 @@ async def test_update_alert_assignee_with_empty_result(mock_execute_query):
 
     assert result["success"] is False
     assert "Failed to update alert assignee" in result["message"]
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_get_alert_events_success(mock_rest_client):
+    """Test successful retrieval of alert events."""
+    mock_events = [
+        {"p_row_id": "event-1", "p_event_time": "2025-04-23 17:07:00.218308897", "p_alert_id": "c89fe49d40e58e82d30755f59d401a93"},
+        {"p_row_id": "event-2", "p_event_time": "2025-04-23 17:08:00.218308897", "p_alert_id": "c89fe49d40e58e82d30755f59d401a93"}
+    ]
+    mock_response = {"results": mock_events}
+    
+    mock_rest_client.get.return_value = (mock_response, 200)
+    
+    result = await get_alert_events(MOCK_ALERT["id"])
+    
+    assert result["success"] is True
+    assert len(result["events"]) == 2
+    assert result["total_events"] == 2
+    assert result["events"][0]["id"] == "event-1"
+    assert result["events"][1]["id"] == "event-2"
+    
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == f"/alerts/{MOCK_ALERT['id']}/events"
+    assert kwargs["params"] == {"limit": 10}
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_get_alert_events_not_found(mock_rest_client):
+    """Test handling of non-existent alert when getting events."""
+    mock_rest_client.get.return_value = ({}, 404)
+    
+    result = await get_alert_events("nonexistent-alert")
+    
+    assert result["success"] is False
+    assert "No alert found with ID" in result["message"]
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_get_alert_events_error(mock_rest_client):
+    """Test handling of errors when getting alert events."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+    
+    result = await get_alert_events(MOCK_ALERT["id"])
+    
+    assert result["success"] is False
+    assert "Failed to fetch alert events" in result["message"]
+
+@pytest.mark.asyncio
+async def test_get_alert_events_invalid_limit():
+    """Test handling of invalid limit value."""
+    result = await get_alert_events(MOCK_ALERT["id"], limit=0)
+    
+    assert result["success"] is False
+    assert "limit must be greater than 0" in result["message"]
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_get_alert_events_limit_exceeds_max(mock_rest_client):
+    """Test that limit is capped at 50 when a larger value is provided."""
+    mock_events = [{"p_row_id": f"event-{i}"} for i in range(1, 50)]
+    mock_response = {"results": mock_events}
+    
+    mock_rest_client.get.return_value = (mock_response, 200)
+    
+    result = await get_alert_events(MOCK_ALERT["id"], limit=100)
+    
+    assert result["success"] is True
+    
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == f"/alerts/{MOCK_ALERT['id']}/events"
+    assert kwargs["params"]["limit"] == 50

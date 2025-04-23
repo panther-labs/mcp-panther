@@ -5,7 +5,7 @@ Tools for interacting with Panther alerts.
 import logging
 from typing import Any, Dict, List
 
-from ..client import _create_panther_client, _execute_query, _get_today_date_range
+from ..client import _create_panther_client, _execute_query, _get_today_date_range, get_rest_client
 from ..queries import (
     ADD_ALERT_COMMENT_MUTATION,
     GET_ALERT_BY_ID_QUERY,
@@ -405,3 +405,57 @@ async def update_alert_assignee_by_id(
             "success": False,
             "message": f"Failed to update alert assignee: {str(e)}",
         }
+
+
+@mcp_tool
+async def get_alert_events(alert_id: str, limit: int = 10) -> Dict[str, Any]:
+    """
+    Get the most recent events for a specific Panther alert by ID.
+
+    This tool does not support pagination to prevent long-running, expensive queries.
+
+    Args:
+        alert_id: The ID of the alert to get events for
+        limit: Maximum number of events to return (default: 10, maximum: 50)
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the request was successful
+        - events: List of most recent events if successful
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Fetching events for alert ID: {alert_id}")
+
+    try:
+        if limit < 1:
+            raise ValueError("limit must be greater than 0")
+        if limit > 50:
+            logger.warning(f"limit {limit} exceeds maximum of 50, using 50 instead")
+            limit = 50
+
+        params = {"limit": limit}
+
+        async with get_rest_client() as client:
+            result, status = await client.get(
+                f"/alerts/{alert_id}/events", params=params, expected_codes=[200, 404]
+            )
+
+            if status == 404:
+                logger.warning(f"No alert found with ID: {alert_id}")
+                return {
+                    "success": False,
+                    "message": f"No alert found with ID: {alert_id}",
+                }
+
+        events = result.get("results", [])
+
+        logger.info(f"Successfully retrieved {len(events)} events for alert ID: {alert_id}")
+
+        return {
+            "success": True,
+            "events": events,
+            "total_events": len(events)
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch alert events: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch alert events: {str(e)}"}
