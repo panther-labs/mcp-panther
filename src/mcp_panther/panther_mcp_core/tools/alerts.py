@@ -5,7 +5,12 @@ Tools for interacting with Panther alerts.
 import logging
 from typing import Any, Dict, List
 
-from ..client import _create_panther_client, _execute_query, _get_today_date_range, get_rest_client
+from ..client import (
+    _create_panther_client,
+    _execute_query,
+    _get_today_date_range,
+    get_rest_client,
+)
 from ..queries import (
     ADD_ALERT_COMMENT_MUTATION,
     GET_ALERT_BY_ID_QUERY,
@@ -432,7 +437,9 @@ async def get_alert_events(alert_id: str, limit: int = 10) -> Dict[str, Any]:
         if limit < 1:
             raise ValueError("limit must be greater than 0")
         if limit > max_limit:
-            logger.warning(f"limit {limit} exceeds maximum of {max_limit}, using {max_limit} instead")
+            logger.warning(
+                f"limit {limit} exceeds maximum of {max_limit}, using {max_limit} instead"
+            )
             limit = max_limit
 
         params = {"limit": limit}
@@ -451,13 +458,11 @@ async def get_alert_events(alert_id: str, limit: int = 10) -> Dict[str, Any]:
 
         events = result.get("results", [])
 
-        logger.info(f"Successfully retrieved {len(events)} events for alert ID: {alert_id}")
+        logger.info(
+            f"Successfully retrieved {len(events)} events for alert ID: {alert_id}"
+        )
 
-        return {
-            "success": True,
-            "events": events,
-            "total_events": len(events)
-        }
+        return {"success": True, "events": events, "total_events": len(events)}
     except Exception as e:
         logger.error(f"Failed to fetch alert events: {str(e)}")
         return {"success": False, "message": f"Failed to fetch alert events: {str(e)}"}
