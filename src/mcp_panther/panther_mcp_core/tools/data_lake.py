@@ -25,7 +25,43 @@ logger = logging.getLogger("mcp-panther")
 async def execute_data_lake_query(
     sql: str, database_name: Optional[str] = "panther_logs.public"
 ) -> Dict[str, Any]:
-    """Execute a performant Snowflake SQL query against Panther's data lake. REQUIRED: USE THE get_table_columns TOOL FIRST to get the correct table schema. THE QUERY MUST ALSO INCLUDE A FILTER ON p_event_time WITH A MAX TIME DURATION OF 90 DAYS."""
+    """Execute a performant Snowflake SQL query against Panther's data lake.
+
+    IMPORTANT: This function is best for ADVANCED QUERIES with custom filtering, joins,
+    or aggregations. For simple log sampling, use get_sample_log_events instead.
+
+    REQUIREMENTS:
+    1. USE THE get_table_columns TOOL FIRST to get the correct table schema.
+    2. THE QUERY MUST INCLUDE A FILTER ON p_event_time WITH A MAX TIME DURATION OF 90 DAYS.
+
+    NOTE: After calling this function, you MUST call get_data_lake_query_results with the
+    returned query_id to retrieve the actual query results.
+
+    Example usage:
+        # Step 1: Get table schema
+        schema = get_table_columns(database_name="panther_logs.public", table_name="panther_audit")
+        
+        # Step 2: Execute query with required p_event_time filter
+        result = execute_data_lake_query(
+            sql="SELECT * FROM panther_logs.public.panther_audit WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
+        )
+        
+        # Step 3: Retrieve the actual results using the query_id
+        if result["success"]:
+            query_results = get_data_lake_query_results(query_id=result["query_id"])
+
+    Args:
+        sql: The SQL query to execute (must include p_event_time filter)
+        database_name: The database to query (default: "panther_logs.public")
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - query_id: ID of the executed query for retrieving results with get_data_lake_query_results
+        - message: Error message if unsuccessful
+    """
+
+
     logger.info("Executing data lake query")
 
     try:
@@ -394,8 +430,28 @@ async def get_table_columns(database_name: str, table_name: str) -> Dict[str, An
 async def get_sample_log_events(log_type: str) -> Dict[str, Any]:
     """Get a sample of 10 log events for a specific log type from the panther_logs.public database.
 
+    This function is the RECOMMENDED tool for quickly exploring sample log data with minimal effort.
+
     This function constructs a SQL query to fetch recent sample events and executes it against
     the data lake. The query automatically filters events from the last 7 days to ensure quick results.
+
+    NOTE: After calling this function, you MUST call get_data_lake_query_results with the returned
+    query_id to retrieve the actual log events.
+
+    Example usage:
+        # Step 1: Get query_id for sample events
+        result = get_sample_log_events(log_type="Panther.Audit")
+        
+        # Step 2: Retrieve the actual results using the query_id
+        if result["success"]:
+            events = get_data_lake_query_results(query_id=result["query_id"])
+            
+            # Step 3: Display results in multiple formats for better analysis
+            # Display as a formatted table for human readability
+            display_table_format(events["results"])
+            
+            # Optionally provide JSON format for deeper inspection
+            print(json.dumps(events["results"][0], indent=2))
 
     Args:
         log_type: The log type to query (this is also typically the table name)
@@ -403,9 +459,16 @@ async def get_sample_log_events(log_type: str) -> Dict[str, Any]:
     Returns:
         Dict containing:
         - success: Boolean indicating if the query was successful
-        - query_id: ID of the executed query for retrieving results
+        - query_id: ID of the executed query for retrieving results with get_data_lake_query_results
         - message: Error message if unsuccessful
+
+    Post-processing:
+        After retrieving results, it's recommended to:
+        1. Display data in a table format (using artifacts for UI display)
+        2. Provide sample JSON for a single record to show complete structure
+        3. Highlight key fields and patterns across records
     """
+
     logger.info(f"Fetching sample log events for log type: {log_type}")
 
     database_name = "panther_logs.public"
