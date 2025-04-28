@@ -6,13 +6,9 @@ import sys
 
 import click
 import uvicorn
-from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.routing import Mount
-
-# Load environment variables from .env file if it exists
-load_dotenv()
 
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
@@ -46,7 +42,6 @@ except ImportError:
 
 # Server dependencies
 deps = [
-    "python-dotenv",
     "gql[aiohttp]",
     "aiohttp",
     "mcp[cli]",

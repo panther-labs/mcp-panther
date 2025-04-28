@@ -9,7 +9,6 @@ dependencies = [
     "gql>=3.5.2",
     "mcp[cli]>=1.6.0",
     "pip-system-certs>=0.1.0",
-    "python-dotenv>=1.1.0",
     "click>=8.1.0",
     "uvicorn>=0.24.0",
     "starlette>=0.35.0",

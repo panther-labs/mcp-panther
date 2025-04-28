@@ -88,15 +88,13 @@ Use the command, args, and env variables below:
         "gql[aiohttp]",
         "--with",
         "mcp[cli]",
-        "--with",
-        "python-dotenv",
         "mcp",
         "run",
-        "PATH/TO/MCPS/mcp-panther/src/mcp_panther/server.py"
+        "PATH-TO-LOCAL-MCP-SERVERS/mcp-panther/src/mcp_panther/server.py"
       ],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-        "PANTHER_API_KEY": "YOUR-API-KEY"
+        "PANTHER_API_KEY": "YOUR-PANTHER-API-TOKEN"
       }
     }
   }
@@ -134,16 +132,7 @@ You will need to run `make build-docker` to build the image
 
 ### Credentials
 
-Your Panther API key and URL can be configured in two ways:
-
-1. Through the MCP Client configuration's `env` key (as shown in the Configuration section above). This will take the highest precedence.
-
-2. Using a `.env` file in the root repository directory with the following format:
-
-```
-PANTHER_INSTANCE_URL=https://YOUR-PANTHER-INSTANCE.domain
-PANTHER_API_KEY=YOUR-API-KEY
-```
+Your Panther API key and URL should be configured through the MCP Client configuration's `env` key (as shown in the Configuration section above).
 
 Make sure to replace the placeholder values with your actual Panther instance URLs and API key.
 
