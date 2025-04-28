@@ -10,7 +10,6 @@ dependencies = [
     "gql>=3.5.2",
     "mcp[cli]>=1.6.0",
     "pip-system-certs>=0.1.0",
-    "python-dotenv>=1.1.0",
     "click>=8.1.0",
     "uvicorn>=0.24.0",
     "starlette>=0.35.0",
@@ -61,5 +60,5 @@ addopts = "-v --cov=src/mcp_panther --cov-report=term-missing"
 pythonpath = ["src"]
 env = [
     "PANTHER_INSTANCE_URL=https://example.com",
-    "PANTHER_API_KEY=test-token"
+    "PANTHER_API_TOKEN=test-token"
 ]

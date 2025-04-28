@@ -50,9 +50,9 @@ async def get_json_from_script_tag(
 
 def get_panther_api_key() -> str:
     """Get Panther API key from environment variable"""
-    api_key = os.getenv("PANTHER_API_KEY")
+    api_key = os.getenv("PANTHER_API_TOKEN")
     if not api_key:
-        raise ValueError("PANTHER_API_KEY environment variable is not set")
+        raise ValueError("PANTHER_API_TOKEN environment variable is not set")
     return api_key
 
 
