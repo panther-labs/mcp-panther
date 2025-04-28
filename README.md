@@ -94,7 +94,7 @@ Use the command, args, and env variables below:
       ],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-        "PANTHER_API_KEY": "YOUR-PANTHER-API-TOKEN"
+        "PANTHER_API_TOKEN": "YOUR-PANTHER-API-TOKEN"
       }
     }
   }
@@ -115,13 +115,13 @@ You will need to run `make build-docker` to build the image
         "run",
         "-i",
         "-e", "PANTHER_INSTANCE_URL",
-        "-e", "PANTHER_API_KEY",
+        "-e", "PANTHER_API_TOKEN",
         "--rm",
         "mcp-panther"
       ],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-        "PANTHER_API_KEY": "YOUR-API-KEY"
+        "PANTHER_API_TOKEN": "YOUR-API-KEY"
       }
     }
   }

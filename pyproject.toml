@@ -59,5 +59,5 @@ addopts = "-v --cov=src/mcp_panther --cov-report=term-missing"
 pythonpath = ["src"]
 env = [
     "PANTHER_INSTANCE_URL=https://example.com",
-    "PANTHER_API_KEY=test-token"
+    "PANTHER_API_TOKEN=test-token"
 ]
