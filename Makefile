@@ -20,7 +20,7 @@ dev-deps:
 
 # Run tests (requires dev dependencies to be installed first)
 test:
-	pytest
+	uv run pytest
 
 # Synchronize dependencies with pyproject.toml
 sync:
