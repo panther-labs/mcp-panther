@@ -44,6 +44,7 @@ except ImportError:
 deps = [
     "gql[aiohttp]",
     "aiohttp",
+    "anyascii",
     "mcp[cli]",
 ]
 
