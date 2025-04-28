@@ -3,6 +3,8 @@ Tools for interacting with Panther's data lake.
 """
 
 import logging
+import anyascii
+import re
 from typing import Any, Dict, Optional
 
 from ..client import _create_panther_client
@@ -407,7 +409,7 @@ async def get_sample_log_events(log_type: str) -> Dict[str, Any]:
     logger.info(f"Fetching sample log events for log type: {log_type}")
 
     database_name = "panther_logs.public"
-    table_name = log_type
+    table_name = _normalize_name(log_type)
 
     try:
         sql = f"""
@@ -427,3 +429,89 @@ async def get_sample_log_events(log_type: str) -> Dict[str, Any]:
             "success": False,
             "message": f"Failed to fetch sample log events: {str(e)}",
         }
+
+transliterate_chars = {
+    '@': "at_sign",
+    ',': "comma",
+    '`': "backtick",
+    "'": "apostrophe",
+    '$': "dollar_sign",
+    '*': "asterisk",
+    '&': "ampersand",
+    '!': "exclamation",
+    '%': "percent",
+    '+': "plus",
+    '/': "slash",
+    '\\': "backslash",
+    '#': "hash",
+    '~': "tilde",
+    '=': "eq",
+}
+
+number_to_word = {
+    '0': "zero",
+    '1': "one",
+    '2': "two",
+    '3': "three",
+    '4': "four",
+    '5': "five",
+    '6': "six",
+    '7': "seven",
+    '8': "eight",
+    '9': "nine",
+}
+
+def _is_name_normalized(name):
+    """Check if a table name is already normalized"""
+    if not re.match(r'^[a-zA-Z_-][a-zA-Z0-9_-]*$', name):
+        return False
+
+    return True
+
+def _normalize_name(name):
+    """Normalize a table name"""
+    if _is_name_normalized(name):
+        return name
+
+    result = []
+    characters = list(name)
+    last = len(characters) - 1
+
+    for i, c in enumerate(characters):
+        if 'a' <= c <= 'z' or 'A' <= c <= 'Z':
+            # Allow uppercase and lowercase letters
+            result.append(c)
+        elif '0' <= c <= '9':
+            if i == 0:
+                # Convert numbers at the start of the string to words
+                result.append(number_to_word[c])
+                result.append('_')
+            else:
+                # Allow numbers beyond the first character
+                result.append(c)
+        elif c == '_' or c == '-':
+            # Allow underscores and hyphens
+            result.append(c)
+        else:
+            # Check if we have a specific transliteration for this character
+            if c in transliterate_chars:
+                if i > 0:
+                    result.append('_')
+
+                result.append(transliterate_chars[c])
+
+                if i < last:
+                    result.append('_')
+                continue
+
+            # Try to handle non-ASCII letters
+            if ord(c) > 127:
+                transliterated = anyascii.anyascii(c)
+                if transliterated and transliterated != "'" and transliterated != ' ':
+                    result.append(transliterated)
+                    continue
+
+            # Fallback to underscore
+            result.append('_')
+
+    return ''.join(result)

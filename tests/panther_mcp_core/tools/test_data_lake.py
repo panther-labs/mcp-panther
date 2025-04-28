@@ -5,6 +5,8 @@ from tests.utils.helpers import patch_graphql_client, patch_execute_query
 from mcp_panther.panther_mcp_core.tools.data_lake import (
     get_sample_log_events,
     execute_data_lake_query,
+    _normalize_name,
+    _is_name_normalized,
 )
 
 DATA_LAKE_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.data_lake"
@@ -25,7 +27,7 @@ async def test_get_sample_log_events_success(mock_graphql_client):
     mock_graphql_client.execute.assert_called_once()
     call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
     assert "panther_logs.public" in call_args["input"]["databaseName"]
-    assert "AWS.CloudTrail" in call_args["input"]["sql"]
+    assert "AWS_CloudTrail" in call_args["input"]["sql"]
     assert "p_event_time" in call_args["input"]["sql"]
     assert "LIMIT 10" in call_args["input"]["sql"]
 
@@ -95,3 +97,51 @@ async def test_execute_data_lake_query_error(mock_graphql_client):
 
     assert result["success"] is False
     assert "Failed to execute data lake query" in result["message"] 
+
+def test_normalize_name():
+    test_cases = [
+        {"input": "@foo", "expected": "at_sign_foo"},
+        {"input": "CrAzY-tAbLe", "expected": "CrAzY-tAbLe"},
+        {"input": "U2", "expected": "U2"},
+        {"input": "2LEGIT-2QUIT", "expected": "two_LEGIT-2QUIT"},
+        {"input": "foo,bar", "expected": "foo_comma_bar"},
+        {"input": "`foo`", "expected": "backtick_foo_backtick"},
+        {"input": "'foo'", "expected": "apostrophe_foo_apostrophe"},
+        {"input": "foo.bar", "expected": "foo_bar"},
+        {"input": "AWS.CloudTrail", "expected": "AWS_CloudTrail"},
+        {"input": ".foo", "expected": "_foo"},
+        {"input": "foo-bar", "expected": "foo-bar"},
+        {"input": "$foo", "expected": "dollar_sign_foo"},
+        {"input": "Μύκονοοοος", "expected": "Mykonoooos"},
+        {"input": "fooʼn", "expected": "foo_n"},
+        {"input": "foo\\bar", "expected": "foo_backslash_bar"},
+        {"input": "<foo>bar", "expected": "_foo_bar"},
+    ]
+
+    for tc in test_cases:
+        col_name = _normalize_name(tc["input"])
+        assert col_name == tc["expected"], f"Input: {tc['input']}, Expected: {tc['expected']}, Got: {col_name}"
+
+def test_is_normalized():
+    test_cases = [
+        {"input": "@foo", "expected": False},
+        {"input": "CrAzY-tAbLe", "expected": True},
+        {"input": "U2", "expected": True},
+        {"input": "2LEGIT-2QUIT", "expected": False},
+        {"input": "foo,bar", "expected": False},
+        {"input": "`foo`", "expected": False},
+        {"input": "'foo'", "expected": False},
+        {"input": "foo.bar", "expected": False},
+        {"input": ".foo", "expected": False},
+        {"input": "foo-bar", "expected": True},
+        {"input": "foo_bar", "expected": True},
+        {"input": "$foo", "expected": False},
+        {"input": "Μύκονοοοος", "expected": False},
+        {"input": "fooʼn", "expected": False},
+        {"input": "foo\\bar", "expected": False},
+        {"input": "<foo>bar", "expected": False},
+    ]
+
+    for tc in test_cases:
+        result = _is_name_normalized(tc["input"])
+        assert result == tc["expected"], f"Input: {tc['input']}, Expected:  {tc['expected']}, Got: {result}"
