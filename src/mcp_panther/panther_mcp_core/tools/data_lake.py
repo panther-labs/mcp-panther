@@ -3,9 +3,10 @@ Tools for interacting with Panther's data lake.
 """
 
 import logging
-import anyascii
 import re
 from typing import Any, Dict, Optional
+
+import anyascii
 
 from ..client import _create_panther_client
 from ..queries import (
@@ -40,12 +41,12 @@ async def execute_data_lake_query(
     Example usage:
         # Step 1: Get table schema
         schema = get_table_columns(database_name="panther_logs.public", table_name="panther_audit")
-        
+
         # Step 2: Execute query with required p_event_time filter
         result = execute_data_lake_query(
             sql="SELECT * FROM panther_logs.public.panther_audit WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
         )
-        
+
         # Step 3: Retrieve the actual results using the query_id
         if result["success"]:
             query_results = get_data_lake_query_results(query_id=result["query_id"])
@@ -60,7 +61,6 @@ async def execute_data_lake_query(
         - query_id: ID of the executed query for retrieving results with get_data_lake_query_results
         - message: Error message if unsuccessful
     """
-
 
     logger.info("Executing data lake query")
 
@@ -441,15 +441,15 @@ async def get_sample_log_events(log_type: str) -> Dict[str, Any]:
     Example usage:
         # Step 1: Get query_id for sample events
         result = get_sample_log_events(log_type="Panther.Audit")
-        
+
         # Step 2: Retrieve the actual results using the query_id
         if result["success"]:
             events = get_data_lake_query_results(query_id=result["query_id"])
-            
+
             # Step 3: Display results in multiple formats for better analysis
             # Display as a formatted table for human readability
             display_table_format(events["results"])
-            
+
             # Optionally provide JSON format for deeper inspection
             print(json.dumps(events["results"][0], indent=2))
 
@@ -493,43 +493,46 @@ async def get_sample_log_events(log_type: str) -> Dict[str, Any]:
             "message": f"Failed to fetch sample log events: {str(e)}",
         }
 
+
 transliterate_chars = {
-    '@': "at_sign",
-    ',': "comma",
-    '`': "backtick",
+    "@": "at_sign",
+    ",": "comma",
+    "`": "backtick",
     "'": "apostrophe",
-    '$': "dollar_sign",
-    '*': "asterisk",
-    '&': "ampersand",
-    '!': "exclamation",
-    '%': "percent",
-    '+': "plus",
-    '/': "slash",
-    '\\': "backslash",
-    '#': "hash",
-    '~': "tilde",
-    '=': "eq",
+    "$": "dollar_sign",
+    "*": "asterisk",
+    "&": "ampersand",
+    "!": "exclamation",
+    "%": "percent",
+    "+": "plus",
+    "/": "slash",
+    "\\": "backslash",
+    "#": "hash",
+    "~": "tilde",
+    "=": "eq",
 }
 
 number_to_word = {
-    '0': "zero",
-    '1': "one",
-    '2': "two",
-    '3': "three",
-    '4': "four",
-    '5': "five",
-    '6': "six",
-    '7': "seven",
-    '8': "eight",
-    '9': "nine",
+    "0": "zero",
+    "1": "one",
+    "2": "two",
+    "3": "three",
+    "4": "four",
+    "5": "five",
+    "6": "six",
+    "7": "seven",
+    "8": "eight",
+    "9": "nine",
 }
+
 
 def _is_name_normalized(name):
     """Check if a table name is already normalized"""
-    if not re.match(r'^[a-zA-Z_-][a-zA-Z0-9_-]*$', name):
+    if not re.match(r"^[a-zA-Z_-][a-zA-Z0-9_-]*$", name):
         return False
 
     return True
+
 
 def _normalize_name(name):
     """Normalize a table name"""
@@ -541,40 +544,40 @@ def _normalize_name(name):
     last = len(characters) - 1
 
     for i, c in enumerate(characters):
-        if 'a' <= c <= 'z' or 'A' <= c <= 'Z':
+        if "a" <= c <= "z" or "A" <= c <= "Z":
             # Allow uppercase and lowercase letters
             result.append(c)
-        elif '0' <= c <= '9':
+        elif "0" <= c <= "9":
             if i == 0:
                 # Convert numbers at the start of the string to words
                 result.append(number_to_word[c])
-                result.append('_')
+                result.append("_")
             else:
                 # Allow numbers beyond the first character
                 result.append(c)
-        elif c == '_' or c == '-':
+        elif c == "_" or c == "-":
             # Allow underscores and hyphens
             result.append(c)
         else:
             # Check if we have a specific transliteration for this character
             if c in transliterate_chars:
                 if i > 0:
-                    result.append('_')
+                    result.append("_")
 
                 result.append(transliterate_chars[c])
 
                 if i < last:
-                    result.append('_')
+                    result.append("_")
                 continue
 
             # Try to handle non-ASCII letters
             if ord(c) > 127:
                 transliterated = anyascii.anyascii(c)
-                if transliterated and transliterated != "'" and transliterated != ' ':
+                if transliterated and transliterated != "'" and transliterated != " ":
                     result.append(transliterated)
                     continue
 
             # Fallback to underscore
-            result.append('_')
+            result.append("_")
 
-    return ''.join(result)
+    return "".join(result)
