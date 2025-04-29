@@ -1,20 +1,29 @@
+import asyncio
 import logging
+import os
+import signal
 import sys
 
-from dotenv import load_dotenv
+import click
+import uvicorn
 from mcp.server.fastmcp import FastMCP
-
-# Load environment variables from .env file if it exists
-load_dotenv()
+from starlette.applications import Starlette
+from starlette.routing import Mount
 
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
 
+# Get log level from environment variable, default to DEBUG if not set
+log_level_name = os.environ.get("LOG_LEVEL", "DEBUG")
+
+# Convert string log level to logging constant
+log_level = getattr(logging, log_level_name.upper(), logging.DEBUG)
+
 # Configure logging with more detail
 logging.basicConfig(
-    level=logging.DEBUG,  # Change to DEBUG for more info
+    level=log_level,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    stream=sys.stderr,  # Ensure logs go to stderr
+    stream=sys.stderr,
 )
 logger = logging.getLogger(MCP_SERVER_NAME)
 
@@ -23,22 +32,19 @@ logger = logging.getLogger(MCP_SERVER_NAME)
 # 2. When running with MCP inspector: `uv run mcp dev src/mcp_panther/server.py`
 # 3. When installing: `uv run mcp install src/mcp_panther/server.py`
 try:
-    # Import MCP registries
     from panther_mcp_core.prompts.registry import register_all_prompts
     from panther_mcp_core.resources.registry import register_all_resources
     from panther_mcp_core.tools.registry import register_all_tools
 except ImportError:
-    # Import MCP registries
     from .panther_mcp_core.prompts.registry import register_all_prompts
     from .panther_mcp_core.resources.registry import register_all_resources
     from .panther_mcp_core.tools.registry import register_all_tools
 
-
 # Server dependencies
 deps = [
-    "python-dotenv",
     "gql[aiohttp]",
     "aiohttp",
+    "anyascii",
     "mcp[cli]",
 ]
 
@@ -47,9 +53,67 @@ mcp = FastMCP(MCP_SERVER_NAME, dependencies=deps)
 
 # Register all tools with MCP using the registry
 register_all_tools(mcp)
-
 # Register all prompts with MCP using the registry
 register_all_prompts(mcp)
-
 # Register all resources with MCP using the registry
 register_all_resources(mcp)
+
+
+def handle_signals():
+    def signal_handler(sig, frame):
+        logger.info(f"Received signal {sig}, shutting down...")
+        os._exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGHUP, signal_handler)
+
+
+@click.command()
+@click.option(
+    "--transport",
+    type=click.Choice(["stdio", "sse"]),
+    default=os.environ.get("MCP_TRANSPORT", default="stdio"),
+    help="Transport type (stdio or sse)",
+)
+@click.option(
+    "--port",
+    default=int(os.environ.get("MCP_PORT", default="3000")),
+    help="Port to use for SSE transport",
+)
+@click.option(
+    "--host",
+    default=os.environ.get("MCP_HOST", default="127.0.0.1"),
+    help="Host to bind to for SSE transport",
+)
+def main(transport: str, port: int, host: str):
+    """Run the Panther MCP server with the specified transport"""
+    # Set up signal handling
+    handle_signals()
+
+    if transport == "sse":
+        # Create the Starlette app
+        app = Starlette(
+            debug=True,
+            routes=[
+                Mount("/", app=mcp.sse_app()),
+            ],
+        )
+
+        logger.info(f"Starting Panther MCP Server with SSE transport on {host}:{port}")
+        # Use Uvicorn's Config and Server classes for more control
+        config = uvicorn.Config(app, host=host, port=port, timeout_graceful_shutdown=1)
+        server = uvicorn.Server(config)
+
+        # Override the default behavior
+        server.force_exit = True  # This makes Ctrl+C force exit
+
+        try:
+            asyncio.run(server.serve())
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received, forcing immediate exit")
+            os._exit(0)
+    else:
+        logger.info("Starting Panther MCP Server with stdio transport")
+        # Let FastMCP handle all the asyncio details internally
+        mcp.run()

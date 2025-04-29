@@ -1,6 +1,6 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime, timedelta
+
+from tests.utils.helpers import patch_graphql_client, patch_execute_query, patch_rest_client
 
 from mcp_panther.panther_mcp_core.tools.alerts import (
     list_alerts,
@@ -8,6 +8,7 @@ from mcp_panther.panther_mcp_core.tools.alerts import (
     update_alert_status,
     add_alert_comment,
     update_alert_assignee_by_id,
+    get_alert_events,
 )
 
 MOCK_ALERT = {
@@ -45,43 +46,16 @@ MOCK_ALERTS_RESPONSE = {
     }
 }
 
-@pytest.fixture
-def mock_graphql_client():
-    """Fixture to create a mock GraphQL client."""
-    with patch("mcp_panther.panther_mcp_core.tools.alerts._create_panther_client") as mock_create:
-        session = AsyncMock()
-        execute_mock = AsyncMock()
-        
-        # Set up the execute mock to return the value we want
-        async def side_effect(*args, **kwargs):
-            return session.execute_return_value
-            
-        execute_mock.side_effect = side_effect
-        session.execute = execute_mock
-        
-        session.__aenter__.return_value = session
-        session.__aexit__.return_value = None
-        
-        mock_create.return_value = session
-        yield session
-
-@pytest.fixture
-def mock_execute_query():
-    """Fixture to create a mock for the _execute_query function."""
-    with patch("mcp_panther.panther_mcp_core.tools.alerts._execute_query") as mock:
-        # Create an async mock that can be customized for each test
-        async_mock = AsyncMock()
-        mock.side_effect = async_mock
-        yield async_mock
+ALERTS_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.alerts"
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_list_alerts_success(mock_graphql_client):
     """Test successful listing of alerts."""
     # Set the return value for execute
-    mock_graphql_client.execute_return_value = MOCK_ALERTS_RESPONSE
-    
+    mock_graphql_client.execute.return_value = MOCK_ALERTS_RESPONSE
+
     result = await list_alerts()
-    print(result)
     assert result["success"] is True
     assert len(result["alerts"]) == 2
     assert result["total_alerts"] == 2
@@ -95,9 +69,10 @@ async def test_list_alerts_success(mock_graphql_client):
     assert first_alert["status"] == "OPEN"
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_list_alerts_with_invalid_page_size(mock_graphql_client):
     """Test handling of invalid page size."""
-    mock_graphql_client.execute_return_value = MOCK_ALERTS_RESPONSE
+    mock_graphql_client.execute.return_value = MOCK_ALERTS_RESPONSE
 
     # Test with page size < 1
     result = await list_alerts(page_size=0)
@@ -111,9 +86,10 @@ async def test_list_alerts_with_invalid_page_size(mock_graphql_client):
     assert call_args["input"]["pageSize"] == 50
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_list_alerts_with_filters(mock_graphql_client):
     """Test listing alerts with various filters."""
-    mock_graphql_client.execute_return_value = MOCK_ALERTS_RESPONSE
+    mock_graphql_client.execute.return_value = MOCK_ALERTS_RESPONSE
 
     start_date = "2024-03-01T00:00:00Z"
     end_date = "2024-03-31T23:59:59Z"
@@ -135,7 +111,7 @@ async def test_list_alerts_with_filters(mock_graphql_client):
     )
 
     assert result["success"] is True
-  
+
     # Verify that mock was called with correct filters
     call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
     assert call_args["input"]["cursor"] == "next-page-plz"
@@ -153,9 +129,10 @@ async def test_list_alerts_with_filters(mock_graphql_client):
     assert call_args["input"]["nameContains"] == "Test"
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_list_alerts_with_detection_id(mock_graphql_client):
     """Test listing alerts with detection ID."""
-    mock_graphql_client.execute_return_value = MOCK_ALERTS_RESPONSE
+    mock_graphql_client.execute.return_value = MOCK_ALERTS_RESPONSE
 
     result = await list_alerts(detection_id="detection-123")
 
@@ -168,6 +145,7 @@ async def test_list_alerts_with_detection_id(mock_graphql_client):
     assert "createdAtBefore" not in call_args["input"]
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_list_alerts_with_invalid_alert_type(mock_graphql_client):
     """Test handling of invalid alert type."""
     result = await list_alerts(alert_type="INVALID")
@@ -175,6 +153,7 @@ async def test_list_alerts_with_invalid_alert_type(mock_graphql_client):
     assert "alert_type must be one of" in result["message"]
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_list_alerts_with_invalid_subtypes(mock_graphql_client):
     """Test handling of invalid subtypes."""
     # Test invalid subtype for ALERT type
@@ -194,6 +173,7 @@ async def test_list_alerts_with_invalid_subtypes(mock_graphql_client):
     assert "subtypes are not allowed" in result["message"]
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_list_alerts_error(mock_graphql_client):
     """Test handling of errors when listing alerts."""
     mock_graphql_client.execute.side_effect = Exception("Test error")
@@ -204,9 +184,10 @@ async def test_list_alerts_error(mock_graphql_client):
     assert "Failed to fetch alerts" in result["message"]
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_get_alert_by_id_success(mock_graphql_client):
     """Test successful retrieval of a single alert."""
-    mock_graphql_client.execute_return_value = {"alert": MOCK_ALERT}
+    mock_graphql_client.execute.return_value = {"alert": MOCK_ALERT}
 
     result = await get_alert_by_id(MOCK_ALERT["id"])
 
@@ -216,9 +197,10 @@ async def test_get_alert_by_id_success(mock_graphql_client):
     assert result["alert"]["status"] == MOCK_ALERT["status"]
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_get_alert_by_id_not_found(mock_graphql_client):
     """Test handling of non-existent alert."""
-    mock_graphql_client.execute_return_value = {"alert": None}
+    mock_graphql_client.execute.return_value = {"alert": None}
 
     result = await get_alert_by_id("nonexistent-alert")
 
@@ -226,6 +208,7 @@ async def test_get_alert_by_id_not_found(mock_graphql_client):
     assert "No alert found" in result["message"]
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_get_alert_by_id_error(mock_graphql_client):
     """Test handling of errors when getting alert by ID."""
     mock_graphql_client.execute.side_effect = Exception("Test error")
@@ -236,6 +219,7 @@ async def test_get_alert_by_id_error(mock_graphql_client):
     assert "Failed to fetch alert details" in result["message"]
 
 @pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
 async def test_update_alert_status_success(mock_execute_query):
     """Test successful update of alert status."""
     mock_response = {
@@ -247,12 +231,12 @@ async def test_update_alert_status_success(mock_execute_query):
     }
 
     mock_execute_query.return_value = mock_response
-    
+
     result = await update_alert_status([MOCK_ALERT["id"]], "TRIAGED")
 
     assert result["success"] is True
     assert result["alerts"][0]["status"] == "TRIAGED"
-    
+
     # Verify _execute_query was called with correct parameters
     mock_execute_query.assert_called_once()
     call_args = mock_execute_query.call_args
@@ -268,6 +252,7 @@ async def test_update_alert_status_invalid_status():
     assert "Status must be one of" in result["message"]
 
 @pytest.mark.asyncio
+@patch_graphql_client(ALERTS_MODULE_PATH)
 async def test_update_alert_status_error(mock_execute_query):
     """Test handling of errors when updating alert status."""
     mock_execute_query.side_effect = Exception("Test error")
@@ -278,6 +263,7 @@ async def test_update_alert_status_error(mock_execute_query):
     assert "Failed to update alert status" in result["message"]
 
 @pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
 async def test_update_alert_status_with_empty_result(mock_execute_query):
     """Test updating alert status with empty result."""
     mock_response = {}  # no updateAlertStatusById in result
@@ -289,6 +275,7 @@ async def test_update_alert_status_with_empty_result(mock_execute_query):
     assert "Failed to update alert status" in result["message"]
 
 @pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
 async def test_add_alert_comment_success(mock_execute_query):
     """Test successful addition of a comment to an alert."""
     mock_comment = {
@@ -299,7 +286,7 @@ async def test_add_alert_comment_success(mock_execute_query):
     mock_response = {
         "createAlertComment": {"comment": mock_comment}
     }
-    
+
     mock_execute_query.return_value = mock_response
 
     result = await add_alert_comment(MOCK_ALERT["id"], "Test comment")
@@ -308,6 +295,7 @@ async def test_add_alert_comment_success(mock_execute_query):
     assert result["comment"]["body"] == "Test comment"
 
 @pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
 async def test_add_alert_comment_error(mock_execute_query):
     """Test handling of errors when adding a comment."""
     mock_execute_query.side_effect = Exception("Test error")
@@ -318,6 +306,7 @@ async def test_add_alert_comment_error(mock_execute_query):
     assert "Failed to add alert comment" in result["message"]
 
 @pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
 async def test_add_alert_comment_with_empty_result(mock_execute_query):
     """Test adding alert comment with empty result."""
     mock_response = {}  # no createAlertComment in result
@@ -329,6 +318,7 @@ async def test_add_alert_comment_with_empty_result(mock_execute_query):
     assert "Failed to add alert comment" in result["message"]
 
 @pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
 async def test_update_alert_assignee_success(mock_execute_query):
     """Test successful update of alert assignee."""
     mock_response = {
@@ -338,7 +328,7 @@ async def test_update_alert_assignee_success(mock_execute_query):
             ]
         }
     }
-    
+
     mock_execute_query.return_value = mock_response
 
     result = await update_alert_assignee_by_id([MOCK_ALERT["id"]], "user-123")
@@ -347,6 +337,7 @@ async def test_update_alert_assignee_success(mock_execute_query):
     assert len(result["alerts"]) == 1
 
 @pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
 async def test_update_alert_assignee_error(mock_execute_query):
     """Test handling of errors when updating alert assignee."""
     mock_execute_query.side_effect = Exception("Test error")
@@ -357,6 +348,7 @@ async def test_update_alert_assignee_error(mock_execute_query):
     assert "Failed to update alert assignee" in result["message"]
 
 @pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
 async def test_update_alert_assignee_with_empty_result(mock_execute_query):
     """Test updating alert assignee with empty result."""
     mock_response = {}  # no updateAlertsAssigneeById in result
@@ -366,3 +358,76 @@ async def test_update_alert_assignee_with_empty_result(mock_execute_query):
 
     assert result["success"] is False
     assert "Failed to update alert assignee" in result["message"]
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_get_alert_events_success(mock_rest_client):
+    """Test successful retrieval of alert events."""
+    mock_events = [
+        {"p_row_id": "event-1", "p_event_time": "2025-04-23 17:07:00.218308897", "p_alert_id": "c89fe49d40e58e82d30755f59d401a93"},
+        {"p_row_id": "event-2", "p_event_time": "2025-04-23 17:08:00.218308897", "p_alert_id": "c89fe49d40e58e82d30755f59d401a93"}
+    ]
+    mock_response = {"results": mock_events}
+    
+    mock_rest_client.get.return_value = (mock_response, 200)
+    
+    result = await get_alert_events(MOCK_ALERT["id"])
+    
+    assert result["success"] is True
+    assert len(result["events"]) == 2
+    assert result["total_events"] == 2
+    assert result["events"][0]["p_row_id"] == "event-1"
+    assert result["events"][1]["p_row_id"] == "event-2"
+    
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == f"/alerts/{MOCK_ALERT['id']}/events"
+    assert kwargs["params"] == {"limit": 10}
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_get_alert_events_not_found(mock_rest_client):
+    """Test handling of non-existent alert when getting events."""
+    mock_rest_client.get.return_value = ({}, 404)
+    
+    result = await get_alert_events("nonexistent-alert")
+    
+    assert result["success"] is False
+    assert "No alert found with ID" in result["message"]
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_get_alert_events_error(mock_rest_client):
+    """Test handling of errors when getting alert events."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+    
+    result = await get_alert_events(MOCK_ALERT["id"])
+    
+    assert result["success"] is False
+    assert "Failed to fetch alert events" in result["message"]
+
+@pytest.mark.asyncio
+async def test_get_alert_events_invalid_limit():
+    """Test handling of invalid limit value."""
+    result = await get_alert_events(MOCK_ALERT["id"], limit=0)
+    
+    assert result["success"] is False
+    assert "limit must be greater than 0" in result["message"]
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_get_alert_events_limit_exceeds_max(mock_rest_client):
+    """Test that limit is capped at 10 when a larger value is provided."""
+    mock_events = [{"p_row_id": f"event-{i}"} for i in range(1, 10)]
+    mock_response = {"results": mock_events}
+    
+    mock_rest_client.get.return_value = (mock_response, 200)
+    
+    result = await get_alert_events(MOCK_ALERT["id"], limit=100)
+    
+    assert result["success"] is True
+    
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == f"/alerts/{MOCK_ALERT['id']}/events"
+    assert kwargs["params"]["limit"] == 10

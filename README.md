@@ -88,15 +88,13 @@ Use the command, args, and env variables below:
         "gql[aiohttp]",
         "--with",
         "mcp[cli]",
-        "--with",
-        "python-dotenv",
         "mcp",
         "run",
-        "PATH/TO/MCPS/mcp-panther/src/mcp_panther/server.py"
+        "PATH-TO-LOCAL-MCP-SERVERS/mcp-panther/src/mcp_panther/server.py"
       ],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-        "PANTHER_API_KEY": "YOUR-API-KEY"
+        "PANTHER_API_TOKEN": "YOUR-PANTHER-API-TOKEN"
       }
     }
   }
@@ -117,13 +115,13 @@ You will need to run `make build-docker` to build the image
         "run",
         "-i",
         "-e", "PANTHER_INSTANCE_URL",
-        "-e", "PANTHER_API_KEY",
+        "-e", "PANTHER_API_TOKEN",
         "--rm",
         "mcp-panther"
       ],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-        "PANTHER_API_KEY": "YOUR-API-KEY"
+        "PANTHER_API_TOKEN": "YOUR-API-KEY"
       }
     }
   }
@@ -134,16 +132,7 @@ You will need to run `make build-docker` to build the image
 
 ### Credentials
 
-Your Panther API key and URL can be configured in two ways:
-
-1. Through the MCP Client configuration's `env` key (as shown in the Configuration section above). This will take the highest precedence.
-
-2. Using a `.env` file in the root repository directory with the following format:
-
-```
-PANTHER_INSTANCE_URL=https://YOUR-PANTHER-INSTANCE.domain
-PANTHER_API_KEY=YOUR-API-KEY
-```
+Your Panther API key and URL should be configured through the MCP Client configuration's `env` key (as shown in the Configuration section above).
 
 Make sure to replace the placeholder values with your actual Panther instance URLs and API key.
 
@@ -208,17 +197,18 @@ The server provides tools organized by common SIEM workflows:
 | **Alert Management** | | | |
 | | `list_alerts` | List alerts with comprehensive filtering options (date range, severity, status, etc.) | "Show me all high severity alerts from the last 24 hours" |
 | | `get_alert_by_id` | Get detailed information about a specific alert | "What's the status of alert 8def456?" |
+| | `get_alert_events` | Get a small sampling of events for a given alert | "Show me events associated with alert 8def456" |
 | | `update_alert_status` | Update the status of one or more alerts | "Mark alerts abc123 and def456 as resolved" |
 | | `add_alert_comment` | Add a comment to a Panther alert | "Add comment 'Looks pretty bad' to alert abc123" |
 | | `update_alert_assignee_by_id` | Update the assignee of one or more alerts | "Assign alerts abc123 and def456 to John" |
 | **Data Investigation** | | | |
 | | `execute_data_lake_query` | Execute SQL queries against Panther's data lake | "Query AWS CloudTrail logs for failed login attempts in the last day" |
 | | `get_data_lake_query_results` | Get results from a previously executed data lake query | "Get results for query ID abc123" |
+| | `get_sample_log_events` | Get a sample of 10 recent events for a specific log type | "Show me sample events from AWS_CLOUDTRAIL logs" |
 | | `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
 | | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
-| | `get_data_lake_dbs_tables_columns` | List databases, tables, and columns in the data lake | "List all available tables in the panther_logs database" |
 | | `list_databases` | List all available data lake databases in Panther | "List all available databases" |
-| | `list_tables` | List all available tables in Panther's data lake | "List all available tables" |
+| | `list_tables_for_database` | List all available tables for a specific database in Panther's data lake | "What tables are in the panther_logs database" |
 | | `get_tables_for_database` | Get all tables for a specific data lake database | "What tables are within the panther_logs.public database" |
 | | `get_table_columns` | Get column details for a specific data lake table | "What columns exist within the table panther_logs.public.aws_cloudtrail" |
 | **Global Helpers** | | | |
