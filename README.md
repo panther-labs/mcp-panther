@@ -1,10 +1,10 @@
 # Panther MCP Server
 
-> Note: MCP-PANTHER IS IN ACTIVE DEVELOPMENT! We recommend careful considerations for expensive operations such as data lake queries.
+> Note: MCP-PANTHER IS IN ACTIVE DEVELOPMENT and subject to change prior to release.
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-This is a Model Context Protocol (MCP) server for Panther that provides functionality to:
+This Model Context Protocol (MCP) server for Panther provides functionality to:
 1. Authenticate with Panther using a Panther API key
 2. Connect to Panther via GraphQL and list alerts from today
 3. List and manage Panther rules
@@ -19,7 +19,7 @@ This is a Model Context Protocol (MCP) server for Panther that provides function
 
 ## Installation
 
-1. Clone this repository or download the files.
+1. Clone or download this repository.
 2. Ensure you have Python 3.12 installed. If using pyenv:
     ```bash
     pyenv install 3.12
@@ -27,32 +27,11 @@ This is a Model Context Protocol (MCP) server for Panther that provides function
 
 3. Install the required dependencies:
 
-    **Using pip (not recommended)**
-
-    ```bash
-    pip install .
-    ```
-
     **Using uv (recommended)**
 
-    1. Install UV using one of the folling methods:
+    1. [Install UV using your preferred method and operating system of choice](https://docs.astral.sh/uv/getting-started/installation/)
 
-        **Using pip**
-        ```bash
-        pip install uv
-        ```
-
-        **Using curl (Unix/macOS)**
-        ```bash
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        ```
-
-        **On Windows (Powershell):**
-        ```bash
-        powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-        ```
-
-    2. Create your virtual environment and install the dependencies using one of the following methods:
+    2. Create your virtual environment and install the dependencies:
 
         **On Unix/macOS:**
         ```bash
@@ -249,11 +228,17 @@ The server provides the following prompts:
 
 ## Troubleshooting
 
-- If you encounter authentication errors, make sure your Panther API key is correct and has the necessary permissions.
-- Check the server logs for detailed error messages: `tail -n 20 -F ~/Library/Logs/Claude/mcp*.log`
-- Ensure your Panther API URLs are correctly set if you're using a custom Panther instance.
+Check the server logs for detailed error messages: `tail -n 20 -F ~/Library/Logs/Claude/mcp*.log`. If you'd 
+
+### Initializing mcp-panther
+
 - If you see an error like `typer is required`, make sure you've installed MCP with CLI components: `pip install mcp[cli]`
-- Ensure you have `npm` and `uv` installed globally on your system.
+- Ensure the `npm` and `uv` are installed **globally** on your system.
+
+### Running tools
+
+- If you get a `{"success": false, "message": "Failed to [action]: Request failed (HTTP 403): {\"error\": \"forbidden\"}"}` error, it likely means your API token lacks the particular permission needed by the tool.
+- Ensure your Panther Instance URL is correctly set. You can view this in the `config://panther` resource from your MCP Client.
 
 ## License
 
