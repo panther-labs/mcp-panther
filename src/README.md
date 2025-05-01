@@ -45,6 +45,26 @@ logging.basicConfig(
 )
 ```
 
+### Run the Development Server
+
+For testing and development, you can run the MCP server in development mode:
+
+```bash
+uv run mcp dev src/mcp_panther/server.py
+```
+
+This starts the MCP Inspector server and provides an interactive web interface to test its functionality.
+
+### Run as a Standalone Server
+
+You can also run the server directly:
+
+```bash
+uv run python -m mcp_panther.server
+```
+
+This will start the server at http://127.0.0.1:8000/
+
 ## Extending Functionality
 
 The MCP Panther server functionality can be extended by adding tools, prompts, and resources.
@@ -205,12 +225,16 @@ ruff format .
 
 ## Best Practices
 
-1. **Type Annotations**: Always include type annotations for parameters and return values.
-2. **Docstrings**: Write clear docstrings for all tools, prompts, and resources.
-3. **Error Handling**: Implement proper error handling, especially for tools that interact with external services.
-4. **Async Functions**: Use async functions for I/O bound operations, such as API calls.
-5. **Testing**: Test your changes thoroughly before submitting PRs.
-6. **Logging**: Use the logger for debugging and informational messages.
+### Code Quality
+1. **Type Safety**: Include type annotations for parameters and return values
+2. **Documentation**: Write clear docstrings and maintain consistent terminology (e.g., use "log type schemas" instead of mixing "schemas" and "log types")
+3. **Error Handling**: Implement robust error handling, especially for external service interactions
+4. **Performance**: Use async functions for I/O operations and limit response lengths to prevent context window flooding
+
+### Development Process
+1. **Testing**: Test changes thoroughly before submitting PRs
+2. **Logging**: Use appropriate log levels for debugging and monitoring
+3. **Tool Design**: Write clear, focused tool descriptions to help LLMs make appropriate choices
 
 ## Common Issues
 
