@@ -1,26 +1,13 @@
-import pytest
-from unittest.mock import patch
 from click.testing import CliRunner
-
-# Import your CLI entrypoint
-from mcp_panther.server import main
-
-
-@pytest.fixture
-def mock_mcp_run():
-    with patch("mcp_panther.server.mcp.run") as mock:
-        yield mock
+from unittest.mock import patch
+from mcp_panther.server import main  # Adjust import to your module layout
 
 
-@pytest.fixture
-def mock_asyncio_run():
-    with patch("mcp_panther.server.asyncio.run") as mock:
-        yield mock
-
-
-def test_main_stdio_mode(mock_mcp_run, mock_asyncio_run):
+def test_main_runs_mcp_stdio():
     runner = CliRunner()
-    result = runner.invoke(main, ["--transport", "stdio"])
+
+    with patch("mcp_panther.server.mcp.run") as mock_run:
+        result = runner.invoke(main, ["--transport", "stdio"])
 
     assert result.exit_code == 0
-    assert mock_asyncio_run.called
+    mock_run.assert_called_once_with(transport="stdio")

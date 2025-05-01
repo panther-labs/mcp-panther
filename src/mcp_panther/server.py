@@ -3,10 +3,12 @@ import logging
 import os
 import signal
 import sys
-import threading
 
 import click
+import uvicorn
 from fastmcp import FastMCP
+from starlette.applications import Starlette
+from starlette.routing import Mount
 
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
@@ -85,32 +87,33 @@ def handle_signals():
     help="Host to bind to for SSE transport",
 )
 def main(transport: str, port: int, host: str):
+    """Run the Panther MCP server with the specified transport"""
+    # Set up signal handling
     handle_signals()
 
     if transport == "sse":
-        ...
-    else:
-        logger.info("Starting Panther MCP Server with stdio transport")
+        # Create the Starlette app
+        app = Starlette(
+            debug=True,
+            routes=[
+                Mount("/", app=mcp.sse_app()),
+            ],
+        )
 
-        def run_mcp():
-            try:
-                mcp.run(transport=transport)
-            except Exception as e:
-                logger.error(f"MCP server error: {e}", exc_info=True)
+        logger.info(f"Starting Panther MCP Server with SSE transport on {host}:{port}")
+        # Use Uvicorn's Config and Server classes for more control
+        config = uvicorn.Config(app, host=host, port=port, timeout_graceful_shutdown=1)
+        server = uvicorn.Server(config)
 
-        # Run MCP in a separate thread
-        mcp_thread = threading.Thread(target=run_mcp)
-        mcp_thread.start()
-
-        async def wait_for_stdin_close():
-            logger.debug("Waiting for EOF on stdin...")
-            await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
-            logger.info("EOF on stdin detected, attempting graceful shutdown")
-            # Best-effort cleanup: exit when thread stops
-            sys.exit(0)
+        # Override the default behavior
+        server.force_exit = True  # This makes Ctrl+C force exit
 
         try:
-            asyncio.run(wait_for_stdin_close())
+            asyncio.run(server.serve())
         except KeyboardInterrupt:
-            logger.info("Keyboard interrupt received, exiting.")
-            sys.exit(0)
+            logger.info("Keyboard interrupt received, forcing immediate exit")
+            os._exit(0)
+    else:
+        logger.info("Starting Panther MCP Server with stdio transport")
+        # Let FastMCP handle all the asyncio details internally
+        mcp.run(transport=transport)

@@ -31,4 +31,4 @@ COPY --from=builder /usr/local/bin/mcp-panther /usr/local/bin/mcp-panther
 COPY . .
 
 # Command to run the server
-CMD ["mcp-panther"]
+CMD ["mcp-panther", "--transport", "stdio"]
