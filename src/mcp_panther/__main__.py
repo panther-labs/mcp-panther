@@ -1,11 +1,10 @@
-import os
 import sys
 
 from .server import main
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
+        main()  # Let Click handle the CLI, don’t wrap in sys.exit()
     except KeyboardInterrupt:
         print("\nGracefully exiting due to keyboard interrupt...", file=sys.stderr)
-        os._exit(0)  # Force immediate exit
+        sys.exit(0)  # Use sys.exit, not os._exit

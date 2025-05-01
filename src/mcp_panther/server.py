@@ -3,12 +3,10 @@ import logging
 import os
 import signal
 import sys
+import threading
 
 import click
-import uvicorn
-from mcp.server.fastmcp import FastMCP
-from starlette.applications import Starlette
-from starlette.routing import Mount
+from fastmcp import FastMCP
 
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
@@ -87,33 +85,32 @@ def handle_signals():
     help="Host to bind to for SSE transport",
 )
 def main(transport: str, port: int, host: str):
-    """Run the Panther MCP server with the specified transport"""
-    # Set up signal handling
     handle_signals()
 
     if transport == "sse":
-        # Create the Starlette app
-        app = Starlette(
-            debug=True,
-            routes=[
-                Mount("/", app=mcp.sse_app()),
-            ],
-        )
-
-        logger.info(f"Starting Panther MCP Server with SSE transport on {host}:{port}")
-        # Use Uvicorn's Config and Server classes for more control
-        config = uvicorn.Config(app, host=host, port=port, timeout_graceful_shutdown=1)
-        server = uvicorn.Server(config)
-
-        # Override the default behavior
-        server.force_exit = True  # This makes Ctrl+C force exit
-
-        try:
-            asyncio.run(server.serve())
-        except KeyboardInterrupt:
-            logger.info("Keyboard interrupt received, forcing immediate exit")
-            os._exit(0)
+        ...
     else:
         logger.info("Starting Panther MCP Server with stdio transport")
-        # Let FastMCP handle all the asyncio details internally
-        mcp.run()
+
+        def run_mcp():
+            try:
+                mcp.run(transport=transport)
+            except Exception as e:
+                logger.error(f"MCP server error: {e}", exc_info=True)
+
+        # Run MCP in a separate thread
+        mcp_thread = threading.Thread(target=run_mcp)
+        mcp_thread.start()
+
+        async def wait_for_stdin_close():
+            logger.debug("Waiting for EOF on stdin...")
+            await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
+            logger.info("EOF on stdin detected, attempting graceful shutdown")
+            # Best-effort cleanup: exit when thread stops
+            sys.exit(0)
+
+        try:
+            asyncio.run(wait_for_stdin_close())
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received, exiting.")
+            sys.exit(0)
