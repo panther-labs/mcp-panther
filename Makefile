@@ -9,6 +9,9 @@ lint:
 build-docker:
 	docker build -t mcp-panther .
 
+build-docker-dev:
+	docker build -t mcp-panther:$(shell git rev-parse --short HEAD) .
+
 # Create a virtual environment using uv (https://github.com/astral-sh/uv)
 # After creating, run: source .venv/bin/activate
 venv:
