@@ -27,8 +27,8 @@ logger = logging.getLogger("mcp-panther")
 async def list_alerts(
     start_date: str = None,
     end_date: str = None,
-    severities: List[str] = None,
-    statuses: List[str] = None,
+    severities: List[str] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+    statuses: List[str] = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
     cursor: str = None,
     detection_id: str = None,
     event_count_max: int = None,

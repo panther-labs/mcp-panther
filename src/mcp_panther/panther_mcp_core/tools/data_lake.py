@@ -23,11 +23,11 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
-async def get_temporal_alert_groups(alert_ids: list[str], time_window: int = 30):
-    """Gather a summary of multiple alerts based on their IDs. This is helpful for prioritizing alerts and identifying relationships.
+async def get_alert_summaries(alert_ids: list[str], time_window: int = 30):
+    """Gather a summary of multiple alerts based on their IDs, which is helpful for prioritizing alerts and identifying relationships.
 
-    This tool performs alert correlation by identifying related security events that occur in the same specific time window.
-    It takes a list of alert IDs and groups them by day, a time bucket, log type, source IP, email, and username to find patterns of related activity.
+    This tool gathers important fields from alerts that occurred in the same time window.
+    It takes a list of alert IDs and groups them by day, a time bucket, log type, source IP, email, username, and trace ID to find patterns of related activity.
     For each group, it counts alerts, collects alert IDs, rule IDs, timestamps, and severity levels, then sorts the results chronologically with the most recent events first.
 
     Args:
@@ -52,6 +52,7 @@ SELECT
     cs.p_any_ip_addresses AS source_ips,
     cs.p_any_emails AS emails,
     cs.p_any_usernames AS usernames,
+    cs.p_any_trace_ids AS trace_ids,
     COUNT(DISTINCT cs.p_alert_id) AS alert_count,
     ARRAY_AGG(DISTINCT cs.p_alert_id) AS alert_ids,
     ARRAY_AGG(DISTINCT cs.p_rule_id) AS rule_ids,
@@ -68,7 +69,8 @@ GROUP BY
     cs.p_log_type,
     cs.p_any_ip_addresses,
     cs.p_any_emails,
-    cs.p_any_usernames
+    cs.p_any_usernames,
+    cs.p_any_trace_ids
 HAVING
     COUNT(DISTINCT cs.p_alert_id) > 0
 ORDER BY
