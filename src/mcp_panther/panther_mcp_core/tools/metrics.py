@@ -3,7 +3,7 @@ Tools for interacting with Panther metrics.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from ..client import _execute_query, _get_today_date_range
 from ..queries import METRICS_ALERTS_PER_RULE_QUERY, METRICS_ALERTS_PER_SEVERITY_QUERY
@@ -16,14 +16,16 @@ logger = logging.getLogger("mcp-panther")
 async def get_metrics_alerts_per_severity(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
-    interval_in_minutes: Optional[int] = 60,  # Default to 1 hour
+    alert_types: Optional[List[str]] = ["Rule"],
+    severities: Optional[List[str]] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+    interval_in_minutes: Optional[int] = 1440,
 ) -> Dict[str, Any]:
-    """Get quick metric counts of alerts grouped by severity over time.
+    """Get metrics alert counts grouped by severity. Defaults to today. Use this tool when you want to get a count of alerts by severity, alert type, or both for a given time period.
 
     Args:
         from_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
         to_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
-        interval_in_minutes: Optional interval between metric checks (for plotting charts). Defaults to 60 minutes (1 hour).
+        interval_in_minutes: The grouping interval for the metrics. Defaults to 1440 minutes (1 day) for daily metrics but can be set to 60 minutes (1 hour) for hourly metrics.
 
     Returns:
         Dict containing:
@@ -61,9 +63,17 @@ async def get_metrics_alerts_per_severity(
 
         metrics_data = result["metrics"]
 
+        # Filter metrics data by alert types and severities
+        alerts_per_severity = [
+            item
+            for item in metrics_data["alertsPerSeverity"]
+            if any(alert_type in item["label"] for alert_type in alert_types)
+            and any(severity in item["label"] for severity in severities)
+        ]
+
         return {
             "success": True,
-            "alerts_per_severity": metrics_data["alertsPerSeverity"],
+            "alerts_per_severity": alerts_per_severity,
             "total_alerts": metrics_data["totalAlerts"],
             "from_date": from_date,
             "to_date": to_date,
@@ -83,13 +93,15 @@ async def get_metrics_alerts_per_rule(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     interval_in_minutes: Optional[int] = 60,  # Default to 1 hour
+    rule_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Get quick metric counts of alerts grouped by rule over time.
+    """Returns the number of created alerts per rule during the given time period. Includes all non-error rule types like rules, scheduled rules, and policies. Use this tool when you want to get a count of alerts by rule for a given time period.
 
     Args:
         from_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
         to_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
         interval_in_minutes: Optional interval between metric checks (for plotting charts). Defaults to 60 minutes (1 hour).
+        rule_ids: Optional list of rule IDs to filter results by. If not provided, returns all rules.
 
     Returns:
         Dict containing:
@@ -125,9 +137,19 @@ async def get_metrics_alerts_per_rule(
 
         metrics_data = result["metrics"]
 
+        # Filter by rule IDs if provided
+        if rule_ids:
+            alerts_per_rule = [
+                item
+                for item in metrics_data["alertsPerRule"]
+                if item["entityId"] in rule_ids
+            ]
+        else:
+            alerts_per_rule = metrics_data["alertsPerRule"]
+
         return {
             "success": True,
-            "alerts_per_rule": metrics_data["alertsPerRule"],
+            "alerts_per_rule": alerts_per_rule,
             "total_alerts": metrics_data["totalAlerts"],
             "from_date": from_date,
             "to_date": to_date,
