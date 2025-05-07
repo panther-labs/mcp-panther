@@ -92,7 +92,7 @@ async def get_metrics_alerts_per_severity(
 async def get_metrics_alerts_per_rule(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
-    interval_in_minutes: Optional[int] = 60,  # Default to 1 hour
+    interval_in_minutes: Optional[int] = 1440,  # Default to 1 day
     rule_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Returns the number of created alerts per rule during the given time period. Includes all non-error rule types like rules, scheduled rules, and policies. Use this tool when you want to get a count of alerts by rule for a given time period.
@@ -100,13 +100,16 @@ async def get_metrics_alerts_per_rule(
     Args:
         from_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
         to_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
-        interval_in_minutes: Optional interval between metric checks (for plotting charts). Defaults to 60 minutes (1 hour).
+        interval_in_minutes: Optional interval between metric checks (for plotting charts). Defaults to 1440 minutes (1 day).
         rule_ids: Optional list of rule IDs to filter results by. If not provided, returns all rules.
 
     Returns:
         Dict containing:
-        - alerts_per_rule: List of series with rule IDs and alert counts
+        - alerts_per_rule: List of series with breakdown by rule
         - total_alerts: Total number of alerts in the period
+        - from_date: Start date of the period
+        - to_date: End date of the period
+        - interval_in_minutes: Grouping interval for the metrics
     """
     try:
         # If no dates provided, get today's date range
