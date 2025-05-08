@@ -14,7 +14,7 @@ from tests.utils.helpers import patch_rest_client
 
 MOCK_RULE = {
     "id": "New.sign-in",
-    "body": "def rule(event):\n    # Return True to match the log event and trigger an alert.\n    return event.get(\"actionName\") == \"SIGN_IN\"\n\ndef title(event):\n    # (Optional) Return a string which will be shown as the alert title.\n    # If no 'dedup' function is defined, the return value of this method will act as deduplication string.\n\n    default_name = \"A user\"\n    id = None\n    email = None\n    name = None\n\n    actor = event.get(\"actor\")\n    if actor:\n        id = actor.get(\"id\")\n        name = actor.get(\"name\")\n        attributes = actor.get(\"attributes\")\n        email = attributes.get(\"email\")\n\n    display_name = name or email or id or default_name\n\n    return f\"{display_name} logged into Panther\"",
+    "body": 'def rule(event):\n    # Return True to match the log event and trigger an alert.\n    return event.get("actionName") == "SIGN_IN"\n\ndef title(event):\n    # (Optional) Return a string which will be shown as the alert title.\n    # If no \'dedup\' function is defined, the return value of this method will act as deduplication string.\n\n    default_name = "A user"\n    id = None\n    email = None\n    name = None\n\n    actor = event.get("actor")\n    if actor:\n        id = actor.get("id")\n        name = actor.get("name")\n        attributes = actor.get("attributes")\n        email = attributes.get("email")\n\n    display_name = name or email or id or default_name\n\n    return f"{display_name} logged into Panther"',
     "dedupPeriodMinutes": 60,
     "description": "",
     "displayName": "New sign-in",
@@ -28,16 +28,16 @@ MOCK_RULE = {
     "lastModified": "2024-11-14T17:09:49.841716265Z",
     "tags": ["Authentication", "Login"],
     "tests": [
-      {
-        "expectedResult": False,
-        "name": "Random Event",
-        "resource": "{\"actionName\":\"SIGN_OUT\",\"actor\":{\"attributes\":{\"email\":\"derek@example.com\"},\"id\":\"1337\",\"name\":\"Derek\"}}"
-      },
-      {
-        "expectedResult": False,
-        "name": "Sign In Test",
-        "resource": "{\"actionName\":\"SIGN_IN\",\"actor\":{\"attributes\":{\"email\":\"derek@example.com\"},\"id\":\"1337\",\"name\":\"Derek\"}}"
-      }
+        {
+            "expectedResult": False,
+            "name": "Random Event",
+            "resource": '{"actionName":"SIGN_OUT","actor":{"attributes":{"email":"derek@example.com"},"id":"1337","name":"Derek"}}',
+        },
+        {
+            "expectedResult": False,
+            "name": "Sign In Test",
+            "resource": '{"actionName":"SIGN_IN","actor":{"attributes":{"email":"derek@example.com"},"id":"1337","name":"Derek"}}',
+        },
     ],
     "reports": {"SOC2": ["CC6.1", "CC6.3"], "PCI DSS": ["Requirement 10.2"]},
     "summaryAttributes": ["actor.name", "actor.attributes.email"],
@@ -46,17 +46,18 @@ MOCK_RULE = {
 
 MOCK_RULE_HIGH_SEVERITY = {
     **MOCK_RULE,
-    "id": "High.severity", 
+    "id": "High.severity",
     "displayName": "Another rule with high severity",
     "severity": "HIGH",
 }
 
 MOCK_RULES_RESPONSE = {
     "results": [MOCK_RULE, MOCK_RULE_HIGH_SEVERITY],
-    "next": "next-page-token"
+    "next": "next-page-token",
 }
 
 RULES_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.rules"
+
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
@@ -169,13 +170,9 @@ async def test_create_rule_with_all_options(mock_rest_client):
         "inline_filters": "key: value",
         "reports": {"PCI": ["1.1", "1.2"]},
         "tests": [
-            {
-                "name": "Test Case",
-                "expectedResult": True,
-                "data": {"test": "data"}
-            }
+            {"name": "Test Case", "expectedResult": True, "data": {"test": "data"}}
         ],
-        "run_tests_first": False
+        "run_tests_first": False,
     }
     mock_rest_client.post.return_value = (MOCK_RULE, 201)
 
@@ -193,7 +190,9 @@ async def test_create_rule_with_all_options(mock_rest_client):
     assert kwargs["json_data"]["displayName"] == rule_data["display_name"]
     assert kwargs["json_data"]["enabled"] is False
     assert kwargs["json_data"]["logTypes"] == rule_data["log_types"]
-    assert kwargs["json_data"]["dedupPeriodMinutes"] == rule_data["dedup_period_minutes"]
+    assert (
+        kwargs["json_data"]["dedupPeriodMinutes"] == rule_data["dedup_period_minutes"]
+    )
     assert kwargs["json_data"]["threshold"] == rule_data["threshold"]
     assert kwargs["json_data"]["runbook"] == rule_data["runbook"]
     assert kwargs["json_data"]["tags"] == rule_data["tags"]
@@ -211,9 +210,7 @@ async def test_create_rule_already_exists(mock_rest_client):
     mock_rest_client.post.return_value = ({}, 409)
 
     result = await create_rule(
-        rule_id="New.sign-in",
-        body=MOCK_RULE["body"],
-        severity="MEDIUM"
+        rule_id="New.sign-in", body=MOCK_RULE["body"], severity="MEDIUM"
     )
 
     assert result["success"] is False
@@ -226,7 +223,7 @@ async def test_create_rule_invalid_severity():
     result = await create_rule(
         rule_id="test.rule",
         body="def rule(event):\n    return True",
-        severity="INVALID"
+        severity="INVALID",
     )
 
     assert result["success"] is False
@@ -240,9 +237,7 @@ async def test_create_rule_error(mock_rest_client):
     mock_rest_client.post.side_effect = Exception("Test error")
 
     result = await create_rule(
-        rule_id="test.rule",
-        body="def rule(event):\n    return True",
-        severity="HIGH"
+        rule_id="test.rule", body="def rule(event):\n    return True", severity="HIGH"
     )
 
     assert result["success"] is False
@@ -272,10 +267,10 @@ async def test_put_rule_with_all_options(mock_rest_client):
             {
                 "name": "Updated Test Case",
                 "expectedResult": False,
-                "data": {"updated": "data"}
+                "data": {"updated": "data"},
             }
         ],
-        "run_tests_first": False
+        "run_tests_first": False,
     }
 
     mock_rest_client.put.return_value = (MOCK_RULE, 200)
@@ -293,7 +288,9 @@ async def test_put_rule_with_all_options(mock_rest_client):
     assert kwargs["json_data"]["displayName"] == rule_data["display_name"]
     assert kwargs["json_data"]["enabled"] is True
     assert kwargs["json_data"]["logTypes"] == rule_data["log_types"]
-    assert kwargs["json_data"]["dedupPeriodMinutes"] == rule_data["dedup_period_minutes"]
+    assert (
+        kwargs["json_data"]["dedupPeriodMinutes"] == rule_data["dedup_period_minutes"]
+    )
     assert kwargs["json_data"]["threshold"] == rule_data["threshold"]
     assert kwargs["json_data"]["runbook"] == rule_data["runbook"]
     assert kwargs["json_data"]["tags"] == rule_data["tags"]
@@ -308,9 +305,7 @@ async def test_put_rule_with_all_options(mock_rest_client):
 async def test_put_rule_invalid_severity():
     """Test update of a rule with invalid severity."""
     result = await put_rule(
-        rule_id="New.sign-in",
-        body=MOCK_RULE["body"],
-        severity="INVALID"
+        rule_id="New.sign-in", body=MOCK_RULE["body"], severity="INVALID"
     )
 
     assert result["success"] is False
@@ -324,9 +319,7 @@ async def test_put_rule_error(mock_rest_client):
     mock_rest_client.put.side_effect = Exception("Test error")
 
     result = await put_rule(
-        rule_id="New.sign-in",
-        body=MOCK_RULE["body"],
-        severity="HIGH"
+        rule_id="New.sign-in", body=MOCK_RULE["body"], severity="HIGH"
     )
 
     assert result["success"] is False
@@ -388,19 +381,23 @@ async def test_list_scheduled_rules_success(mock_rest_client):
         **MOCK_RULE,
         "id": "scheduled.data.exfiltration",
         "displayName": "Scheduled Data Exfiltration Check",
-        "scheduledQueries": ["SELECT * FROM data_movement WHERE bytes_transferred > 1000000 AND destination_ip NOT IN (trusted_ips)"]
+        "scheduledQueries": [
+            "SELECT * FROM data_movement WHERE bytes_transferred > 1000000 AND destination_ip NOT IN (trusted_ips)"
+        ],
     }
 
     mock_scheduled_rule_variation = {
         **mock_scheduled_rule_base,
-        "id": "scheduled.unused.credentials", 
+        "id": "scheduled.unused.credentials",
         "displayName": "Scheduled Unused Credentials Check",
-        "scheduledQueries": ["SELECT * FROM credential_usage WHERE last_used < NOW() - INTERVAL '90 days'"]
+        "scheduledQueries": [
+            "SELECT * FROM credential_usage WHERE last_used < NOW() - INTERVAL '90 days'"
+        ],
     }
 
     mock_scheduled_rules = {
         "results": [mock_scheduled_rule_base, mock_scheduled_rule_variation],
-        "next": "next-token"
+        "next": "next-token",
     }
     mock_rest_client.get.return_value = (mock_scheduled_rules, 200)
 
@@ -437,10 +434,10 @@ async def test_list_scheduled_rules_with_pagination(mock_rest_client):
             {
                 "id": "scheduled.test.rule",
                 "displayName": "Test Scheduled Rule",
-                "scheduledQueries": ["SELECT * FROM test"]
+                "scheduledQueries": ["SELECT * FROM test"],
             }
         ],
-        "next": "next-scheduled-token"
+        "next": "next-scheduled-token",
     }
     mock_rest_client.get.return_value = (scheduled_rules_response, 200)
 
@@ -461,7 +458,9 @@ async def test_get_scheduled_rule_by_id_success(mock_rest_client):
         **MOCK_RULE,
         "id": "scheduled.data.exfiltration",
         "displayName": "Scheduled Data Exfiltration Check",
-        "scheduledQueries": ["SELECT * FROM data_movement WHERE bytes_transferred > 1000000 AND destination_ip NOT IN (trusted_ips)"]
+        "scheduledQueries": [
+            "SELECT * FROM data_movement WHERE bytes_transferred > 1000000 AND destination_ip NOT IN (trusted_ips)"
+        ],
     }
     mock_rest_client.get.return_value = (scheduled_rule, 200)
 
@@ -510,14 +509,14 @@ async def test_list_simple_rules_success(mock_rest_client):
 
     simple_rule_variation = {
         **simple_rule_base,
-        "id": "simple.domain.blocklist", 
+        "id": "simple.domain.blocklist",
         "displayName": "Simple Domain Blocklist Rule",
         "description": "Alerts on traffic to known malicious domains",
     }
 
     mock_simple_rules = {
         "results": [simple_rule_base, simple_rule_variation],
-        "next": "next-token"
+        "next": "next-token",
     }
     mock_rest_client.get.return_value = (mock_simple_rules, 200)
 
@@ -538,13 +537,8 @@ async def test_list_simple_rules_success(mock_rest_client):
 async def test_list_simple_rules_with_pagination(mock_rest_client):
     """Test pagination for listing simple rules."""
     simple_rules_response = {
-        "results": [
-            {
-                "id": "simple.test.rule",
-                "displayName": "Test Simple Rule"
-            }
-        ],
-        "next": "next-simple-token"
+        "results": [{"id": "simple.test.rule", "displayName": "Test Simple Rule"}],
+        "next": "next-simple-token",
     }
     mock_rest_client.get.return_value = (simple_rules_response, 200)
 

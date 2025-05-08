@@ -124,6 +124,20 @@ async def execute_data_lake_query(
 
     logger.info("Executing data lake query")
 
+    # Validate that the query includes a p_event_time filter after WHERE or AND
+    sql_lower = sql.lower().replace("\n", " ")
+    if not re.search(
+        r"\b(where|and)\s+.*?p_event_time\s*(>=|<=|=|>|<|between)", sql_lower
+    ):
+        error_msg = (
+            "Query must include p_event_time as a filter condition after WHERE or AND"
+        )
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+        }
+
     try:
         client = await _create_panther_client()
 

@@ -1,4 +1,4 @@
-dirs := $(shell ls | egrep 'src' | xargs)
+dirs := $(shell ls | egrep 'src|tests' | xargs)
 
 fmt:
 	ruff format $(dirs)
