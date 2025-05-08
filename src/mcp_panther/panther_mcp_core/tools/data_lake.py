@@ -23,6 +23,66 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
+async def get_alert_event_summaries(alert_ids: list[str], time_window: int = 30):
+    """Gather a summary of one or more alert's events. This is helpful for prioritizing and identifying relationships.
+
+    This tool gathers stats on p_ fields from alerts that occurred within a shared time window.
+    It takes a list of alert IDs and groups them by day, a time bucket, log type, source IPs, emails, usernames, and trace IDs to identify patterns of related activity.
+    For each group, it counts alerts, collects alert IDs, rule IDs, timestamps, and severity levels, then sorts the results chronologically with the most recent events first.
+
+    Args:
+        alert_ids: List of alert IDs to analyze
+        time_window: The time window in minutes to group distinct events by (must be 1, 5, 15, 30, or 60)
+
+    Example:
+        alert_ids = ["alert-123", "alert-456", "alert-789"]
+    """
+    if time_window not in [1, 5, 15, 30, 60]:
+        raise ValueError("Time window must be 1, 5, 15, 30, or 60")
+
+    # Convert alert IDs list to SQL array
+    alert_ids_str = ", ".join(f"'{aid}'" for aid in alert_ids)
+
+    query = f"""
+SELECT
+    DATE_TRUNC('DAY', cs.p_event_time) AS event_day,
+    DATE_TRUNC('MINUTE', DATEADD('MINUTE', {time_window} * FLOOR(EXTRACT(MINUTE FROM cs.p_event_time) / {time_window}), 
+        DATE_TRUNC('HOUR', cs.p_event_time))) AS time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses AS source_ips,
+    cs.p_any_emails AS emails,
+    cs.p_any_usernames AS usernames,
+    cs.p_any_trace_ids AS trace_ids,
+    COUNT(DISTINCT cs.p_alert_id) AS alert_count,
+    ARRAY_AGG(DISTINCT cs.p_alert_id) AS alert_ids,
+    ARRAY_AGG(DISTINCT cs.p_rule_id) AS rule_ids,
+    MIN(cs.p_event_time) AS first_event,
+    MAX(cs.p_event_time) AS last_event,
+    ARRAY_AGG(DISTINCT cs.p_alert_severity) AS severities
+FROM
+    panther_signals.public.correlation_signals cs
+WHERE
+    cs.p_alert_id IN ({alert_ids_str})
+GROUP BY
+    event_day,
+    time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses,
+    cs.p_any_emails,
+    cs.p_any_usernames,
+    cs.p_any_trace_ids
+HAVING
+    COUNT(DISTINCT cs.p_alert_id) > 0
+ORDER BY
+    event_day DESC,
+    time_{time_window}_minute DESC,
+    alert_count DESC
+LIMIT 1000
+"""
+    return await execute_data_lake_query(query, "panther_signals.public")
+
+
+@mcp_tool
 async def execute_data_lake_query(
     sql: str, database_name: Optional[str] = "panther_logs.public"
 ) -> Dict[str, Any]:
