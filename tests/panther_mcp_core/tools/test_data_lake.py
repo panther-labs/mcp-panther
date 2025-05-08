@@ -60,7 +60,7 @@ async def test_execute_data_lake_query_success(mock_graphql_client):
     """Test successful execution of a data lake query."""
     mock_graphql_client.execute.return_value = {"executeDataLakeQuery": {"id": MOCK_QUERY_ID}}
 
-    sql = "SELECT * FROM panther_logs.public.AWS_CloudTrail LIMIT 10"
+    sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
     result = await execute_data_lake_query(sql)
 
     assert result["success"] is True
@@ -77,7 +77,7 @@ async def test_execute_data_lake_query_custom_database(mock_graphql_client):
     """Test executing a data lake query with a custom database."""
     mock_graphql_client.execute.return_value = {"executeDataLakeQuery": {"id": MOCK_QUERY_ID}}
 
-    sql = "SELECT * FROM my_custom_table LIMIT 10"
+    sql = "SELECT * FROM my_custom_table WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
     custom_db = "custom_database"
     result = await execute_data_lake_query(sql, database_name=custom_db)
 
@@ -92,11 +92,35 @@ async def test_execute_data_lake_query_error(mock_graphql_client):
     """Test handling of errors when executing a data lake query."""
     mock_graphql_client.execute.side_effect = Exception("Test error")
 
-    sql = "SELECT * FROM panther_logs.public.AWS_CloudTrail LIMIT 10"
+    sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
     result = await execute_data_lake_query(sql)
 
     assert result["success"] is False
-    assert "Failed to execute data lake query" in result["message"] 
+    assert "Failed to execute data lake query" in result["message"]
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_execute_data_lake_query_missing_event_time(mock_graphql_client):
+    """Test that queries without p_event_time filter are rejected."""
+    sql = "SELECT * FROM panther_logs.public.aws_cloudtrail LIMIT 10"
+    result = await execute_data_lake_query(sql)
+
+    assert result["success"] is False
+    assert "Query must include a filter on p_event_time" in result["message"]
+    mock_graphql_client.execute.assert_not_called()
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_execute_data_lake_query_with_event_time(mock_graphql_client):
+    """Test that queries with p_event_time filter are accepted."""
+    mock_graphql_client.execute.return_value = {"executeDataLakeQuery": {"id": MOCK_QUERY_ID}}
+
+    sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
+    result = await execute_data_lake_query(sql)
+
+    assert result["success"] is True
+    assert result["query_id"] == MOCK_QUERY_ID
+    mock_graphql_client.execute.assert_called_once()
 
 def test_normalize_name():
     test_cases = [

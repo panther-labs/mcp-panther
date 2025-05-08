@@ -64,6 +64,15 @@ async def execute_data_lake_query(
 
     logger.info("Executing data lake query")
 
+    # Validate that the query includes a p_event_time filter
+    if "p_event_time" not in sql.lower():
+        error_msg = "Query must include a filter on p_event_time"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+        }
+
     try:
         client = await _create_panther_client()
 
