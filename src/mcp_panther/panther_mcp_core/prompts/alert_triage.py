@@ -33,23 +33,3 @@ def list_and_prioritize_alerts(start_date: str, end_date: str) -> str:
     5. End with prioritized recommendations for investigation based on the entity groups, not just alert severity.
 
 Format your response with clear markdown headings for each entity group and use concise, cybersecurity-nuanced language."""
-
-
-@mcp_prompt
-def get_alerts_by_timeframe(start_date: str, end_date: str) -> str:
-    """Get a simple list of alerts created within a specified time period.
-
-    Args:
-        start_date: The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
-        end_date: The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
-    """
-    return f"""You are an expert in cybersecurity, SIEM, and attacker techniques.
-
-List all non-INFO-level alerts created between {start_date} and {end_date}. Format the results in a markdown table with the following columns:
-1. Alert ID
-2. Title
-3. Severity
-4. Creation time
-5. Status
-
-Sort the alerts by creation time (newest first) and group them by severity."""
