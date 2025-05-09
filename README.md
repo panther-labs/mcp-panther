@@ -91,67 +91,42 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 ## Security Best Practices
 
-As a security company, we highly recommend that you follow the best practices below:
+Panther highly recommends the following MCP best practices:
 
-- **Run only trusted, officially signed MCP servers.** Verify digital signatures or checksums before running, audit the tool code, and avoid community tools that have not passed any security review or are not from an official publisher.
-- **Apply strict least-privilege to every API credential (e.g., Panther API tokens).** Scope tokens to the minimal permissions required and bind them to an IP allow-list or CIDR range so they're useless if exfiltrated. Rotate credentials on a preferred interval (e.g., every 30d).
+- **Run only trusted, officially signed MCP servers.** Verify digital signatures or checksums before running, audit the tool code, and avoid community tools from unofficial publishers.
+- **Apply strict least-privilege to Panther API tokens.** Scope tokens to the minimal permissions required and bind them to an IP allow-list or CIDR range so they're useless if exfiltrated. Rotate credentials on a preferred interval (e.g., every 30d).
 - **Host the MCP server in a locked-down sandbox (e.g., Docker) with read-only mounts.** This confines any compromise to a minimal blast radius.
 - **Monitor credential access to Panther and monitor for anomalies.** Write a Panther rule!
 - **Scan MCP servers with `mcp-scan`.** Utilize the `mcp-scan` tool by [invariantlabs](https://github.com/invariantlabs-ai/mcp-scan) for common vulnerabilities.
 
-> Note: There is a lack of support for secure credential management with MCP clients today. We anticipate that to change and will update this section once it does.
+## Panther Configuration
 
-## Setup
+1. Create an API token in Panther:
+   - Navigate to Settings (gear icon) → API Tokens
+   - Create a new token with the following permissions (recommended read-only approach to start):
+   - <details>
+     <summary><strong>View Required Permissions</strong></summary>
+
+     ![Screenshot of Panther Token permissions](panther-token-perms-1.png)
+     ![Screenshot of Panther Token permissions](panther-token-perms-2.png)
+
+     </details>
+
+2. Store the generated token securely (e.g., in 1Password)
+
+3. Grab the Panther instance URL from your browser (e.g., `https://YOUR-PANTHER-INSTANCE.domain`)
+    - Note: This must include `https://`
+
+## MCP Installation
 
 Clone this repository:
 ```bash
 git clone git@github.com:panther-labs/mcp-panther.git
 ```
 
-## Panther API Configuration
+**Choose one of the following installation methods below.**
 
-Before proceeding with installation, you'll need to configure your Panther API access:
-
-1. Create an API token in Panther:
-   - Navigate to Settings (gear icon) → API Tokens
-   - Create a new token with the following permissions (recommended read-only approach):
-
-![Alt text](panther-token-perms-1.png)
-![Alt text](panther-token-perms-2.png)
-
-2. Store the generated token securely (e.g., in 1Password)
-
-3. You'll need these values for your MCP configuration:
-   - Your Panther instance URL (e.g., `https://YOUR-PANTHER-INSTANCE.domain`)
-   - Your generated API token
-
-## Client Setup
-
-### Cursor
-[Follow the instructions here](https://docs.cursor.com/context/model-context-protocol#configuring-mcp-servers) to configure your project or global MCP configuration. **It's VERY IMPORTANT that you do not check this file into version control.**
-
-### Claude Desktop
-Install the server directly:
-```bash
-uv run mcp install src/mcp_panther/server.py
-```
-
-If you run into any issues, [try the troubleshooting steps here](https://modelcontextprotocol.io/quickstart/user#troubleshooting).
-
-### Goose
-Use with [Goose](https://block.github.io/goose/), Block's open-source AI agent:
-```bash
-# Install the package with entry points
-uv pip install .
-
-# Start Goose with the MCP server
-goose session --with-extension "uv run /path/to/mcp-panther/.venv/bin/mcp-panther"
-```
-> NOTE: Adjust the path to match your installation directory
-
-## MCP Configuration
-
-### Option 1: Docker Setup
+### Docker Setup
 1. Ensure Docker is installed on your system
 2. Build the Docker image:
 ```bash
@@ -161,7 +136,7 @@ make build-docker
 ```bash
 docker images | grep mcp-panther
 ```
-4. Configure your MCP client of choice:
+4. Configure your MCP client of choice (below):
 ```json
 {
   "mcpServers": {
@@ -184,7 +159,7 @@ docker images | grep mcp-panther
 }
 ```
 
-### Option 2: UV Setup
+### UV Setup
 1. Ensure Python 3.12 is installed:
 ```bash
 pyenv install 3.12  # if using pyenv
@@ -210,7 +185,7 @@ uv venv
 uv sync
 ```
 
-4. Configure your MCP client of choice:
+4. Configure your MCP client of choice (below):
 ```json
 {
   "mcpServers": {
@@ -236,6 +211,34 @@ uv sync
   }
 }
 ```
+
+## Client Setup
+
+### Cursor
+[Follow the instructions here](https://docs.cursor.com/context/model-context-protocol#configuring-mcp-servers) to configure your project or global MCP configuration. **It's VERY IMPORTANT that you do not check this file into version control.**
+
+Once configured, navigate to Cursor Settings > MCP to view the running server:
+
+<img src="panther-mcp-cursor-config.png" width="500" />
+
+### Claude Desktop
+Install the server directly:
+```bash
+uv run mcp install src/mcp_panther/server.py
+```
+
+If you run into any issues, [try the troubleshooting steps here](https://modelcontextprotocol.io/quickstart/user#troubleshooting).
+
+### Goose
+Use with [Goose](https://block.github.io/goose/), Block's open-source AI agent:
+```bash
+# Install the package with entry points
+uv pip install .
+
+# Start Goose with the MCP server
+goose session --with-extension "uv run /path/to/mcp-panther/.venv/bin/mcp-panther"
+```
+> NOTE: Adjust the path to match your installation directory
 
 ## Troubleshooting
 
