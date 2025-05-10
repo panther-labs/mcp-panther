@@ -13,7 +13,7 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
-async def get_metrics_alerts_per_severity(
+async def get_metrics_alerts_and_errors_per_severity(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     alert_types: Optional[List[str]] = ["Rule"],
@@ -94,7 +94,7 @@ async def get_metrics_alerts_per_severity(
 
 
 @mcp_tool
-async def get_metrics_alerts_per_rule(
+async def get_metrics_alerts_and_errors_per_rule(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     interval_in_minutes: Optional[int] = 1440,  # Default to 1 day

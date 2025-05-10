@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 from mcp_panther.panther_mcp_core.tools.metrics import (
-    get_metrics_alerts_per_rule,
-    get_metrics_alerts_per_severity,
+    get_metrics_alerts_and_errors_per_rule,
+    get_metrics_alerts_and_errors_per_severity,
 )
 
 # Sample response data
@@ -75,13 +75,13 @@ def mock_get_today_date_range():
 
 @pytest.mark.asyncio
 class TestGetMetricsAlertsPerRule:
-    """Test suite for get_metrics_alerts_per_rule function."""
+    """Test suite for get_metrics_alerts_and_errors_per_rule function."""
 
     async def test_default_parameters(
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with default parameters."""
-        result = await get_metrics_alerts_per_rule()
+        result = await get_metrics_alerts_and_errors_per_rule()
 
         assert result["success"] is True
         assert len(result["alerts_per_rule"]) == 2
@@ -102,7 +102,7 @@ class TestGetMetricsAlertsPerRule:
         from_date = "2024-03-19T00:00:00Z"
         to_date = "2024-03-19T23:59:59Z"
 
-        result = await get_metrics_alerts_per_rule(from_date=from_date, to_date=to_date)
+        result = await get_metrics_alerts_and_errors_per_rule(from_date=from_date, to_date=to_date)
 
         assert result["success"] is True
         assert result["from_date"] == from_date
@@ -111,7 +111,7 @@ class TestGetMetricsAlertsPerRule:
 
     async def test_custom_interval(self, mock_execute_query, mock_get_today_date_range):
         """Test function with custom interval."""
-        result = await get_metrics_alerts_per_rule(interval_in_minutes=60)
+        result = await get_metrics_alerts_and_errors_per_rule(interval_in_minutes=60)
 
         assert result["success"] is True
         assert result["interval_in_minutes"] == 60
@@ -121,7 +121,7 @@ class TestGetMetricsAlertsPerRule:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with rule ID filtering."""
-        result = await get_metrics_alerts_per_rule(
+        result = await get_metrics_alerts_and_errors_per_rule(
             rule_ids=["Cloudflare.Firewall.L7DDoS"]
         )
 
@@ -134,7 +134,7 @@ class TestGetMetricsAlertsPerRule:
         """Test error handling when query fails."""
         mock_execute_query.side_effect = Exception("API Error")
 
-        result = await get_metrics_alerts_per_rule()
+        result = await get_metrics_alerts_and_errors_per_rule()
 
         assert result["success"] is False
         assert "Failed to fetch alerts per rule metrics" in result["message"]
@@ -142,13 +142,13 @@ class TestGetMetricsAlertsPerRule:
 
 @pytest.mark.asyncio
 class TestGetMetricsAlertsPerSeverity:
-    """Test suite for get_metrics_alerts_per_severity function."""
+    """Test suite for get_metrics_alerts_and_errors_per_severity function."""
 
     async def test_default_parameters(
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with default parameters."""
-        result = await get_metrics_alerts_per_severity()
+        result = await get_metrics_alerts_and_errors_per_severity()
 
         assert result["success"] is True
         assert len(result["alerts_per_severity"]) == 2
@@ -171,7 +171,7 @@ class TestGetMetricsAlertsPerSeverity:
         from_date = "2024-03-19T00:00:00Z"
         to_date = "2024-03-19T23:59:59Z"
 
-        result = await get_metrics_alerts_per_severity(
+        result = await get_metrics_alerts_and_errors_per_severity(
             from_date=from_date, to_date=to_date
         )
 
@@ -184,7 +184,7 @@ class TestGetMetricsAlertsPerSeverity:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with custom alert types."""
-        result = await get_metrics_alerts_per_severity(alert_types=["Rule", "Policy"])
+        result = await get_metrics_alerts_and_errors_per_severity(alert_types=["Rule", "Policy"])
 
         assert result["success"] is True
         assert len(result["alerts_per_severity"]) == 2
@@ -194,7 +194,7 @@ class TestGetMetricsAlertsPerSeverity:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with custom severities."""
-        result = await get_metrics_alerts_per_severity(severities=["CRITICAL", "HIGH"])
+        result = await get_metrics_alerts_and_errors_per_severity(severities=["CRITICAL", "HIGH"])
 
         assert result["success"] is True
         assert len(result["alerts_per_severity"]) == 2
@@ -212,7 +212,7 @@ class TestGetMetricsAlertsPerSeverity:
         """Test error handling when query fails."""
         mock_execute_query.side_effect = Exception("API Error")
 
-        result = await get_metrics_alerts_per_severity()
+        result = await get_metrics_alerts_and_errors_per_severity()
 
         assert result["success"] is False
         assert "Failed to fetch alerts per severity metrics" in result["message"]

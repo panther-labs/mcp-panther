@@ -75,8 +75,8 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `get_metrics_alerts_per_rule` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
-| `get_metrics_alerts_per_severity` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
+| `get_metrics_alerts_and_errors_per_rule` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
+| `get_metrics_alerts_and_errors_per_severity` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
 
 </details>
 
