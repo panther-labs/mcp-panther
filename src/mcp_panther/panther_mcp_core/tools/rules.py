@@ -13,13 +13,13 @@ logger = logging.getLogger("mcp-panther")
 
 @mcp_tool
 async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
-    """List all rules from Panther with optional pagination
+    """List all rules from your Panther instance.
 
     Args:
         cursor: Optional cursor for pagination from a previous query
         limit: Optional maximum number of results to return (default: 100)
     """
-    logger.info("Fetching rules from Panther")
+    logger.info(f"Fetching {limit} rules from Panther")
 
     try:
         # Prepare query parameters
@@ -63,18 +63,18 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
             "next_cursor": next_cursor,
         }
     except Exception as e:
-        logger.error(f"Failed to fetch rules: {str(e)}")
-        return {"success": False, "message": f"Failed to fetch rules: {str(e)}"}
+        logger.error(f"Failed to list rules: {str(e)}")
+        return {"success": False, "message": f"Failed to list rules: {str(e)}"}
 
 
 @mcp_tool
 async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
-    """Get detailed information about a Panther rule by ID including the rule body and tests
+    """Get detailed information about a Panther rule, including the rule body and tests
 
     Args:
         rule_id: The ID of the rule to fetch
     """
-    logger.info(f"Fetching rule details for ID: {rule_id}")
+    logger.info(f"Fetching rule details for rule ID: {rule_id}")
 
     try:
         async with get_rest_client() as client:
@@ -90,11 +90,11 @@ async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
                     "message": f"No rule found with ID: {rule_id}",
                 }
 
-        logger.info(f"Successfully retrieved rule details for ID: {rule_id}")
+        logger.info(f"Successfully retrieved rule details for rule ID: {rule_id}")
         return {"success": True, "rule": result}
     except Exception as e:
-        logger.error(f"Failed to fetch rule details: {str(e)}")
-        return {"success": False, "message": f"Failed to fetch rule details: {str(e)}"}
+        logger.error(f"Failed to get rule details: {str(e)}")
+        return {"success": False, "message": f"Failed to get rule details: {str(e)}"}
 
 
 @mcp_tool
@@ -116,24 +116,26 @@ async def create_rule(
     tests: List[dict] = None,
     run_tests_first: bool = True,
 ) -> Dict[str, Any]:
-    """Create a new Panther rule.
+    """Create a new Panther rule. First think about the type of behavior you want to detect, then query the data lake for sample logs and use those as examples to build and test your rule. Read a similar rule with recent alerts and use it as a template.
+
+    The Panther Python streaming rule body requires a `rule(event)` function that analyzes each log event and returns `True` to trigger an alert or `False` otherwise, with event data accessed safely using `event.get("field", default_value)` for top-level fields and `event.deep_get("parent", "child", "field", default_value)` for nested structures. Supplementary functions like `title(event)` (required), `severity(event)`, `alert_context(event)`, and `destinations(event)` (all optional) enhance alerts by providing descriptive titles, dynamic severity levels, contextual data for automation, and custom routing options. All rules must handle missing fields gracefully, respect the 15-second execution time limit, and follow the stateless execution model where each event is processed independently. Panther provides standardized fields with the `p_` prefix (like `p_log_type`, `p_event_time`, `p_any_ip_addresses`) across all log types, and rules should leverage these normalized fields for consistency while focusing on a single, clear detection pattern per rule.
 
     Args:
         rule_id: Unique identifier for the rule
         body: Python code that implements the rule logic
         severity: Alert severity level (INFO, LOW, MEDIUM, HIGH, CRITICAL)
-        description: Optional description of what the rule does
-        display_name: Optional display name for the rule
-        enabled: Whether the rule is active (default: True)
-        log_types: Optional list of log types this rule applies to
-        dedup_period_minutes: Time window for alert deduplication (default: 60)
-        threshold: Number of events required to trigger alert (default: 1)
-        runbook: Optional documentation on how to handle alerts
-        tags: Optional list of tags for categorization
-        summary_attributes: Optional list of fields to summarize in alerts
-        inline_filters: Optional YAML filter for the rule
-        reports: Optional mapping of report names to destinations
-        tests: Optional list of unit tests for the rule
+        description: Optional description for what the rule is meant to detect
+        display_name: Optional human-readable name for the rule
+        enabled: If the rule is active (default: True)
+        log_types: The list of log types this rule applies to (e.g. ["AWS.CloudTrail", "AWS.GuardDuty"])
+        dedup_period_minutes: The time window for alert deduplication (default: 60)
+        threshold: The number of events required to trigger an alert (default: 1)
+        runbook: Instructions for handling alerts (this is read by the Panther AI triage agent)
+        tags: A list of tags for categorization
+        summary_attributes: A list of column names for summarizing alerts (e.g. ["p_any_ip_addresses", "p_any_user_ids"])
+        inline_filters: A YAML filter for the rule (optional)
+        reports: A mapping of report names to destinations (optional)
+        tests: A list of unit tests for the rule (create one True and one False test)
         run_tests_first: Whether to run tests before saving (default: True)
 
     Returns:

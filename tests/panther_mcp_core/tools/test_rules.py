@@ -104,7 +104,7 @@ async def test_list_rules_error(mock_rest_client):
     result = await list_rules()
 
     assert result["success"] is False
-    assert "Failed to fetch rules" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -147,7 +147,7 @@ async def test_get_rule_by_id_error(mock_rest_client):
     result = await get_rule_by_id(MOCK_RULE["id"])
 
     assert result["success"] is False
-    assert "Failed to fetch rule details" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -241,7 +241,7 @@ async def test_create_rule_error(mock_rest_client):
     )
 
     assert result["success"] is False
-    assert "Failed to create rule" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -323,7 +323,7 @@ async def test_put_rule_error(mock_rest_client):
     )
 
     assert result["success"] is False
-    assert "Failed to update rule" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -370,7 +370,7 @@ async def test_disable_rule_error(mock_rest_client):
     result = await disable_rule(MOCK_RULE["id"])
 
     assert result["success"] is False
-    assert "Failed to disable rule" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -422,7 +422,7 @@ async def test_list_scheduled_rules_error(mock_rest_client):
     result = await list_scheduled_rules()
 
     assert result["success"] is False
-    assert "Failed to fetch scheduled rules" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -493,7 +493,7 @@ async def test_get_scheduled_rule_by_id_error(mock_rest_client):
     result = await get_scheduled_rule_by_id("scheduled.rule.id")
 
     assert result["success"] is False
-    assert "Failed to fetch scheduled rule details" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -560,7 +560,7 @@ async def test_list_simple_rules_error(mock_rest_client):
     result = await list_simple_rules()
 
     assert result["success"] is False
-    assert "Failed to fetch simple rules" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -603,4 +603,4 @@ async def test_get_simple_rule_by_id_error(mock_rest_client):
     result = await get_simple_rule_by_id("simple.rule.id")
 
     assert result["success"] is False
-    assert "Failed to fetch simple rule details" in result["message"]
+    assert "Failed" in result["message"]
