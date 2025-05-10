@@ -102,7 +102,9 @@ class TestGetMetricsAlertsPerRule:
         from_date = "2024-03-19T00:00:00Z"
         to_date = "2024-03-19T23:59:59Z"
 
-        result = await get_metrics_alerts_and_errors_per_rule(from_date=from_date, to_date=to_date)
+        result = await get_metrics_alerts_and_errors_per_rule(
+            from_date=from_date, to_date=to_date
+        )
 
         assert result["success"] is True
         assert result["from_date"] == from_date
@@ -184,7 +186,9 @@ class TestGetMetricsAlertsPerSeverity:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with custom alert types."""
-        result = await get_metrics_alerts_and_errors_per_severity(alert_types=["Rule", "Policy"])
+        result = await get_metrics_alerts_and_errors_per_severity(
+            alert_types=["Rule", "Policy"]
+        )
 
         assert result["success"] is True
         assert len(result["alerts_per_severity"]) == 2
@@ -194,7 +198,9 @@ class TestGetMetricsAlertsPerSeverity:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with custom severities."""
-        result = await get_metrics_alerts_and_errors_per_severity(severities=["CRITICAL", "HIGH"])
+        result = await get_metrics_alerts_and_errors_per_severity(
+            severities=["CRITICAL", "HIGH"]
+        )
 
         assert result["success"] is True
         assert len(result["alerts_per_severity"]) == 2
