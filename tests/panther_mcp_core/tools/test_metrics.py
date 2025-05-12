@@ -2,9 +2,9 @@
 Unit tests for Panther metrics tools.
 """
 
+from unittest.mock import patch
+
 import pytest
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
 
 from mcp_panther.panther_mcp_core.tools.metrics import (
     get_metrics_alerts_and_errors_per_rule,
