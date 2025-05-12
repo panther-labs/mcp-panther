@@ -94,6 +94,7 @@ async def execute_data_lake_query(
     REQUIREMENTS:
     1. USE THE get_table_columns TOOL FIRST to get the correct table schema.
     2. THE QUERY MUST INCLUDE A FILTER ON p_event_time WITH A MAX TIME DURATION OF 90 DAYS.
+    3. Check the size of the table with get_bytes_processed_per_log_type_and_source. If the table is large, use smaller time windows and more specific filters.
 
     NOTE: After calling this function, you MUST call get_data_lake_query_results with the
     returned query_id to retrieve the actual query results.
