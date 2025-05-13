@@ -93,7 +93,7 @@ async def execute_data_lake_query(
     REQUIREMENTS:
     1. USE THE get_table_columns TOOL FIRST to get the correct table schema.
     2. THE QUERY MUST INCLUDE A FILTER ON p_event_time WITH A MAX TIME DURATION OF 90 DAYS.
-    3. Check the size of the table with get_bytes_processed_per_log_type_and_source. If the table is large, use smaller time windows and more specific filters.
+    3. BE SPECIFIC with your query to reduce costs.
     4. The query must be compatible with Snowflake SQL. For example, use field:nested_field instead of field.nested_field.
 
     NOTE: After calling this function, you MUST call get_data_lake_query_results with the
@@ -177,8 +177,19 @@ async def get_data_lake_query_results(query_id: str) -> Dict[str, Any]:
 
     Args:
         query_id: The ID of the query to get results for
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - status: Status of the query (e.g., "succeeded", "running", "failed", "cancelled")
+        - message: Error message if unsuccessful
+        - results: List of query result rows
+        - column_info: Dict containing column names and types
+        - stats: Dict containing stats about the query
+        - has_next_page: Boolean indicating if there are more results available
+        - end_cursor: Cursor for fetching the next page of results, or null if no more pages
     """
-    logger.info(f"Fetching results for query ID: {query_id}")
+    logger.info(f"Fetching data lake queryresults for query ID: {query_id}")
 
     try:
         client = await _create_panther_client()
@@ -231,12 +242,14 @@ async def get_data_lake_query_results(query_id: str) -> Dict[str, Any]:
         # Extract results from edges
         query_results = [edge["node"] for edge in edges]
 
-        logger.info(f"Successfully retrieved {len(query_results)} results")
+        logger.info(
+            f"Successfully retrieved {len(query_results)} results for query ID: {query_id}"
+        )
 
         # Format the response
         return {
             "success": True,
-            "status": "succeeded",
+            "status": status,
             "results": query_results,
             "column_info": {
                 "order": column_info.get("order", []),
@@ -249,10 +262,14 @@ async def get_data_lake_query_results(query_id: str) -> Dict[str, Any]:
             },
             "has_next_page": results.get("pageInfo", {}).get("hasNextPage", False),
             "end_cursor": results.get("pageInfo", {}).get("endCursor"),
+            "message": query_data.get("message", "Query executed successfully"),
         }
     except Exception as e:
-        logger.error(f"Failed to fetch query results: {str(e)}")
-        return {"success": False, "message": f"Failed to fetch query results: {str(e)}"}
+        logger.error(f"Failed to fetch data lake query results: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch data lake query results: {str(e)}",
+        }
 
 
 @mcp_tool
