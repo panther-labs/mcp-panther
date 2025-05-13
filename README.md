@@ -258,6 +258,10 @@ Check the server logs for detailed error messages: `tail -n 20 -F ~/Library/Logs
 
 This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
 
+## Core Contributors
+
+Special thanks to [Tomasz Tchorz](https://github.com/tomasz-sq) and [Glenn Edwards](https://github.com/glenn-sq) from [Block](https://block.xyz), who played a core role in launching MCP-Panther as a joint open-source effort with Panther.
+
 ## Contributing
 
 We welcome contributions to improve MCP-Panther! Here's how you can help:
