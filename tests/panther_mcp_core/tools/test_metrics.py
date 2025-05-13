@@ -1,15 +1,16 @@
-"""
-Unit tests for Panther metrics tools.
-"""
-
 from unittest.mock import patch
 
 import pytest
 
+from mcp_panther.panther_mcp_core.queries import METRICS_BYTES_PROCESSED_QUERY
 from mcp_panther.panther_mcp_core.tools.metrics import (
+    get_bytes_processed_per_log_type_and_source,
     get_metrics_alerts_and_errors_per_rule,
     get_metrics_alerts_and_errors_per_severity,
 )
+from tests.utils.helpers import patch_graphql_client
+
+METRICS_MODULE_PATH = "mcp_panther.panther_mcp_core.client"
 
 # Sample response data
 MOCK_METRICS_RESPONSE = {
@@ -222,3 +223,188 @@ class TestGetMetricsAlertsPerSeverity:
 
         assert result["success"] is False
         assert "Failed to fetch alerts per severity metrics" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(METRICS_MODULE_PATH)
+async def test_get_bytes_processed_per_log_type_and_source_success(mock_graphql_client):
+    """Test successful retrieval of bytes processed metrics."""
+    # Mock response data
+    mock_response = {
+        "metrics": {
+            "bytesProcessedPerSource": [
+                {
+                    "label": "AWS.CloudTrail",
+                    "value": 1000000,
+                    "breakdown": {"source1": 500000, "source2": 500000},
+                },
+                {
+                    "label": "AWS.VPCFlow",
+                    "value": 2000000,
+                    "breakdown": {"source3": 1000000, "source4": 1000000},
+                },
+            ]
+        }
+    }
+    mock_graphql_client.execute.return_value = mock_response
+
+    # Test with explicit date range
+    result = await get_bytes_processed_per_log_type_and_source(
+        from_date="2024-03-01T00:00:00Z", to_date="2024-03-02T00:00:00Z", interval="24h"
+    )
+
+    assert result["success"] is True
+    assert len(result["bytes_processed"]) == 2
+    assert result["total_bytes"] == 3000000
+    assert result["from_date"] == "2024-03-01T00:00:00Z"
+    assert result["to_date"] == "2024-03-02T00:00:00Z"
+    assert result["interval"] == "24h"
+
+    # Verify the first series
+    first_series = result["bytes_processed"][0]
+    assert first_series["label"] == "AWS.CloudTrail"
+    assert first_series["value"] == 1000000
+    assert first_series["breakdown"] == {"source1": 500000, "source2": 500000}
+
+    # Verify the second series
+    second_series = result["bytes_processed"][1]
+    assert second_series["label"] == "AWS.VPCFlow"
+    assert second_series["value"] == 2000000
+    assert second_series["breakdown"] == {"source3": 1000000, "source4": 1000000}
+
+    # Verify GraphQL query was called with correct variables
+    mock_graphql_client.execute.assert_called_once()
+    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    assert call_args["input"] == {
+        "fromDate": "2024-03-01T00:00:00Z",
+        "toDate": "2024-03-02T00:00:00Z",
+        "intervalInMinutes": 1440,
+    }
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(METRICS_MODULE_PATH)
+async def test_get_bytes_processed_per_log_type_and_source_default_dates(
+    mock_graphql_client,
+):
+    """Test bytes processed metrics with default date range (today)."""
+    # Mock response data
+    mock_response = {
+        "metrics": {
+            "bytesProcessedPerSource": [
+                {
+                    "label": "AWS.CloudTrail",
+                    "value": 1000000,
+                    "breakdown": {"source1": 1000000},
+                }
+            ]
+        }
+    }
+    mock_graphql_client.execute.return_value = mock_response
+
+    # Test with default date range
+    result = await get_bytes_processed_per_log_type_and_source()
+
+    assert result["success"] is True
+    assert len(result["bytes_processed"]) == 1
+    assert result["total_bytes"] == 1000000
+    assert result["interval"] == "24h"
+
+    # Verify GraphQL query was called with today's date range
+    mock_graphql_client.execute.assert_called_once()
+    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    assert "input" in call_args
+    assert "fromDate" in call_args["input"]
+    assert "toDate" in call_args["input"]
+    assert call_args["input"]["intervalInMinutes"] == 1440
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(METRICS_MODULE_PATH)
+async def test_get_bytes_processed_per_log_type_and_source_different_intervals(
+    mock_graphql_client,
+):
+    """Test bytes processed metrics with different interval options."""
+    # Mock response data
+    mock_response = {
+        "metrics": {
+            "bytesProcessedPerSource": [
+                {
+                    "label": "AWS.CloudTrail",
+                    "value": 1000000,
+                    "breakdown": {"source1": 1000000},
+                }
+            ]
+        }
+    }
+    mock_graphql_client.execute.return_value = mock_response
+
+    # Test with 1h interval
+    result = await get_bytes_processed_per_log_type_and_source(
+        from_date="2024-03-01T00:00:00Z", to_date="2024-03-01T01:00:00Z", interval="1h"
+    )
+    assert result["success"] is True
+    assert result["interval"] == "1h"
+    mock_graphql_client.execute.assert_called_with(
+        METRICS_BYTES_PROCESSED_QUERY,
+        variable_values={
+            "input": {
+                "fromDate": "2024-03-01T00:00:00Z",
+                "toDate": "2024-03-01T01:00:00Z",
+                "intervalInMinutes": 60,
+            }
+        },
+    )
+
+    # Test with 12h interval
+    mock_graphql_client.reset_mock()
+    result = await get_bytes_processed_per_log_type_and_source(
+        from_date="2024-03-01T00:00:00Z", to_date="2024-03-01T12:00:00Z", interval="12h"
+    )
+    assert result["success"] is True
+    assert result["interval"] == "12h"
+    mock_graphql_client.execute.assert_called_with(
+        METRICS_BYTES_PROCESSED_QUERY,
+        variable_values={
+            "input": {
+                "fromDate": "2024-03-01T00:00:00Z",
+                "toDate": "2024-03-01T12:00:00Z",
+                "intervalInMinutes": 720,
+            }
+        },
+    )
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(METRICS_MODULE_PATH)
+async def test_get_bytes_processed_per_log_type_and_source_error(mock_graphql_client):
+    """Test error handling in bytes processed metrics."""
+    # Mock GraphQL error
+    mock_graphql_client.execute.side_effect = Exception("GraphQL error")
+
+    result = await get_bytes_processed_per_log_type_and_source(
+        from_date="2024-03-01T00:00:00Z", to_date="2024-03-02T00:00:00Z"
+    )
+
+    assert result["success"] is False
+    assert "Failed to fetch bytes processed metrics" in result["message"]
+    assert "GraphQL error" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(METRICS_MODULE_PATH)
+async def test_get_bytes_processed_per_log_type_and_source_empty_response(
+    mock_graphql_client,
+):
+    """Test handling of empty metrics response."""
+    # Mock empty response
+    mock_response = {"metrics": {"bytesProcessedPerSource": []}}
+    mock_graphql_client.execute.return_value = mock_response
+
+    result = await get_bytes_processed_per_log_type_and_source(
+        from_date="2024-03-01T00:00:00Z", to_date="2024-03-02T00:00:00Z"
+    )
+
+    assert result["success"] is True
+    assert len(result["bytes_processed"]) == 0
+    assert result["total_bytes"] == 0
