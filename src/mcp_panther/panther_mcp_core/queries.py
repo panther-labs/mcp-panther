@@ -360,7 +360,7 @@ query GetBytesProcessedMetrics($input: MetricsInput!) {
 
 GET_SCHEMA_DETAILS_QUERY = gql("""
 query GetSchemaDetails($name: String!) {
-    schemas(input: { name: $name }) {
+    schemas(input: { contains: $name }) {
         edges {
             node {
                 name
