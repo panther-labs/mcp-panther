@@ -3,7 +3,7 @@ Tools for interacting with Panther rules.
 """
 
 import logging
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -108,8 +108,8 @@ class UnitTest(BaseModel):
         description="The test event data (either a log event or cloud resource) as a JSON string",
     )
     expectedResult: bool = Field(description="The expected result of the test")  # noqa: N815
-    mocks: Optional[List[Dict[str, Any]]] = Field(
-        default=None, description="Optional mocks for the test"
+    mocks: List[Dict[str, Any]] = Field(
+        default_factory=list, description="An optional list of mocks for the test"
     )
 
 
@@ -166,25 +166,26 @@ class RuleCreate(BaseModel):
         ge=1,
         description="The minimum number of events required to trigger an alert",
     )
-    runbook: Optional[str] = Field(
-        default=None,
+    runbook: str = Field(
+        default="",
         description="Instructions for handling alerts (read by the Panther AI triage agent)",
     )
-    tags: Optional[List[str]] = Field(
-        default=None, description="A list of tags for categorization"
+    tags: List[str] = Field(
+        default_factory=list, description="A list of tags for categorization"
     )
-    summaryAttributes: Optional[List[str]] = Field(  # noqa: N815
-        default=None,
+    summaryAttributes: List[str] = Field(  # noqa: N815
+        default_factory=list,
         description="A list of column names for summarizing alerts (e.g. ['p_any_ip_addresses', 'p_any_user_ids'])",
     )
-    inlineFilters: Optional[str] = Field(  # noqa: N815
-        default=None, description="A YAML filter for the rule"
+    inlineFilters: str = Field(  # noqa: N815
+        default="", description="An optional YAML filter for the rule"
     )
-    reports: Optional[Dict[str, List[str]]] = Field(
-        default=None, description="A mapping of compliance report names to destinations"
+    reports: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="An optional field mapping of compliance report names to destinations",
     )
-    tests: Optional[List[UnitTest]] = Field(
-        default=None,
+    tests: List[UnitTest] = Field(
+        default_factory=list,
         description="A list of test cases to validate the rule's logic (create one True and one False test)",
     )
 
@@ -237,6 +238,40 @@ async def create_rule(
         return {
             "success": False,
             "message": f"Failed to create rule: {str(e)}",
+        }
+
+
+@mcp_tool
+async def write_streaming_rule(rule: RuleCreate) -> Dict[str, Any]:
+    """Write a Panther rule to a local file or repository. This tool is designed for local development workflows
+    where rules are committed to a repository rather than created directly via the API.
+
+    Args:
+        rule: The rule data to write
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the operation was successful
+        - rule: The dumped rule data if successful
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Writing rule with ID: {rule.id}")
+
+    try:
+        # Convert rule model to dict, excluding None values
+        rule_data = rule.model_dump(exclude_none=True)
+
+        logger.info(f"Successfully prepared rule data for ID: {rule.id}")
+        return {
+            "success": True,
+            "rule": rule_data,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to write rule: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to write rule: {str(e)}",
         }
 
 
