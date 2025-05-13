@@ -194,6 +194,10 @@ uv sync
       "args": [
         "run",
         "--with",
+        "fastmcp",
+        "--with",
+        "anyascii",
+        "--with",
         "aiohttp",
         "--with",
         "gql[aiohttp]",
