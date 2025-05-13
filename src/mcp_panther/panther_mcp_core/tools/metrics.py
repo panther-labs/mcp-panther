@@ -3,10 +3,14 @@ Tools for interacting with Panther metrics.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from ..client import _execute_query, _get_today_date_range
-from ..queries import METRICS_ALERTS_PER_RULE_QUERY, METRICS_ALERTS_PER_SEVERITY_QUERY
+from ..queries import (
+    METRICS_ALERTS_PER_RULE_QUERY,
+    METRICS_ALERTS_PER_SEVERITY_QUERY,
+    METRICS_BYTES_PROCESSED_QUERY,
+)
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
@@ -169,4 +173,106 @@ async def get_metrics_alerts_and_errors_per_rule(
         return {
             "success": False,
             "message": f"Failed to fetch alerts per rule metrics: {str(e)}",
+        }
+
+
+@mcp_tool
+async def get_bytes_processed_per_log_type_and_source(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    interval: Literal["1h", "12h", "24h"] = "24h",
+) -> Dict[str, Any]:
+    """Get the total bytes processed per log type and source for a given time period.
+
+    This tool helps understand data ingestion patterns and costs by showing:
+    1. Total bytes processed per log type
+    2. Breakdown by source for each log type
+
+    Example usage:
+        # Get bytes processed for the last day
+        metrics = get_bytes_processed_per_log_type_and_source(
+            from_date="2024-03-01T00:00:00Z",
+            to_date="2024-03-02T00:00:00Z",
+            interval="24h"
+        )
+
+        # Use results to analyze ingestion patterns
+        if metrics["success"]:
+            for series in metrics["bytes_processed"]:
+                print(f"Log type: {series['label']}")
+                print(f"Total bytes: {series['value']}")
+                print("Breakdown by source:")
+                for source, value in series["breakdown"].items():
+                    print(f"  {source}: {value} bytes")
+
+    Args:
+        from_date: Start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z"). Defaults to today at 00:00:00Z.
+        to_date: End date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z"). Defaults to today at 23:59:59Z.
+        interval: The time interval for the metrics ("1h", "12h", or "24h"). Defaults to "24h".
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - bytes_processed: List of series with breakdown by log type and source
+        - total_bytes: Total bytes processed in the period
+        - from_date: Start date of the period
+        - to_date: End date of the period
+        - interval: The time interval used
+    """
+    try:
+        # If no dates provided, get today's date range
+        if not from_date and not to_date:
+            from_date, to_date = _get_today_date_range()
+            logger.info(
+                f"No date range provided, using today's date range: {from_date} to {to_date}"
+            )
+        else:
+            logger.info(f"Using provided date range: {from_date} to {to_date}")
+
+        logger.info(
+            f"Fetching bytes processed metrics from {from_date} to {to_date} with {interval} interval"
+        )
+
+        # Calculate interval in minutes based on the interval parameter
+        interval_minutes = {
+            "1h": 60,  # 1 hour
+            "12h": 720,  # 12 hours
+            "24h": 1440,  # 24 hours
+        }[interval]
+
+        # Prepare variables
+        variables = {
+            "input": {
+                "fromDate": from_date,
+                "toDate": to_date,
+                "intervalInMinutes": interval_minutes,
+            }
+        }
+
+        # Execute query
+        result = await _execute_query(METRICS_BYTES_PROCESSED_QUERY, variables)
+
+        if not result or "metrics" not in result:
+            raise Exception("Failed to fetch metrics data")
+
+        metrics_data = result["metrics"]
+        bytes_processed = metrics_data["bytesProcessedPerSource"]
+
+        # Calculate total bytes across all series
+        total_bytes = sum(series["value"] for series in bytes_processed)
+
+        return {
+            "success": True,
+            "bytes_processed": bytes_processed,
+            "total_bytes": total_bytes,
+            "from_date": from_date,
+            "to_date": to_date,
+            "interval": interval,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to fetch bytes processed metrics: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch bytes processed metrics: {str(e)}",
         }
