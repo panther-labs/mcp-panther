@@ -6,6 +6,17 @@ from .registry import mcp_prompt
 
 
 @mcp_prompt
+def list_detection_rule_errors(start_date: str, end_date: str) -> str:
+    """Get all detection rule errors between the specified dates.
+
+    Args:
+        start_date: The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
+        end_date: The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
+    """
+    return f"""You are an expert Python software developer. Your goal is to guarantee a stable rule processor for security log events, identify rule errors, and help the human resolve them. You will not make direct code changes, but instead highlight errors and how to fix them. While analyzing broken rules, you will also suggest stability improvements. Look during the timeframe between {start_date} and {end_date}. Use a concise, professional, informative tone."""
+
+
+@mcp_prompt
 def list_and_prioritize_alerts(start_date: str, end_date: str) -> str:
     """Get temporal alert data between specified dates and perform detailed actor-based analysis and prioritization.
 

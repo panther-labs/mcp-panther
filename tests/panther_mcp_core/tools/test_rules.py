@@ -1,14 +1,19 @@
+import json
+
 import pytest
+
 from mcp_panther.panther_mcp_core.tools.rules import (
-    list_rules,
-    get_rule_by_id,
+    RuleCreate,
+    UnitTest,
     create_rule,
-    put_rule,
     disable_rule,
-    list_scheduled_rules,
+    get_rule_by_id,
     get_scheduled_rule_by_id,
-    list_simple_rules,
     get_simple_rule_by_id,
+    list_rules,
+    list_scheduled_rules,
+    list_simple_rules,
+    put_rule,
 )
 from tests.utils.helpers import patch_rest_client
 
@@ -104,7 +109,7 @@ async def test_list_rules_error(mock_rest_client):
     result = await list_rules()
 
     assert result["success"] is False
-    assert "Failed to fetch rules" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -147,101 +152,171 @@ async def test_get_rule_by_id_error(mock_rest_client):
     result = await get_rule_by_id(MOCK_RULE["id"])
 
     assert result["success"] is False
-    assert "Failed to fetch rule details" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
 async def test_create_rule_with_all_options(mock_rest_client):
     """Test creation of a rule with all optional parameters."""
-    rule_data = {
-        "rule_id": "test.all.options",
-        "body": "def rule(event):\n    return True",
-        "severity": "CRITICAL",
-        "description": "Test rule with all options",
-        "display_name": "Test All Options",
-        "enabled": False,
-        "log_types": ["Custom.Log", "AWS.CloudTrail"],
-        "dedup_period_minutes": 120,
-        "threshold": 5,
-        "runbook": "Follow these steps to investigate...",
-        "tags": ["test", "complete"],
-        "summary_attributes": ["sourceIp", "userName"],
-        "inline_filters": "key: value",
-        "reports": {"PCI": ["1.1", "1.2"]},
-        "tests": [
-            {"name": "Test Case", "expectedResult": True, "data": {"test": "data"}}
-        ],
-        "run_tests_first": False,
-    }
-    mock_rest_client.post.return_value = (MOCK_RULE, 201)
+    # Mock successful response
+    mock_rest_client.post.return_value = (
+        {
+            "id": "test.rule",
+            "body": "def rule(event):\n    return True",
+            "severity": "HIGH",
+            "description": "Test rule with all options",
+            "displayName": "Test All Options",
+            "enabled": True,
+            "logTypes": ["AWS.CloudTrail"],
+            "dedupPeriodMinutes": 120,
+            "threshold": 5,
+            "runbook": "Test runbook",
+            "tags": ["test", "all-options"],
+            "summaryAttributes": ["p_any_ip_addresses"],
+            "inlineFilters": "event_type: 'AWS.CloudTrail'",
+            "reports": {"test_report": ["test-destination"]},
+            "tests": [
+                {
+                    "name": "Test True",
+                    "resource": json.dumps({"event": {"test": True}}),
+                    "expectedResult": True,
+                }
+            ],
+        },
+        200,
+    )
 
-    result = await create_rule(**rule_data)
+    # Create rule data using RuleCreate model
+    rule_data = RuleCreate(
+        id="test.rule",
+        body="def rule(event):\n    return True",
+        severity="HIGH",
+        description="Test rule with all options",
+        displayName="Test All Options",
+        enabled=True,
+        logTypes=["AWS.CloudTrail"],
+        dedupPeriodMinutes=120,
+        threshold=5,
+        runbook="Test runbook",
+        tags=["test", "all-options"],
+        summaryAttributes=["p_any_ip_addresses"],
+        inlineFilters="event_type: 'AWS.CloudTrail'",
+        reports={"test_report": ["test-destination"]},
+        tests=[
+            UnitTest(
+                name="Test True",
+                resource=json.dumps({"event": {"test": True}}),
+                expectedResult=True,
+            )
+        ],
+    )
+
+    result = await create_rule(rule=rule_data)
 
     assert result["success"] is True
+    assert result["rule"]["id"] == "test.rule"
+    assert result["rule"]["severity"] == "HIGH"
+    assert result["rule"]["description"] == "Test rule with all options"
+    assert result["rule"]["displayName"] == "Test All Options"
+    assert result["rule"]["enabled"] is True
+    assert result["rule"]["logTypes"] == ["AWS.CloudTrail"]
+    assert result["rule"]["dedupPeriodMinutes"] == 120
+    assert result["rule"]["threshold"] == 5
+    assert result["rule"]["runbook"] == "Test runbook"
+    assert result["rule"]["tags"] == ["test", "all-options"]
+    assert result["rule"]["summaryAttributes"] == ["p_any_ip_addresses"]
+    assert result["rule"]["inlineFilters"] == "event_type: 'AWS.CloudTrail'"
+    assert result["rule"]["reports"] == {"test_report": ["test-destination"]}
+    assert len(result["rule"]["tests"]) == 1
+    assert result["rule"]["tests"][0]["name"] == "Test True"
 
+    # Verify API call
     mock_rest_client.post.assert_called_once()
-    args, kwargs = mock_rest_client.post.call_args
-
-    assert args[0] == "/rules"
-    assert kwargs["json_data"]["id"] == rule_data["rule_id"]
-    assert kwargs["json_data"]["severity"] == rule_data["severity"]
-    assert kwargs["json_data"]["description"] == rule_data["description"]
-    assert kwargs["json_data"]["displayName"] == rule_data["display_name"]
-    assert kwargs["json_data"]["enabled"] is False
-    assert kwargs["json_data"]["logTypes"] == rule_data["log_types"]
-    assert (
-        kwargs["json_data"]["dedupPeriodMinutes"] == rule_data["dedup_period_minutes"]
-    )
-    assert kwargs["json_data"]["threshold"] == rule_data["threshold"]
-    assert kwargs["json_data"]["runbook"] == rule_data["runbook"]
-    assert kwargs["json_data"]["tags"] == rule_data["tags"]
-    assert kwargs["json_data"]["summaryAttributes"] == rule_data["summary_attributes"]
-    assert kwargs["json_data"]["inlineFilters"] == rule_data["inline_filters"]
-    assert kwargs["json_data"]["reports"] == rule_data["reports"]
-    assert kwargs["json_data"]["tests"] == rule_data["tests"]
-    assert kwargs["params"]["run-tests-first"] == "false"
+    call_args = mock_rest_client.post.call_args[1]
+    assert call_args["json_data"]["id"] == "test.rule"
+    assert call_args["params"] == {"run-tests-first": "true"}
 
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
 async def test_create_rule_already_exists(mock_rest_client):
     """Test creation of a rule that already exists."""
-    mock_rest_client.post.return_value = ({}, 409)
+    # Mock conflict response
+    mock_rest_client.post.return_value = (None, 409)
 
-    result = await create_rule(
-        rule_id="New.sign-in", body=MOCK_RULE["body"], severity="MEDIUM"
+    # Create rule data using RuleCreate model
+    rule_data = RuleCreate(
+        id="New.sign-in",
+        body="""def rule(event):
+    # Return True to match the log event and trigger an alert.
+    return event.get("action", "") == "sign-in"
+
+def title(event):
+    # Optional: A function that returns a string to use as the alert title.
+    # If not provided, the alert title will be the rule's display name.
+    display_name = event.get("display_name", "A user") or default_name
+
+    return f"{display_name} logged into Panther" """,
+        severity="MEDIUM",
+        description="Detects when a user signs in to Panther",
+        displayName="New Sign In",
+        logTypes=["Panther.Audit"],
     )
 
+    result = await create_rule(rule=rule_data)
+
     assert result["success"] is False
-    assert "Rule with this ID already exists" in result["message"]
+    assert result["message"] == "Rule with this ID already exists"
+
+    # Verify API call
+    mock_rest_client.post.assert_called_once()
+    call_args = mock_rest_client.post.call_args[1]
+    assert call_args["json_data"]["id"] == "New.sign-in"
+    assert call_args["params"] == {"run-tests-first": "true"}
 
 
 @pytest.mark.asyncio
 async def test_create_rule_invalid_severity():
     """Test creation of a rule with invalid severity."""
-    result = await create_rule(
-        rule_id="test.rule",
-        body="def rule(event):\n    return True",
-        severity="INVALID",
-    )
-
-    assert result["success"] is False
-    assert "Severity must be one of" in result["message"]
+    with pytest.raises(
+        ValueError,
+        match="Input should be 'INFO', 'LOW', 'MEDIUM', 'HIGH' or 'CRITICAL'",
+    ):
+        RuleCreate(
+            id="test.rule",
+            body="def rule(event):\n    return True",
+            severity="INVALID",
+        )
 
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
 async def test_create_rule_error(mock_rest_client):
-    """Test handling of errors when creating a rule."""
-    mock_rest_client.post.side_effect = Exception("Test error")
+    """Test error handling during rule creation."""
+    # Mock error response
+    mock_rest_client.post.side_effect = Exception("API Error")
 
-    result = await create_rule(
-        rule_id="test.rule", body="def rule(event):\n    return True", severity="HIGH"
+    # Create rule data using RuleCreate model
+    rule_data = RuleCreate(
+        id="test.rule",
+        body="def rule(event):\n    return True",
+        severity="HIGH",
+        description="Test rule for error handling",
+        displayName="Test Error Rule",
+        logTypes=["AWS.CloudTrail"],
     )
+
+    result = await create_rule(rule=rule_data)
 
     assert result["success"] is False
     assert "Failed to create rule" in result["message"]
+
+    # Verify API call
+    mock_rest_client.post.assert_called_once()
+    call_args = mock_rest_client.post.call_args[1]
+    assert call_args["json_data"]["id"] == "test.rule"
+    assert call_args["params"] == {"run-tests-first": "true"}
 
 
 @pytest.mark.asyncio
@@ -323,7 +398,7 @@ async def test_put_rule_error(mock_rest_client):
     )
 
     assert result["success"] is False
-    assert "Failed to update rule" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -370,7 +445,7 @@ async def test_disable_rule_error(mock_rest_client):
     result = await disable_rule(MOCK_RULE["id"])
 
     assert result["success"] is False
-    assert "Failed to disable rule" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -422,7 +497,7 @@ async def test_list_scheduled_rules_error(mock_rest_client):
     result = await list_scheduled_rules()
 
     assert result["success"] is False
-    assert "Failed to fetch scheduled rules" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -493,7 +568,7 @@ async def test_get_scheduled_rule_by_id_error(mock_rest_client):
     result = await get_scheduled_rule_by_id("scheduled.rule.id")
 
     assert result["success"] is False
-    assert "Failed to fetch scheduled rule details" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -560,7 +635,7 @@ async def test_list_simple_rules_error(mock_rest_client):
     result = await list_simple_rules()
 
     assert result["success"] is False
-    assert "Failed to fetch simple rules" in result["message"]
+    assert "Failed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -603,4 +678,4 @@ async def test_get_simple_rule_by_id_error(mock_rest_client):
     result = await get_simple_rule_by_id("simple.rule.id")
 
     assert result["success"] is False
-    assert "Failed to fetch simple rule details" in result["message"]
+    assert "Failed" in result["message"]

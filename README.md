@@ -45,7 +45,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `create_rule` | Create a new Panther rule | "Create a new rule to detect failed logins" |
+| `create_rule` | Create a new Panther rule | "Create a new rule to detect more than 7 failed logins within a day across any user in the AWS Console" |
 | `disable_rule` | Disable a rule by setting enabled to false | "Disable rule abc123" |
 | `get_global_helper_by_id` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
 | `get_rule_by_id` | Get detailed information about a specific rule | "Get details for rule ID abc123" |
@@ -75,8 +75,8 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `get_metrics_alerts_per_rule` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
-| `get_metrics_alerts_per_severity` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
+| `get_metrics_alerts_and_errors_per_rule` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
+| `get_metrics_alerts_and_errors_per_severity` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
 
 </details>
 

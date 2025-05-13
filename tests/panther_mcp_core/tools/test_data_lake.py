@@ -1,13 +1,12 @@
 import pytest
 
-from tests.utils.helpers import patch_graphql_client, patch_execute_query
-
 from mcp_panther.panther_mcp_core.tools.data_lake import (
-    get_sample_log_events,
-    execute_data_lake_query,
-    _normalize_name,
     _is_name_normalized,
+    _normalize_name,
+    execute_data_lake_query,
+    get_sample_log_events,
 )
+from tests.utils.helpers import patch_graphql_client
 
 DATA_LAKE_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.data_lake"
 

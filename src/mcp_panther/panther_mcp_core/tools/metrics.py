@@ -13,24 +13,29 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
-async def get_metrics_alerts_per_severity(
+async def get_metrics_alerts_and_errors_per_severity(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     alert_types: Optional[List[str]] = ["Rule"],
     severities: Optional[List[str]] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
     interval_in_minutes: Optional[int] = 1440,
 ) -> Dict[str, Any]:
-    """Get metrics alert counts grouped by severity. Defaults to today. Use this tool when you want to get a count of alerts by severity, alert type, or both for a given time period.
+    """Gets alert metrics grouped by severity for ALL alert types including alerts, detection errors, and system errors within a given time period. Use this tool to identify hot spots in your alerts, and use the list_alerts tool for specific details.
 
     Args:
-        from_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
-        to_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
-        interval_in_minutes: The grouping interval for the metrics. Defaults to 1440 minutes (1 day) for daily metrics but can be set to 60 minutes (1 hour) for hourly metrics.
+        from_date: Start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z"). Defaults to today at 00:00:00Z.
+        to_date: End date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z"). Defaults to today at 23:59:59Z.
+        interval_in_minutes: The grouping interval for the metrics. Defaults to 1440 minutes (1 day) but can be set as low as 60 minutes.
+        severities: Optional list of severities to filter by (e.g. ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"])
+        alert_types: Optional list of alert types to filter by (e.g. ["Rule", "Policy", "Scheduled Rule", "Detection Error", "System Error"])
 
     Returns:
         Dict containing:
         - alerts_per_severity: List of series with breakdown by severity
         - total_alerts: Total number of alerts in the period
+        - from_date: Start date of the period
+        - to_date: End date of the period
+        - interval_in_minutes: Grouping interval for the metrics
     """
     try:
         # If no dates provided, get today's date range
@@ -89,23 +94,23 @@ async def get_metrics_alerts_per_severity(
 
 
 @mcp_tool
-async def get_metrics_alerts_per_rule(
+async def get_metrics_alerts_and_errors_per_rule(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     interval_in_minutes: Optional[int] = 1440,  # Default to 1 day
     rule_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Returns the number of created alerts per rule during the given time period. Includes all non-error rule types like rules, scheduled rules, and policies. Use this tool when you want to get a count of alerts by rule for a given time period.
+    """Gets alert metrics per detection rule for ALL alert types including alerts, detection errors, and system errors within a given time period. Use this tool to identify hot spots in your alerts, and use the list_alerts tool for specific details.
 
     Args:
-        from_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
-        to_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
-        interval_in_minutes: Optional interval between metric checks (for plotting charts). Defaults to 1440 minutes (1 day).
+        from_date: Start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z"). Defaults to today at 00:00:00Z.
+        to_date: End date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z"). Defaults to today at 23:59:59Z.
+        interval_in_minutes: The grouping interval for the metrics. Defaults to 1440 minutes (1 day) but can be set as low as 60 minutes.
         rule_ids: Optional list of rule IDs to filter results by. If not provided, returns all rules.
 
     Returns:
         Dict containing:
-        - alerts_per_rule: List of series with breakdown by rule
+        - alerts_per_rule: Total alert count, description and entityId for each rule
         - total_alerts: Total number of alerts in the period
         - from_date: Start date of the period
         - to_date: End date of the period
