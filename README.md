@@ -225,6 +225,11 @@ Once configured, navigate to Cursor Settings > MCP to view the running server:
 
 <img src="panther-mcp-cursor-config.png" width="500" />
 
+**Tips:**
+* Be specific about where you want to generate new rules by using the `@` symbol and then typing a specific directory.
+* For more reliability during tool use, try selecting a specific model, like Claude 3.7 Sonnet.
+* If your MCP Client is failing to find any tools from the Panther MCP Server, try restarting the Client and ensuring the MCP server is running. In Cursor, refresh the MCP Server and start a new chat.
+
 ### Claude Desktop
 Install the server directly:
 ```bash

@@ -86,15 +86,15 @@ LIMIT 1000
 async def execute_data_lake_query(
     sql: str, database_name: Optional[str] = "panther_logs.public"
 ) -> Dict[str, Any]:
-    """Execute a performant Snowflake SQL query against Panther's data lake.
+    """Execute a Snowflake compatible SQL query against Panther's data lake.
 
-    IMPORTANT: This function is best for ADVANCED QUERIES with custom filtering, joins,
-    or aggregations. For simple log sampling, use get_sample_log_events instead.
+    IMPORTANT: This function is best for ADVANCED QUERIES with custom filtering, joins, or aggregations. For simple log sampling, use get_sample_log_events instead.
 
     REQUIREMENTS:
     1. USE THE get_table_columns TOOL FIRST to get the correct table schema.
     2. THE QUERY MUST INCLUDE A FILTER ON p_event_time WITH A MAX TIME DURATION OF 90 DAYS.
     3. Check the size of the table with get_bytes_processed_per_log_type_and_source. If the table is large, use smaller time windows and more specific filters.
+    4. The query must be compatible with Snowflake SQL. For example, use field:nested_field instead of field.nested_field.
 
     NOTE: After calling this function, you MUST call get_data_lake_query_results with the
     returned query_id to retrieve the actual query results.
