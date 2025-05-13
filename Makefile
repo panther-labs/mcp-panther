@@ -25,3 +25,6 @@ test:
 # Synchronize dependencies with pyproject.toml
 sync:
 	uv sync
+
+mcp-dev:
+	uv run mcp dev src/mcp_panther/server.py
