@@ -3,7 +3,9 @@ Tools for interacting with Panther rules.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..client import get_rest_client
 from .registry import mcp_tool
@@ -13,13 +15,13 @@ logger = logging.getLogger("mcp-panther")
 
 @mcp_tool
 async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
-    """List all rules from Panther with optional pagination
+    """List all rules from your Panther instance.
 
     Args:
         cursor: Optional cursor for pagination from a previous query
         limit: Optional maximum number of results to return (default: 100)
     """
-    logger.info("Fetching rules from Panther")
+    logger.info(f"Fetching {limit} rules from Panther")
 
     try:
         # Prepare query parameters
@@ -63,18 +65,18 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
             "next_cursor": next_cursor,
         }
     except Exception as e:
-        logger.error(f"Failed to fetch rules: {str(e)}")
-        return {"success": False, "message": f"Failed to fetch rules: {str(e)}"}
+        logger.error(f"Failed to list rules: {str(e)}")
+        return {"success": False, "message": f"Failed to list rules: {str(e)}"}
 
 
 @mcp_tool
 async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
-    """Get detailed information about a Panther rule by ID including the rule body and tests
+    """Get detailed information about a Panther rule, including the rule body and tests
 
     Args:
         rule_id: The ID of the rule to fetch
     """
-    logger.info(f"Fetching rule details for ID: {rule_id}")
+    logger.info(f"Fetching rule details for rule ID: {rule_id}")
 
     try:
         async with get_rest_client() as client:
@@ -90,50 +92,114 @@ async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
                     "message": f"No rule found with ID: {rule_id}",
                 }
 
-        logger.info(f"Successfully retrieved rule details for ID: {rule_id}")
+        logger.info(f"Successfully retrieved rule details for rule ID: {rule_id}")
         return {"success": True, "rule": result}
     except Exception as e:
-        logger.error(f"Failed to fetch rule details: {str(e)}")
-        return {"success": False, "message": f"Failed to fetch rule details: {str(e)}"}
+        logger.error(f"Failed to get rule details: {str(e)}")
+        return {"success": False, "message": f"Failed to get rule details: {str(e)}"}
+
+
+class UnitTest(BaseModel):
+    """Model for a Panther rule unit test."""
+
+    name: str = Field(description="A descriptive name of the test case")
+    resource: str = Field(
+        default="{}",
+        description="The test event data (either a log event or cloud resource) as a JSON string",
+    )
+    expectedResult: bool = Field(description="The expected result of the test")  # noqa: N815
+    mocks: Optional[List[Dict[str, Any]]] = Field(
+        default=None, description="Optional mocks for the test"
+    )
+
+
+class RuleCreate(BaseModel):
+    """Model for creating a new Panther rule."""
+
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow both camelCase and snake_case
+        json_schema_extra={
+            "example": {
+                "id": "AWS.S3.Bucket.PublicAccess",
+                "body": "def rule(event):\n    return True",
+                "severity": "HIGH",
+                "description": "Detects when an S3 bucket is made publicly accessible",
+                "displayName": "S3 Bucket Public Access",
+                "logTypes": ["AWS.S3"],
+                "tests": [
+                    {
+                        "name": "Public Access Enabled",
+                        "resource": '{"bucketName": "test-bucket", "publicAccessBlock": false}',
+                        "expectedResult": True,
+                    },
+                    {
+                        "name": "Public Access Disabled",
+                        "resource": '{"bucketName": "test-bucket", "publicAccessBlock": true}',
+                        "expectedResult": False,
+                    },
+                ],
+            }
+        },
+    )
+
+    id: str = Field(description="Unique identifier for the rule")
+    body: str = Field(description="Python code that implements the rule logic")
+    severity: Literal["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"] = Field(
+        description="Alert severity level"
+    )
+    description: str = Field(
+        description="Description for what the rule is meant to detect"
+    )
+    displayName: str = Field(description="Human-readable name for the rule")  # noqa: N815
+    enabled: bool = Field(default=True, description="Whether the rule is active")
+    logTypes: List[str] = Field(  # noqa: N815
+        description="The list of log types this rule applies to (e.g. ['AWS.CloudTrail', 'AWS.GuardDuty'])"
+    )
+    dedupPeriodMinutes: int = Field(  # noqa: N815
+        default=60,
+        ge=1,
+        le=1440,
+        description="The time window for alert deduplication in minutes based on the title or dedup key",
+    )
+    threshold: int = Field(
+        default=1,
+        ge=1,
+        description="The minimum number of events required to trigger an alert",
+    )
+    runbook: Optional[str] = Field(
+        default=None,
+        description="Instructions for handling alerts (read by the Panther AI triage agent)",
+    )
+    tags: Optional[List[str]] = Field(
+        default=None, description="A list of tags for categorization"
+    )
+    summaryAttributes: Optional[List[str]] = Field(  # noqa: N815
+        default=None,
+        description="A list of column names for summarizing alerts (e.g. ['p_any_ip_addresses', 'p_any_user_ids'])",
+    )
+    inlineFilters: Optional[str] = Field(  # noqa: N815
+        default=None, description="A YAML filter for the rule"
+    )
+    reports: Optional[Dict[str, List[str]]] = Field(
+        default=None, description="A mapping of compliance report names to destinations"
+    )
+    tests: Optional[List[UnitTest]] = Field(
+        default=None,
+        description="A list of test cases to validate the rule's logic (create one True and one False test)",
+    )
 
 
 @mcp_tool
 async def create_rule(
-    rule_id: str,
-    body: str,
-    severity: str,
-    description: str = None,
-    display_name: str = None,
-    enabled: bool = True,
-    log_types: List[str] = None,
-    dedup_period_minutes: int = 60,
-    threshold: int = 1,
-    runbook: str = None,
-    tags: List[str] = None,
-    summary_attributes: List[str] = None,
-    inline_filters: str = None,
-    reports: dict = None,
-    tests: List[dict] = None,
+    rule: RuleCreate,
     run_tests_first: bool = True,
 ) -> Dict[str, Any]:
-    """Create a new Panther rule.
+    """Create a new Panther rule. First, think about the type of behavior you want to detect, then query the data lake for sample logs to use as examples for your rule. Read a similar rule with recent alerts and use it as a template.
+
+    The Panther Python streaming rule body requires a `rule(event)` function that analyzes each log event and returns `True` to trigger an alert or `False` otherwise, with event data accessed safely using `event.get("field", default_value)` for top-level fields and `event.deep_get("parent", "child", "field", default_value)` for nested structures. Supplementary functions like `title(event)` (required), `severity(event)`, `alert_context(event)`, and `destinations(event)` (all optional) enhance alerts by providing descriptive titles, dynamic severity levels, contextual instructions for runbooks, and custom destination routing based on event data. All rules must handle missing fields gracefully, respect the 15-second execution time limit, and follow the stateless execution model where each event is processed independently. Panther provides standardized fields with the `p_` prefix (like `p_log_type`, `p_event_time`, `p_any_ip_addresses`) across all log types, and rules should leverage these normalized fields for consistency while focusing on a single, clear detection pattern per rule.
 
     Args:
-        rule_id: Unique identifier for the rule
-        body: Python code that implements the rule logic
-        severity: Alert severity level (INFO, LOW, MEDIUM, HIGH, CRITICAL)
-        description: Optional description of what the rule does
-        display_name: Optional display name for the rule
-        enabled: Whether the rule is active (default: True)
-        log_types: Optional list of log types this rule applies to
-        dedup_period_minutes: Time window for alert deduplication (default: 60)
-        threshold: Number of events required to trigger alert (default: 1)
-        runbook: Optional documentation on how to handle alerts
-        tags: Optional list of tags for categorization
-        summary_attributes: Optional list of fields to summarize in alerts
-        inline_filters: Optional YAML filter for the rule
-        reports: Optional mapping of report names to destinations
-        tests: Optional list of unit tests for the rule
+        rule: The rule data to create
         run_tests_first: Whether to run tests before saving (default: True)
 
     Returns:
@@ -142,43 +208,11 @@ async def create_rule(
         - rule: Created rule information if successful
         - message: Error message if unsuccessful
     """
-    logger.info(f"Creating new rule with ID: {rule_id}")
+    logger.info(f"Creating new rule with ID: {rule.id}")
 
     try:
-        # Validate severity
-        valid_severities = ["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
-        if severity not in valid_severities:
-            raise ValueError(f"Severity must be one of {valid_severities}")
-
-        # Prepare rule data
-        rule_data = {
-            "id": rule_id,
-            "body": body,
-            "severity": severity,
-            "enabled": enabled,
-            "dedupPeriodMinutes": dedup_period_minutes,
-            "threshold": threshold,
-        }
-
-        # Add optional fields if provided
-        if description:
-            rule_data["description"] = description
-        if display_name:
-            rule_data["displayName"] = display_name
-        if log_types:
-            rule_data["logTypes"] = log_types
-        if runbook:
-            rule_data["runbook"] = runbook
-        if tags:
-            rule_data["tags"] = tags
-        if summary_attributes:
-            rule_data["summaryAttributes"] = summary_attributes
-        if inline_filters:
-            rule_data["inlineFilters"] = inline_filters
-        if reports:
-            rule_data["reports"] = reports
-        if tests:
-            rule_data["tests"] = tests
+        # Convert rule model to dict, excluding None values
+        rule_data = rule.model_dump(exclude_none=True)
 
         # Prepare query parameters
         params = {"run-tests-first": str(run_tests_first).lower()}
@@ -195,7 +229,7 @@ async def create_rule(
                     "message": "Rule with this ID already exists",
                 }
 
-        logger.info(f"Successfully created rule with ID: {rule_id}")
+        logger.info(f"Successfully created rule with ID: {rule.id}")
         return {"success": True, "rule": result}
 
     except Exception as e:

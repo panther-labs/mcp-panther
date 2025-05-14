@@ -6,33 +6,41 @@ from .registry import mcp_prompt
 
 
 @mcp_prompt
-def triage_alert(alert_id: str) -> str:
-    """
-    Generate a prompt for triaging a specific Panther alert.
+def list_detection_rule_errors(start_date: str, end_date: str) -> str:
+    """Get all detection rule errors between the specified dates.
 
     Args:
-        alert_id: The ID of the alert to triage
-
-    Returns:
-        A prompt string for guiding the user through alert triage
+        start_date: The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
+        end_date: The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
     """
-    return f"""You are an expert cyber security analyst. Follow these steps to triage a Panther alert:
-    1. Get the alert details for alert ID {alert_id}
-    2. Query the data lake to read all associated events (database: panther_rule_matches.public, table: log type from the alert)
-    3. Determine alert judgment based on common attacker patterns and techniques (benign, false positive, true positive, or a custom judgment).
-    """
+    return f"""You are an expert Python software developer. Your goal is to guarantee a stable rule processor for security log events, identify rule errors, and help the human resolve them. You will not make direct code changes, but instead highlight errors and how to fix them. While analyzing broken rules, you will also suggest stability improvements. Look during the timeframe between {start_date} and {end_date}. Use a concise, professional, informative tone."""
 
 
 @mcp_prompt
-def prioritize_and_triage_alerts() -> str:
-    """
-    Generate a prompt for prioritizing and triaging multiple Panther alerts.
+def list_and_prioritize_alerts(start_date: str, end_date: str) -> str:
+    """Get temporal alert data between specified dates and perform detailed actor-based analysis and prioritization.
 
-    Returns:
-        A prompt string for guiding the user through alert prioritization and triage
+    Args:
+        start_date: The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
+        end_date: The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
     """
-    return """You are an expert cyber security analyst. Your goal is to prioritize alerts based on severity, impact, and other relevant criteria to decide which alerts to investigate first. Use the following steps to prioritize alerts:
-    1. List all alerts in the last 7 days excluding severities LOW, and logically group them by user, host, or other similar criteria. Alerts can be related even if they have different titles or log types (for example, if a user logs into Okta and then AWS).
-    2. Triage each group of alerts to understand what happened and what the impact was. Query the data lake to read all associated events (database: panther_rule_matches.public, table: log type from the alert) and use the results to understand the impact.
-    3. For each group, if the alerts are false positives, suggest a rule improvement by reading the Python source, comment on the alert with your analysis, and mark the alert as invalid. If the alerts are true positives, begin pivoting on the available data to understand the root cause and impact.
-    """
+    return f"""Analyze alert signals and group them based on entity names. The goal is to identify patterns of related activity across alerts and triage them together.
+
+1. Get all alert IDs between {start_date} and {end_date}.
+2. Get stats on all alert events with the get_alert_event_summaries tool.
+3. Group alerts by entity names, combining similar alerts together.
+4. For each group:
+    1. Identify the common entity name performing the actions
+    2. Summarize the activity pattern across all related alerts
+    3. Include key details such as:
+    - Rule IDs triggered
+    - Timeframes of activity
+    - Source IPs and usernames involved
+    - Systems or platforms affected
+    4. Provide a brief assessment of whether the activity appears to be:
+    - Expected system behavior
+    - Legitimate user activity
+    - Suspicious or concerning behavior requiring investigation
+    5. End with prioritized recommendations for investigation based on the entity groups, not just alert severity.
+
+Format your response with clear markdown headings for each entity group and use concise, cybersecurity-nuanced language."""

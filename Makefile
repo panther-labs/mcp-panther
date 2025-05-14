@@ -1,4 +1,4 @@
-dirs := $(shell ls | egrep 'src' | xargs)
+dirs := $(shell ls | egrep 'src|tests' | xargs)
 
 fmt:
 	ruff format $(dirs)
@@ -6,7 +6,7 @@ fmt:
 lint:
 	ruff check $(dirs)
 
-build-docker:
+build-docker: test
 	docker build -t mcp-panther .
 
 # Create a virtual environment using uv (https://github.com/astral-sh/uv)
@@ -25,3 +25,6 @@ test:
 # Synchronize dependencies with pyproject.toml
 sync:
 	uv sync
+
+mcp-dev:
+	uv run mcp dev src/mcp_panther/server.py

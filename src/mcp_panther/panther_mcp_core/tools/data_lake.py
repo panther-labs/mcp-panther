@@ -23,6 +23,66 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
+async def get_alert_event_summaries(alert_ids: list[str], time_window: int = 30):
+    """Gather a summary of one or more alert's events. This is helpful for prioritizing and identifying relationships.
+
+    This tool gathers stats on p_ fields from alerts that occurred within a shared time window.
+    It takes a list of alert IDs and groups them by day, a time bucket, log type, source IPs, emails, usernames, and trace IDs to identify patterns of related activity.
+    For each group, it counts alerts, collects alert IDs, rule IDs, timestamps, and severity levels, then sorts the results chronologically with the most recent events first.
+
+    Args:
+        alert_ids: List of alert IDs to analyze
+        time_window: The time window in minutes to group distinct events by (must be 1, 5, 15, 30, or 60)
+
+    Example:
+        alert_ids = ["alert-123", "alert-456", "alert-789"]
+    """
+    if time_window not in [1, 5, 15, 30, 60]:
+        raise ValueError("Time window must be 1, 5, 15, 30, or 60")
+
+    # Convert alert IDs list to SQL array
+    alert_ids_str = ", ".join(f"'{aid}'" for aid in alert_ids)
+
+    query = f"""
+SELECT
+    DATE_TRUNC('DAY', cs.p_event_time) AS event_day,
+    DATE_TRUNC('MINUTE', DATEADD('MINUTE', {time_window} * FLOOR(EXTRACT(MINUTE FROM cs.p_event_time) / {time_window}), 
+        DATE_TRUNC('HOUR', cs.p_event_time))) AS time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses AS source_ips,
+    cs.p_any_emails AS emails,
+    cs.p_any_usernames AS usernames,
+    cs.p_any_trace_ids AS trace_ids,
+    COUNT(DISTINCT cs.p_alert_id) AS alert_count,
+    ARRAY_AGG(DISTINCT cs.p_alert_id) AS alert_ids,
+    ARRAY_AGG(DISTINCT cs.p_rule_id) AS rule_ids,
+    MIN(cs.p_event_time) AS first_event,
+    MAX(cs.p_event_time) AS last_event,
+    ARRAY_AGG(DISTINCT cs.p_alert_severity) AS severities
+FROM
+    panther_signals.public.correlation_signals cs
+WHERE
+    cs.p_alert_id IN ({alert_ids_str})
+GROUP BY
+    event_day,
+    time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses,
+    cs.p_any_emails,
+    cs.p_any_usernames,
+    cs.p_any_trace_ids
+HAVING
+    COUNT(DISTINCT cs.p_alert_id) > 0
+ORDER BY
+    event_day DESC,
+    time_{time_window}_minute DESC,
+    alert_count DESC
+LIMIT 1000
+"""
+    return await execute_data_lake_query(query, "panther_signals.public")
+
+
+@mcp_tool
 async def execute_data_lake_query(
     sql: str, database_name: Optional[str] = "panther_logs.public"
 ) -> Dict[str, Any]:
@@ -34,6 +94,7 @@ async def execute_data_lake_query(
     REQUIREMENTS:
     1. USE THE get_table_columns TOOL FIRST to get the correct table schema.
     2. THE QUERY MUST INCLUDE A FILTER ON p_event_time WITH A MAX TIME DURATION OF 90 DAYS.
+    3. Check the size of the table with get_bytes_processed_per_log_type_and_source. If the table is large, use smaller time windows and more specific filters.
 
     NOTE: After calling this function, you MUST call get_data_lake_query_results with the
     returned query_id to retrieve the actual query results.
@@ -63,6 +124,20 @@ async def execute_data_lake_query(
     """
 
     logger.info("Executing data lake query")
+
+    # Validate that the query includes a p_event_time filter after WHERE or AND
+    sql_lower = sql.lower().replace("\n", " ")
+    if not re.search(
+        r"\b(where|and)\s+.*?p_event_time\s*(>=|<=|=|>|<|between)", sql_lower
+    ):
+        error_msg = (
+            "Query must include p_event_time as a filter condition after WHERE or AND"
+        )
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+        }
 
     try:
         client = await _create_panther_client()

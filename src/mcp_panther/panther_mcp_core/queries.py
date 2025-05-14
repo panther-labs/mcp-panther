@@ -346,9 +346,21 @@ query Metrics($input: MetricsInput!) {
 }
 """)
 
+METRICS_BYTES_PROCESSED_QUERY = gql("""
+query GetBytesProcessedMetrics($input: MetricsInput!) {
+    metrics(input: $input) {
+        bytesProcessedPerSource {
+            label
+            value
+            breakdown
+        }
+    }
+}
+""")
+
 GET_SCHEMA_DETAILS_QUERY = gql("""
 query GetSchemaDetails($name: String!) {
-    schemas(input: { name: $name }) {
+    schemas(input: { contains: $name }) {
         edges {
             node {
                 name
