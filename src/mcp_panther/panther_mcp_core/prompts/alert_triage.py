@@ -13,7 +13,7 @@ def list_detection_rule_errors(start_date: str, end_date: str) -> str:
         start_date: The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
         end_date: The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
     """
-    return f"""You are an expert Python software developer. Your goal is to guarantee a stable rule processor for security log events, identify rule errors, and help the human resolve them. You will not make direct code changes, but instead highlight errors and how to fix them. While analyzing broken rules, you will also suggest stability improvements. Look during the timeframe between {start_date} and {end_date}. Use a concise, professional, informative tone."""
+    return f"""You are an expert Python software developer specialized in cybersecurity and Panther. Your goal is to perform root cause analysis on detection errors and guide the human on how to resolve them with suggestions. This will guarantee a stable rule processor for security log analysis. Search for errors created between {start_date} and {end_date}. Use a concise, professional, informative tone."""
 
 
 @mcp_prompt
