@@ -3,14 +3,17 @@ import json
 import logging
 import os
 import re
+from importlib.metadata import version
 from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
 
 import aiohttp
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 
+PACKAGE_NAME = "mcp-panther"
+
 # Get logger
-logger = logging.getLogger("mcp-panther")
+logger = logging.getLogger(PACKAGE_NAME)
 
 
 async def get_json_from_script_tag(
@@ -131,11 +134,28 @@ async def get_panther_gql_endpoint() -> str:
     return base + "/public/graphql"
 
 
+def _get_user_agent() -> str:
+    """Get the user agent string for API requests.
+
+    Returns:
+        str: User agent string in format '{PACKAGE_NAME}/{version} (Python)'
+    """
+    try:
+        package_version = version(PACKAGE_NAME)
+        return f"{PACKAGE_NAME}/{package_version} (Python)"
+    except Exception as e:
+        logger.debug(f"Failed to get package version: {e}")
+        return f"{PACKAGE_NAME}/development (Python)"
+
+
 async def _create_panther_client() -> Client:
     """Create a Panther GraphQL client with proper configuration"""
     transport = AIOHTTPTransport(
         url=await get_panther_gql_endpoint(),
-        headers={"X-API-Key": get_panther_api_key()},
+        headers={
+            "X-API-Key": get_panther_api_key(),
+            "User-Agent": _get_user_agent(),
+        },
         ssl=True,  # Enable SSL verification
     )
     return Client(transport=transport, fetch_schema_from_transport=True)
@@ -196,6 +216,7 @@ class PantherRestClient:
             self._headers = {
                 "X-API-Key": get_panther_api_key(),
                 "Content-Type": "application/json",
+                "User-Agent": _get_user_agent(),
             }
         return self
 
