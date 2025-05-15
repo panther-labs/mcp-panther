@@ -4,11 +4,12 @@ Tools for interacting with Panther's data lake.
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 import anyascii
+from pydantic import Field
 
-from ..client import _create_panther_client
+from ..client import _create_panther_client, _get_today_date_range
 from ..queries import (
     EXECUTE_DATA_LAKE_QUERY,
     GET_COLUMNS_FOR_TABLE_QUERY,
@@ -23,22 +24,50 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
-async def get_alert_event_summaries(alert_ids: list[str], time_window: int = 30):
-    """Gather a summary of one or more alert's events. This is helpful for prioritizing and identifying relationships.
+async def get_alert_event_summaries(
+    alert_ids: Annotated[
+        List[str],
+        Field(
+            description="List of alert IDs to analyze",
+            example='["alert-123", "alert-456", "alert-789"]',
+        ),
+    ],
+    time_window: Annotated[
+        int,
+        Field(
+            description="The time window in minutes to group distinct events by",
+            ge=1,
+            le=60,
+            default=30,
+        ),
+    ] = 30,
+    start_date: Annotated[
+        Optional[str],
+        Field(
+            description='The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to start of today UTC.',
+            pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
+        ),
+    ] = None,
+    end_date: Annotated[
+        Optional[str],
+        Field(
+            description='The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to end of today UTC.',
+            pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
+        ),
+    ] = None,
+) -> Dict[str, Any]:
+    """Analyze patterns and relationships across multiple alerts by aggregating their event data into time-based groups. For each time window (configurable from 1-60 minutes), the tool collects unique entities (IPs, emails, usernames, trace IDs) and alert metadata (IDs, rules, severities) to help identify related activities. Results are ordered chronologically with the most recent first, helping analysts identify temporal patterns, common entities, and potential incident scope.
 
-    This tool gathers stats on p_ fields from alerts that occurred within a shared time window.
-    It takes a list of alert IDs and groups them by day, a time bucket, log type, source IPs, emails, usernames, and trace IDs to identify patterns of related activity.
-    For each group, it counts alerts, collects alert IDs, rule IDs, timestamps, and severity levels, then sorts the results chronologically with the most recent events first.
-
-    Args:
-        alert_ids: List of alert IDs to analyze
-        time_window: The time window in minutes to group distinct events by (must be 1, 5, 15, 30, or 60)
-
-    Example:
-        alert_ids = ["alert-123", "alert-456", "alert-789"]
+    Returns a dictionary containing query execution details and a query_id for retrieving results.
     """
     if time_window not in [1, 5, 15, 30, 60]:
         raise ValueError("Time window must be 1, 5, 15, 30, or 60")
+
+    # Get default date range if not provided
+    if start_date is None or end_date is None:
+        default_start, default_end = _get_today_date_range()
+        start_date = start_date or default_start
+        end_date = end_date or default_end
 
     # Convert alert IDs list to SQL array
     alert_ids_str = ", ".join(f"'{aid}'" for aid in alert_ids)
@@ -63,6 +92,8 @@ FROM
     panther_signals.public.correlation_signals cs
 WHERE
     cs.p_alert_id IN ({alert_ids_str})
+AND 
+    cs.p_event_time BETWEEN '{start_date}' AND '{end_date}'
 GROUP BY
     event_day,
     time_{time_window}_minute,
@@ -84,51 +115,33 @@ LIMIT 1000
 
 @mcp_tool
 async def execute_data_lake_query(
-    sql: str, database_name: Optional[str] = "panther_logs.public"
+    sql: Annotated[
+        str,
+        Field(
+            description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND. The query must be compatible with Snowflake SQL."
+        ),
+    ],
+    database_name: Annotated[
+        Optional[str],
+        Field(description="The database to query.", default="panther_logs.public"),
+    ] = "panther_logs.public",
 ) -> Dict[str, Any]:
-    """Execute a Snowflake compatible SQL query against Panther's data lake.
+    """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. For simple log sampling, use get_sample_log_events instead. The query must follow Snowflake SQL syntax (e.g., use field:nested_field instead of field.nested_field).
 
-    IMPORTANT: This function is best for ADVANCED QUERIES with custom filtering, joins, or aggregations. For simple log sampling, use get_sample_log_events instead.
+    WORKFLOW:
+    1. First call get_table_columns to understand the schema
+    2. Then execute_data_lake_query with your SQL
+    3. Finally call get_data_lake_query_results with the returned query_id
 
-    REQUIREMENTS:
-    1. USE THE get_table_columns TOOL FIRST to get the correct table schema.
-    2. THE QUERY MUST INCLUDE A FILTER ON p_event_time WITH A MAX TIME DURATION OF 90 DAYS.
-    3. BE SPECIFIC with your query to reduce costs.
-    4. The query must be compatible with Snowflake SQL. For example, use field:nested_field instead of field.nested_field.
-
-    NOTE: After calling this function, you MUST call get_data_lake_query_results with the
-    returned query_id to retrieve the actual query results.
-
-    Example usage:
-        # Step 1: Get table schema
-        schema = get_table_columns(database_name="panther_logs.public", table_name="panther_audit")
-
-        # Step 2: Execute query with required p_event_time filter
-        result = execute_data_lake_query(
-            sql="SELECT * FROM panther_logs.public.panther_audit WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
-        )
-
-        # Step 3: Retrieve the actual results using the query_id
-        if result["success"]:
-            query_results = get_data_lake_query_results(query_id=result["query_id"])
-
-    Args:
-        sql: The SQL query to execute (must include p_event_time filter)
-        database_name: The database to query (default: "panther_logs.public")
-
-    Returns:
-        Dict containing:
-        - success: Boolean indicating if the query was successful
-        - query_id: ID of the executed query for retrieving results with get_data_lake_query_results
-        - message: Error message if unsuccessful
+    Returns a dictionary with query execution status and a query_id for retrieving results.
     """
-
     logger.info("Executing data lake query")
 
     # Validate that the query includes a p_event_time filter after WHERE or AND
     sql_lower = sql.lower().replace("\n", " ")
     if not re.search(
-        r"\b(where|and)\s+.*?p_event_time\s*(>=|<=|=|>|<|between)", sql_lower
+        r"\b(where|and)\s+.*?(?:[\w.]+\.)?p_event_time\s*(>=|<=|=|>|<|between)",
+        sql_lower,
     ):
         error_msg = (
             "Query must include p_event_time as a filter condition after WHERE or AND"
