@@ -140,7 +140,7 @@ def _is_running_in_docker() -> bool:
     Returns:
         bool: True if running in Docker, False otherwise
     """
-    return os.environ.get('MCP_PANTHER_DOCKER_RUNTIME') == 'true'
+    return os.environ.get("MCP_PANTHER_DOCKER_RUNTIME") == "true"
 
 
 def _get_user_agent() -> str:
