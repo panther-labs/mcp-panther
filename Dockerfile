@@ -25,6 +25,9 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
+# Set environment variable to indicate Docker environment
+ENV MCP_PANTHER_DOCKER_RUNTIME=true
+
 # Copy only the installed packages and project files
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/mcp-panther /usr/local/bin/mcp-panther
