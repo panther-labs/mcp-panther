@@ -28,3 +28,6 @@ sync:
 
 mcp-dev:
 	uv run mcp dev src/mcp_panther/server.py
+
+integration-test:
+	FASTMCP_INTEGRATION_TEST=1 uv run pytest -s tests/panther_mcp_core/test_fastmcp_integration.py
