@@ -23,7 +23,7 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
-async def get_alert_event_summaries(
+async def summarize_alert_events(
     alert_ids: Annotated[
         List[str],
         Field(
@@ -128,7 +128,7 @@ async def execute_data_lake_query(
     """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. For simple log sampling, use get_sample_log_events instead. The query must follow Snowflake SQL syntax (e.g., use field:nested_field instead of field.nested_field).
 
     WORKFLOW:
-    1. First call get_table_columns to understand the schema
+    1. First call get_table_schema to understand the schema
     2. Then execute_data_lake_query with your SQL
     3. Finally call get_data_lake_query_results with the returned query_id
 
@@ -333,7 +333,7 @@ async def list_databases() -> Dict[str, Any]:
 
 
 @mcp_tool
-async def list_tables_for_database(database: str) -> Dict[str, Any]:
+async def list_database_tables(database: str) -> Dict[str, Any]:
     """List all available tables in a Panther Database.
 
     Required: Only use valid database names obtained from list_databases
@@ -402,7 +402,7 @@ async def list_tables_for_database(database: str) -> Dict[str, Any]:
 
 
 @mcp_tool
-async def get_table_columns(database_name: str, table_name: str) -> Dict[str, Any]:
+async def get_table_schema(database_name: str, table_name: str) -> Dict[str, Any]:
     """Get column details for a specific datalake table.
 
     Args:

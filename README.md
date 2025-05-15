@@ -31,12 +31,11 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `execute_data_lake_query` | Execute SQL queries against Panther's data lake | "Query AWS CloudTrail logs for failed login attempts in the last day" |
 | `get_data_lake_query_results` | Get results from a previously executed data lake query | "Get results for query ID abc123" |
 | `get_sample_log_events` | Get a sample of 10 recent events for a specific log type | "Show me sample events from AWS_CLOUDTRAIL logs" |
-| `get_table_columns` | Get column details for a specific data lake table | "What columns exist within the table panther_logs.public.aws_cloudtrail" |
 | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
-| `get_tables_for_database` | Get all tables for a specific data lake database | "What tables are within the panther_logs.public database" |
 | `list_databases` | List all available data lake databases in Panther | "List all available databases" |
 | `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
-| `list_tables_for_database` | List all available tables for a specific database in Panther's data lake | "What tables are in the panther_logs database" |
+| `list_database_tables` | List all available tables for a specific database in Panther's data lake | "What tables are in the panther_logs database" |
+| `summarize_alert_events` | Analyze patterns and relationships across multiple alerts by aggregating their event data | "Show me patterns in events from alerts abc123 and def456" |
 
 </details>
 
@@ -75,8 +74,8 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `get_metrics_alerts_and_errors_per_rule` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
-| `get_metrics_alerts_and_errors_per_severity` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
+| `get_rule_alert_metrics` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
+| `get_severity_alert_metrics` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
 
 </details>
 

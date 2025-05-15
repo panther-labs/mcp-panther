@@ -37,7 +37,7 @@ def list_and_prioritize_alerts(start_date: str, end_date: str) -> str:
     return f"""Analyze alert signals and group them based on entity names. The goal is to identify patterns of related activity across alerts and triage them together.
 
 1. Get all alert IDs between {start_date} and {end_date}.
-2. Get stats on all alert events with the get_alert_event_summaries tool.
+2. Get stats on all alert events with the summarize_alert_events tool.
 3. Group alerts by entity names, combining similar alerts together.
 4. For each group:
     1. Identify the common entity name performing the actions
