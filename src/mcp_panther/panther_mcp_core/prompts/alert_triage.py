@@ -6,6 +6,16 @@ from .registry import mcp_prompt
 
 
 @mcp_prompt
+def get_log_sources_report() -> str:
+    return """You are an expert in security data pipelines and ETL. Your goal is to ensure that all Panther log sources are healthy, and if they are unhealthy, to understand the root cause and how to fix it. Follow these steps:
+
+1. List log sources
+2. If any log sources are unhealthy, search for a related SYSTEM ERROR alert, you might need to look a few weeks back if the source has been unhealthy for some time.
+3. If the reason for being unhealthy is a classification error, query the panther_monitor.public. database, classification_failures table with a filter on p_source_id matching the offending source. Read the payload, try to guess the log type, and then compare it to the log source's attached schemas to pinpoint why it isn't classifying.
+4. If no sources are unhealthy, print a summary of your findings. If several are unhealthy, triage one at a time, providing a summary for each one."""
+
+
+@mcp_prompt
 def list_detection_rule_errors(start_date: str, end_date: str) -> str:
     """Get all detection rule errors between the specified dates.
 
