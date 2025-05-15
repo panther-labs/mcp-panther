@@ -6,7 +6,7 @@ fmt:
 lint:
 	ruff check $(dirs)
 
-build-docker: test
+docker: test
 	docker build -t mcp-panther .
 
 # Create a virtual environment using uv (https://github.com/astral-sh/uv)
