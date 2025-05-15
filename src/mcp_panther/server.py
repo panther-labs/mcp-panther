@@ -46,6 +46,7 @@ deps = [
     "aiohttp",
     "anyascii",
     "mcp[cli]",
+    "fastmcp",
 ]
 
 # Create the MCP server
