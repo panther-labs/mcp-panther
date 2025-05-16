@@ -16,7 +16,7 @@ venv:
 
 # Install development dependencies (run after activating virtual environment)
 dev-deps:
-	uv pip install -e ".[dev]"
+	uv sync --group dev
 
 # Run tests (requires dev dependencies to be installed first)
 test:

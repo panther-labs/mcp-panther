@@ -16,7 +16,7 @@ dependencies = [
     "fastmcp>=2.3.3",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "ruff>=0.11.2",
     "pytest>=8.0.0",
@@ -63,3 +63,7 @@ env = [
     "PANTHER_INSTANCE_URL=https://example.com",
     "PANTHER_API_TOKEN=test-token"
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
