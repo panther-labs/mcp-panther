@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from mcp_panther.panther_mcp_core.client import _is_running_in_docker, _get_user_agent
+from mcp_panther.panther_mcp_core.client import _get_user_agent, _is_running_in_docker
 
 
 @pytest.mark.parametrize(
@@ -17,7 +17,10 @@ from mcp_panther.panther_mcp_core.client import _is_running_in_docker, _get_user
 )
 def test_is_running_in_docker(env_value, expected):
     """Test Docker environment detection with various environment variable values."""
-    with mock.patch.dict(os.environ, {"MCP_PANTHER_DOCKER_RUNTIME": env_value} if env_value is not None else {}):
+    with mock.patch.dict(
+        os.environ,
+        {"MCP_PANTHER_DOCKER_RUNTIME": env_value} if env_value is not None else {},
+    ):
         assert _is_running_in_docker() == expected
 
 
@@ -33,9 +36,17 @@ def test_is_running_in_docker(env_value, expected):
 def test_get_user_agent(docker_running, version, expected):
     """Test user agent string generation with various conditions."""
     # Mock version function
-    with mock.patch("mcp_panther.panther_mcp_core.client.version", return_value=version) if version else mock.patch(
-        "mcp_panther.panther_mcp_core.client.version", side_effect=Exception("Version not found")
+    with (
+        mock.patch("mcp_panther.panther_mcp_core.client.version", return_value=version)
+        if version
+        else mock.patch(
+            "mcp_panther.panther_mcp_core.client.version",
+            side_effect=Exception("Version not found"),
+        )
     ):
         # Mock Docker detection
-        with mock.patch("mcp_panther.panther_mcp_core.client._is_running_in_docker", return_value=docker_running):
-            assert _get_user_agent() == expected 
+        with mock.patch(
+            "mcp_panther.panther_mcp_core.client._is_running_in_docker",
+            return_value=docker_running,
+        ):
+            assert _get_user_agent() == expected
