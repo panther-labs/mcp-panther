@@ -200,9 +200,7 @@ uv sync
         "aiohttp",
         "--with",
         "gql[aiohttp]",
-        "--with",
-        "mcp[cli]",
-        "mcp",
+        "fastmcp",
         "run",
         "FULL-PATH-TO-REPO/src/mcp_panther/server.py"
       ],
