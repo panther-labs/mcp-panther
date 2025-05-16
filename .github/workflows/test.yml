@@ -31,8 +31,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install --system -e ".[dev]"
-      
+          make dev-deps
+
       - name: Run tests
         run: |
-          pytest tests/ --cov=src/mcp_panther --cov-report=term --cov-report=html --cov-report=json
+          make test
