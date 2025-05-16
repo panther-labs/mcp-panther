@@ -6,7 +6,7 @@ import sys
 
 import click
 import uvicorn
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.routing import Mount
 
@@ -46,7 +46,6 @@ deps = [
     "aiohttp",
     "anyascii",
     "mcp[cli]",
-    "fastmcp",
 ]
 
 # Create the MCP server
