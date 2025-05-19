@@ -1,4 +1,4 @@
-name: Release and Publish to PyPI
+name: Release and Publish to PyPI and GitHub Container Registry
 
 on:
   workflow_dispatch:
@@ -10,11 +10,13 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
-  release_publish:
+  prepare_release:
     runs-on: ubuntu-latest
-
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
     steps:
     - name: Check out the repository
       uses: actions/checkout@v4
@@ -48,6 +50,7 @@ jobs:
       run: |
         VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Build package
       run: |
@@ -71,6 +74,26 @@ jobs:
           --draft=false \
           dist/*
 
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: dist/
+        retention-days: 1
+
+  publish_pypi:
+    needs: prepare_release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
     - name: Publish to PyPI
       run: |
         uv pip install --system twine
@@ -78,3 +101,42 @@ jobs:
       env:
         TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+
+  publish_ghcr:
+    needs: prepare_release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Check out the repository
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64,linux/arm64
+        tags: |
+          ghcr.io/${{ github.repository }}:latest
+          ghcr.io/${{ github.repository }}:${{ needs.prepare_release.outputs.version }}
+        labels: |
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.description=MCP Panther
+          org.opencontainers.image.licenses=Apache-2.0
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
