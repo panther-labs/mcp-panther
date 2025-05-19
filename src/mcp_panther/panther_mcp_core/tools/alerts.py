@@ -3,7 +3,10 @@ Tools for interacting with Panther alerts.
 """
 
 import logging
-from typing import Any, Dict, List
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 from ..client import (
     _create_panther_client,
@@ -18,164 +21,269 @@ from ..queries import (
     UPDATE_ALERT_STATUS_MUTATION,
     UPDATE_ALERTS_ASSIGNEE_BY_ID_MUTATION,
 )
+from ..types import AlertSeverity, AlertStatus, AlertSubtype, AlertType
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
 
 
+class ListAlertsInput(BaseModel):
+    """Input model for listing alerts with validation."""
+
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow both camelCase and snake_case
+        json_schema_extra={
+            "example": {
+                "start_date": "2024-03-20T00:00:00Z",
+                "end_date": "2024-03-21T00:00:00Z",
+                "severities": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+                "statuses": ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
+                "page_size": 25,
+                "alert_type": "ALERT",
+            }
+        },
+    )
+
+    start_date: Optional[datetime] = Field(
+        default=None,
+        description="Start date in ISO 8601 format (e.g. '2024-03-20T00:00:00Z')",
+    )
+    end_date: Optional[datetime] = Field(
+        default=None,
+        description="End date in ISO 8601 format (e.g. '2024-03-21T00:00:00Z')",
+    )
+    severities: List[AlertSeverity] = Field(
+        default=[
+            AlertSeverity.CRITICAL,
+            AlertSeverity.HIGH,
+            AlertSeverity.MEDIUM,
+            AlertSeverity.LOW,
+        ],
+        description="List of alert severities to filter alerts by",
+    )
+    statuses: List[AlertStatus] = Field(
+        default=[
+            AlertStatus.OPEN,
+            AlertStatus.TRIAGED,
+            AlertStatus.RESOLVED,
+            AlertStatus.CLOSED,
+        ],
+        description="List of alert statuses to filter alerts by",
+    )
+    cursor: Optional[str] = Field(
+        default=None, description="Cursor for pagination from a previous query"
+    )
+    detection_id: Optional[str] = Field(
+        default=None, description="Detection ID to filter alerts by."
+    )
+    event_count_max: Optional[int] = Field(
+        default=None,
+        description="Maximum number of events that returned alerts can have",
+    )
+    event_count_min: Optional[int] = Field(
+        default=None,
+        description="Minimum number of events that returned alerts must have",
+    )
+    log_sources: Optional[List[str]] = Field(
+        default=None, description="List of log source IDs to filter alerts by"
+    )
+    log_types: Optional[List[str]] = Field(
+        default=None, description="List of log type names to filter alerts by"
+    )
+    name_contains: Optional[str] = Field(
+        default=None, description="String to search for in alert titles"
+    )
+    page_size: int = Field(
+        default=25, ge=1, le=50, description="Number of results per page"
+    )
+    resource_types: Optional[List[str]] = Field(
+        default=None, description="List of AWS resource type names to filter alerts by"
+    )
+    alert_type: AlertType = Field(
+        default=AlertType.ALERT, description="Type of alerts to return"
+    )
+    subtypes: Optional[List[AlertSubtype]] = Field(
+        default=None,
+        description="List of alert subtypes. Valid values depend on alert_type",
+    )
+
+    @field_validator("subtypes", mode="after")
+    @classmethod
+    def validate_subtypes(
+        cls, v: Optional[List[Any]], info: ValidationInfo
+    ) -> Optional[List[AlertSubtype]]:
+        # If no subtypes are provided, return None
+        if v is None:
+            return v
+
+        alert_type = info.data.get("alert_type", AlertType.ALERT)
+
+        # Coerce all subtypes to AlertSubtype, raise if not possible
+        coerced_subtypes = []
+        for st in v:
+            if isinstance(st, AlertSubtype):
+                coerced_subtypes.append(st)
+            else:
+                try:
+                    coerced_subtypes.append(AlertSubtype(st))
+                except Exception:
+                    raise ValueError(
+                        f"Invalid subtype value: {st}. Must be one of: {[e.value for e in AlertSubtype]}"
+                    )
+
+        if alert_type == AlertType.SYSTEM_ERROR:
+            if coerced_subtypes:
+                raise ValueError(
+                    "subtypes are not allowed when alert_type is SYSTEM_ERROR"
+                )
+            return coerced_subtypes
+
+        # For non-SYSTEM_ERROR types, validate against allowed subtypes
+        allowed_subtypes = AlertSubtype.get_valid_subtypes_for_type(alert_type)
+        invalid_subtypes = [st for st in coerced_subtypes if st not in allowed_subtypes]
+        if invalid_subtypes:
+            raise ValueError(
+                f"Invalid subtypes {invalid_subtypes} for alert_type={alert_type}. "
+                f"Valid subtypes are: {allowed_subtypes}"
+            )
+        return coerced_subtypes
+
+
+class AlertNode(BaseModel):
+    """Model for an alert node in the response."""
+
+    id: str
+    title: str
+    severity: str
+    status: str
+    created_at: str = Field(alias="createdAt")
+    type: str
+    description: Optional[str] = None
+    reference: Optional[str] = None
+    runbook: Optional[str] = None
+    first_event_occurred_at: Optional[str] = Field(
+        default=None, alias="firstEventOccurredAt"
+    )
+    last_received_event_at: Optional[str] = Field(
+        default=None, alias="lastReceivedEventAt"
+    )
+    origin: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow both camelCase and snake_case
+    )
+
+
+class ListAlertsResponse(BaseModel):
+    """Response model for listing alerts."""
+
+    success: bool
+    alerts: List[AlertNode]
+    total_alerts: int
+    has_next_page: bool
+    has_previous_page: bool
+    end_cursor: Optional[str] = None
+    start_cursor: Optional[str] = None
+
+
 @mcp_tool
-async def list_alerts(
-    start_date: str = None,
-    end_date: str = None,
-    severities: List[str] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
-    statuses: List[str] = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
-    cursor: str = None,
-    detection_id: str = None,
-    event_count_max: int = None,
-    event_count_min: int = None,
-    log_sources: List[str] = None,
-    log_types: List[str] = None,
-    name_contains: str = None,
-    page_size: int = 25,  # Default to 25, max is 50
-    resource_types: List[str] = None,
-    subtypes: List[str] = None,
-    alert_type: str = "ALERT",  # Defaults to ALERT per schema
-) -> Dict[str, Any]:
-    """List alerts from Panther with comprehensive filtering options
+async def list_alerts(list_alerts_input: ListAlertsInput) -> Dict[str, Any]:
+    """List alerts from Panther with various filtering options.
 
     Args:
-        start_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
-        end_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
-        severities: Optional list of severities to filter by (e.g. ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"])
-        statuses: Optional list of statuses to filter by (e.g. ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"])
-        cursor: Optional cursor for pagination from a previous query
-        detection_id: Optional detection ID to filter alerts by. If provided, date range is not required.
-        event_count_max: Optional maximum number of events that returned alerts must have
-        event_count_min: Optional minimum number of events that returned alerts must have
-        log_sources: Optional list of log source IDs to filter alerts by
-        log_types: Optional list of log type names to filter alerts by
-        name_contains: Optional string to search for in alert titles
-        page_size: Number of results per page (default: 25, maximum: 50)
-        resource_types: Optional list of AWS resource type names to filter alerts by
-        subtypes: Optional list of alert subtypes. Valid values depend on alert_type:
-            - When alert_type="ALERT": ["POLICY", "RULE", "SCHEDULED_RULE"]
-            - When alert_type="DETECTION_ERROR": ["RULE_ERROR", "SCHEDULED_RULE_ERROR"]
-            - When alert_type="SYSTEM_ERROR": subtypes are not allowed
-        alert_type: Type of alerts to return (default: "ALERT"). One of:
-            - "ALERT": Regular detection alerts
-            - "DETECTION_ERROR": Alerts from detection errors
-            - "SYSTEM_ERROR": System error alerts
+        list_alerts_input: Input parameters for listing alerts, including filters and pagination options.
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the request was successful
+        - alerts: List of alerts matching the filters
+        - total_alerts: Total number of alerts returned
+        - has_next_page: Boolean indicating if there are more results
+        - has_previous_page: Boolean indicating if there are previous results
+        - end_cursor: Cursor for the next page of results
+        - start_cursor: Cursor for the previous page of results
     """
     logger.info("Fetching alerts from Panther")
 
     try:
         client = await _create_panther_client()
 
-        # Validate page size
-        if page_size < 1:
-            raise ValueError("page_size must be greater than 0")
-        if page_size > 50:
-            logger.warning(
-                f"page_size {page_size} exceeds maximum of 50, using 50 instead"
-            )
-            page_size = 50
-
-        # Validate alert_type and subtypes combination
-        valid_alert_types = ["ALERT", "DETECTION_ERROR", "SYSTEM_ERROR"]
-        if alert_type not in valid_alert_types:
-            raise ValueError(f"alert_type must be one of {valid_alert_types}")
-
-        if subtypes:
-            valid_subtypes = {
-                "ALERT": ["POLICY", "RULE", "SCHEDULED_RULE"],
-                "DETECTION_ERROR": ["RULE_ERROR", "SCHEDULED_RULE_ERROR"],
-                "SYSTEM_ERROR": [],
-            }
-            if alert_type == "SYSTEM_ERROR":
-                raise ValueError(
-                    "subtypes are not allowed when alert_type is SYSTEM_ERROR"
-                )
-
-            allowed_subtypes = valid_subtypes[alert_type]
-            invalid_subtypes = [st for st in subtypes if st not in allowed_subtypes]
-            if invalid_subtypes:
-                raise ValueError(
-                    f"Invalid subtypes {invalid_subtypes} for alert_type={alert_type}. "
-                    f"Valid subtypes are: {allowed_subtypes}"
-                )
-
         # Prepare base input variables
         variables = {
             "input": {
-                "pageSize": page_size,
+                "pageSize": list_alerts_input.page_size,
                 "sortBy": "createdAt",
                 "sortDir": "descending",
-                "type": alert_type,
+                "type": list_alerts_input.alert_type,
             }
         }
 
         # Handle the required filter: either detectionId OR date range
-        if detection_id:
-            variables["input"]["detectionId"] = detection_id
-            logger.info(f"Filtering by detection ID: {detection_id}")
-        else:
-            # If no detection_id, we must have a date range
-            # TODO(jn): Add support for relative date ranges
-            if not start_date or not end_date:
-                start_date, end_date = _get_today_date_range()
-                logger.info(
-                    f"No detection ID and missing date range, using last 24 hours: {start_date} to {end_date}"
-                )
-            else:
-                logger.info(f"Using provided date range: {start_date} to {end_date}")
+        if list_alerts_input.detection_id:
+            variables["input"]["detectionId"] = list_alerts_input.detection_id
+            logger.info(f"Filtering by detection ID: {list_alerts_input.detection_id}")
 
-            variables["input"]["createdAtAfter"] = start_date
-            variables["input"]["createdAtBefore"] = end_date
+        if not list_alerts_input.start_date or not list_alerts_input.end_date:
+            start_date, end_date = _get_today_date_range()
+            logger.info(
+                f"No date range provided, using last 24 hours: {start_date} to {end_date}"
+            )
+        else:
+            logger.info(
+                f"Using provided date range: {list_alerts_input.start_date} to {list_alerts_input.end_date}"
+            )
+
+        variables["input"]["createdAtAfter"] = list_alerts_input.start_date
+        variables["input"]["createdAtBefore"] = list_alerts_input.end_date
 
         # Add optional filters
-        if cursor:
-            if not isinstance(cursor, str):
-                raise ValueError(
-                    "Cursor must be a string value from previous response's endCursor"
-                )
-            variables["input"]["cursor"] = cursor
-            logger.info(f"Using cursor for pagination: {cursor}")
+        if list_alerts_input.cursor:
+            variables["input"]["cursor"] = list_alerts_input.cursor
+            logger.info(f"Using cursor for pagination: {list_alerts_input.cursor}")
 
-        if severities:
-            variables["input"]["severities"] = severities
-            logger.info(f"Filtering by severities: {severities}")
+        if list_alerts_input.severities:
+            variables["input"]["severities"] = list_alerts_input.severities
+            logger.info(f"Filtering by severities: {list_alerts_input.severities}")
 
-        if statuses:
-            variables["input"]["statuses"] = statuses
-            logger.info(f"Filtering by statuses: {statuses}")
+        if list_alerts_input.statuses:
+            variables["input"]["statuses"] = list_alerts_input.statuses
+            logger.info(f"Filtering by statuses: {list_alerts_input.statuses}")
 
-        if event_count_max is not None:
-            variables["input"]["eventCountMax"] = event_count_max
-            logger.info(f"Filtering by max event count: {event_count_max}")
+        if list_alerts_input.event_count_max is not None:
+            variables["input"]["eventCountMax"] = list_alerts_input.event_count_max
+            logger.info(
+                f"Filtering by max event count: {list_alerts_input.event_count_max}"
+            )
 
-        if event_count_min is not None:
-            variables["input"]["eventCountMin"] = event_count_min
-            logger.info(f"Filtering by min event count: {event_count_min}")
+        if list_alerts_input.event_count_min is not None:
+            variables["input"]["eventCountMin"] = list_alerts_input.event_count_min
+            logger.info(
+                f"Filtering by min event count: {list_alerts_input.event_count_min}"
+            )
 
-        if log_sources:
-            variables["input"]["logSources"] = log_sources
-            logger.info(f"Filtering by log sources: {log_sources}")
+        if list_alerts_input.log_sources:
+            variables["input"]["logSources"] = list_alerts_input.log_sources
+            logger.info(f"Filtering by log sources: {list_alerts_input.log_sources}")
 
-        if log_types:
-            variables["input"]["logTypes"] = log_types
-            logger.info(f"Filtering by log types: {log_types}")
+        if list_alerts_input.log_types:
+            variables["input"]["logTypes"] = list_alerts_input.log_types
+            logger.info(f"Filtering by log types: {list_alerts_input.log_types}")
 
-        if name_contains:
-            variables["input"]["nameContains"] = name_contains
-            logger.info(f"Filtering by name contains: {name_contains}")
+        if list_alerts_input.name_contains:
+            variables["input"]["nameContains"] = list_alerts_input.name_contains
+            logger.info(
+                f"Filtering by name contains: {list_alerts_input.name_contains}"
+            )
 
-        if resource_types:
-            variables["input"]["resourceTypes"] = resource_types
-            logger.info(f"Filtering by resource types: {resource_types}")
+        if list_alerts_input.resource_types:
+            variables["input"]["resourceTypes"] = list_alerts_input.resource_types
+            logger.info(
+                f"Filtering by resource types: {list_alerts_input.resource_types}"
+            )
 
-        if subtypes:
-            variables["input"]["subtypes"] = subtypes
-            logger.info(f"Filtering by subtypes: {subtypes}")
+        if list_alerts_input.subtypes:
+            variables["input"]["subtypes"] = list_alerts_input.subtypes
+            logger.info(f"Filtering by subtypes: {list_alerts_input.subtypes}")
 
         logger.debug(f"Query variables: {variables}")
 
@@ -193,21 +301,24 @@ async def list_alerts(
         alert_edges = alerts_data.get("edges", [])
         page_info = alerts_data.get("pageInfo", {})
 
-        # Extract alerts from edges
-        alerts = [edge["node"] for edge in alert_edges]
+        # Extract alerts from edges and convert to AlertNode models
+        alerts = [AlertNode.model_validate(edge["node"]) for edge in alert_edges]
 
         logger.info(f"Successfully retrieved {len(alerts)} alerts")
 
-        # Format the response
-        return {
-            "success": True,
-            "alerts": alerts,
-            "total_alerts": len(alerts),
-            "has_next_page": page_info.get("hasNextPage", False),
-            "has_previous_page": page_info.get("hasPreviousPage", False),
-            "end_cursor": page_info.get("endCursor"),
-            "start_cursor": page_info.get("startCursor"),
-        }
+        # Format the response using the response model
+        response = ListAlertsResponse(
+            success=True,
+            alerts=alerts,
+            total_alerts=len(alerts),
+            has_next_page=page_info.get("hasNextPage", False),
+            has_previous_page=page_info.get("hasPreviousPage", False),
+            end_cursor=page_info.get("endCursor"),
+            start_cursor=page_info.get("startCursor"),
+        )
+
+        return response.model_dump()
+
     except Exception as e:
         logger.error(f"Failed to fetch alerts: {str(e)}")
         return {"success": False, "message": f"Failed to fetch alerts: {str(e)}"}
