@@ -28,7 +28,7 @@ The MCP Panther project is a server implementation for the Model Control Protoco
 To manually test your changes, you can run the MCP server using:
 
 ```bash
-uv run mcp dev src/mcp_panther/server.py
+uv run fastmcp dev src/mcp_panther/server.py
 ```
 
 This command runs the server in development mode, which provides additional debugging information and automatically reloads when changes are detected.
@@ -50,7 +50,7 @@ logging.basicConfig(
 For testing and development, you can run the MCP server in development mode:
 
 ```bash
-uv run mcp dev src/mcp_panther/server.py
+uv run fastmcp dev src/mcp_panther/server.py
 ```
 
 This starts the MCP Inspector server and provides an interactive web interface to test its functionality.

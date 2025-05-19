@@ -227,19 +227,6 @@ query ListTables($databaseName: String!, $pageSize: Int, $cursor: String) {
 }
 """)
 
-LIST_TABLES_FOR_DATABASE_QUERY = gql("""
-query ListTablesForDatabase($name: String!) {
-    dataLakeDatabase(name: $name) {
-        name
-        description
-        tables {
-            name
-            description
-        }
-    }
-}
-""")
-
 GET_COLUMNS_FOR_TABLE_QUERY = gql("""
 query GetColumnDetails($databaseName: String!, $tableName: String!) {
   dataLakeDatabaseTable(input: { databaseName: $databaseName, tableName: $tableName }) {

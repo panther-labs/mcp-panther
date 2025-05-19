@@ -94,7 +94,7 @@ async def list_log_type_schemas(
 
 
 @mcp_tool
-async def get_log_type_schema_details(schema_names: list[str]) -> Dict[str, Any]:
+async def get_panther_log_type_schema(schema_names: list[str]) -> Dict[str, Any]:
     """Get detailed information for specific log type schemas, including their full specifications.
     Limited to 5 schemas at a time to prevent response size issues.
 

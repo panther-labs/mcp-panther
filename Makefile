@@ -6,7 +6,7 @@ fmt:
 lint:
 	ruff check $(dirs)
 
-build-docker: test
+docker: test
 	docker build -t mcp-panther .
 
 # Create a virtual environment using uv (https://github.com/astral-sh/uv)
@@ -16,7 +16,7 @@ venv:
 
 # Install development dependencies (run after activating virtual environment)
 dev-deps:
-	uv pip install -e ".[dev]"
+	uv sync --group dev
 
 # Run tests (requires dev dependencies to be installed first)
 test:
@@ -27,4 +27,7 @@ sync:
 	uv sync
 
 mcp-dev:
-	uv run mcp dev src/mcp_panther/server.py
+	uv run fastmcp dev src/mcp_panther/server.py
+
+integration-test:
+	FASTMCP_INTEGRATION_TEST=1 uv run pytest -s tests/panther_mcp_core/test_fastmcp_integration.py
