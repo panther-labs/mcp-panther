@@ -230,8 +230,10 @@ Once configured, navigate to Cursor Settings > MCP to view the running server:
 ### Claude Desktop
 Install the server directly:
 ```bash
-uv run mcp install src/mcp_panther/server.py
+uv run fastmcp install src/mcp_panther/server.py
 ```
+
+Then open the `claude_desktop_config.json` and add the `env` fields (as shown above).
 
 If you run into any issues, [try the troubleshooting steps here](https://modelcontextprotocol.io/quickstart/user#troubleshooting).
 
@@ -252,7 +254,6 @@ Check the server logs for detailed error messages: `tail -n 20 -F ~/Library/Logs
 
 ### Initializing mcp-panther
 
-- If you see an error like `typer is required`, make sure you've installed MCP with CLI components: `pip install mcp[cli]`
 - Ensure the `npm` and `uv` are installed **globally** on your system.
 
 ### Running tools
