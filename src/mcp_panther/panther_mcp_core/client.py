@@ -16,6 +16,10 @@ PACKAGE_NAME = "mcp-panther"
 logger = logging.getLogger(PACKAGE_NAME)
 
 
+class UnexpectedResponseStatusError(ValueError):
+    pass
+
+
 async def get_json_from_script_tag(
     url: str, script_id: str
 ) -> Optional[Union[Dict[str, Any], AnyStr]]:
@@ -34,7 +38,7 @@ async def get_json_from_script_tag(
             url, ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE")
         ) as response:
             if response.status != 200:
-                raise ValueError(
+                raise UnexpectedResponseStatusError(
                     f"unexpected status code when resolving api info: {response.status}"
                 )
 
@@ -85,8 +89,18 @@ async def get_instance_config() -> Optional[Dict[str, Any]]:
     global instance_config
     instance_url = get_panther_instance_url()
     if instance_config is None:
-        info = await get_json_from_script_tag(instance_url, "__PANTHER_CONFIG__")
-        instance_config = info
+        try:
+            info = await get_json_from_script_tag(instance_url, "__PANTHER_CONFIG__")
+            instance_config = info
+        except UnexpectedResponseStatusError:
+            if "public/graphql" in instance_url:
+                instance_config = {
+                    "rest": instance_url.replace("public/graphql", "").strip("/")
+                }
+            else:
+                instance_config = {
+                    "rest": instance_url.strip("/"),
+                }
 
     return instance_config
 
@@ -108,6 +122,8 @@ async def get_panther_rest_api_base() -> str:
     config = await get_instance_config()
     if not config:
         return ""
+    if config.get("rest"):
+        return config.get("rest")
 
     base = config.get("WEB_APPLICATION_GRAPHQL_API_ENDPOINT", "")
     return base.replace("/internal/graphql", "")
