@@ -3,9 +3,18 @@ Tools for interacting with Panther metrics.
 """
 
 import logging
-from typing import Any, Dict, List, Literal, Optional
+from datetime import datetime
+from enum import Enum
+from typing import Annotated, Any, Dict, Literal
 
-from ..client import _execute_query, _get_today_date_range
+from pydantic import Field
+
+from ..client import (
+    _execute_query,
+    _get_today_date_range,
+    get_today_date_range,
+    graphql_date_format,
+)
 from ..permissions import Permission, all_perms
 from ..queries import (
     METRICS_ALERTS_PER_RULE_QUERY,
@@ -17,29 +26,57 @@ from .registry import mcp_tool
 logger = logging.getLogger("mcp-panther")
 
 
+class MetricAlertType(str, Enum):
+    RULE = "Rule"
+    POLICY = "Policy"
+
+
+class AlertSeverity(str, Enum):
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    INFO = "INFO"
+
+
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.ALERT_READ),
     }
 )
 async def get_severity_alert_metrics(
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
-    alert_types: Optional[List[str]] = ["Rule"],
-    severities: Optional[List[str]] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
-    interval_in_minutes: Optional[int] = 1440,
+    from_date: Annotated[
+        datetime | None,
+        Field(description="The start date of the metrics period."),
+    ] = None,
+    to_date: Annotated[
+        datetime | None,
+        Field(description="The end date of the metrics period."),
+    ] = None,
+    alert_types: Annotated[
+        list[MetricAlertType],
+        Field(description="The specific Panther alert types to get metrics for."),
+    ] = [MetricAlertType.RULE],
+    severities: Annotated[
+        list[AlertSeverity],
+        Field(description="The specific Panther alert severities to get metrics for."),
+    ] = [
+        AlertSeverity.CRITICAL,
+        AlertSeverity.HIGH,
+        AlertSeverity.MEDIUM,
+        AlertSeverity.LOW,
+    ],
+    interval_in_minutes: Annotated[
+        Literal[15, 30, 60, 180, 360, 720, 1440],
+        Field(
+            description="How data points are aggregated over time, with smaller intervals providing more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents."
+        ),
+    ] = 1440,
 ) -> Dict[str, Any]:
-    """Gets alert metrics grouped by severity for ALL alert types including alerts, detection errors, and system errors within a given time period. Use this tool to identify hot spots in your alerts, and use the list_alerts tool for specific details.
-
-    Args:
-        from_date: Start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z"). Defaults to today at 00:00:00Z.
-        to_date: End date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z"). Defaults to today at 23:59:59Z.
-        interval_in_minutes: The grouping interval for the metrics. Defaults to 1440 minutes (1 day) but can be set as low as 60 minutes.
-        severities: Optional list of severities to filter by (e.g. ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"])
-        alert_types: Optional list of alert types to filter by (e.g. ["Rule", "Policy", "Scheduled Rule", "Detection Error", "System Error"])
+    """Gets alert metrics grouped by severity for rule and policy alert types within a given time period. Use this tool to identify hot spots in your alerts, and use the list_alerts tool for specific details. Keep in mind that these metrics combine errors and alerts, so there may be inconsistencies from what list_alerts returns.
 
     Returns:
-        Dict containing:
+        Dict:
         - alerts_per_severity: List of series with breakdown by severity
         - total_alerts: Total number of alerts in the period
         - from_date: Start date of the period
@@ -47,12 +84,16 @@ async def get_severity_alert_metrics(
         - interval_in_minutes: Grouping interval for the metrics
     """
     try:
-        # If no dates provided, get today's date range
-        if not from_date and not to_date:
-            from_date, to_date = _get_today_date_range()
+        # If from or to date is missing, use today's date range
+        if not all([from_date, to_date]):
+            from_date_today, to_date_today = get_today_date_range()
             logger.info(
-                f"No date range provided, using today's date range: {from_date} to {to_date}"
+                f"From or To date is missing, using today's date range: {from_date_today} to {to_date_today}"
             )
+            if not from_date:
+                from_date = from_date_today
+            if not to_date:
+                to_date = to_date_today
         else:
             logger.info(f"Using provided date range: {from_date} to {to_date}")
 
@@ -60,16 +101,16 @@ async def get_severity_alert_metrics(
             f"Fetching alerts per severity metrics from {from_date} to {to_date}"
         )
 
-        # Prepare variables
+        # Prepare variables for GraphQL query
         variables = {
             "input": {
-                "fromDate": from_date,
-                "toDate": to_date,
+                "fromDate": graphql_date_format(from_date),
+                "toDate": graphql_date_format(to_date),
                 "intervalInMinutes": interval_in_minutes,
             }
         }
 
-        # Execute query
+        # Execute GraphQL query
         result = await _execute_query(METRICS_ALERTS_PER_SEVERITY_QUERY, variables)
 
         if not result or "metrics" not in result:
@@ -89,8 +130,8 @@ async def get_severity_alert_metrics(
             "success": True,
             "alerts_per_severity": alerts_per_severity,
             "total_alerts": metrics_data["totalAlerts"],
-            "from_date": from_date,
-            "to_date": to_date,
+            "from_date": graphql_date_format(from_date),
+            "to_date": graphql_date_format(to_date),
             "interval_in_minutes": interval_in_minutes,
         }
 
@@ -108,17 +149,22 @@ async def get_severity_alert_metrics(
     }
 )
 async def get_rule_alert_metrics(
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
-    interval_in_minutes: Optional[int] = 1440,  # Default to 1 day
-    rule_ids: Optional[List[str]] = None,
+    from_date: datetime | None = None,
+    to_date: datetime | None = None,
+    interval_in_minutes: Annotated[
+        Literal[15, 30, 60, 180, 360, 720, 1440],
+        Field(
+            description="How data points are aggregated over time, with smaller intervals providing more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents."
+        ),
+    ] = 1440,
+    rule_ids: list[str] | None = None,
 ) -> Dict[str, Any]:
     """Gets alert metrics per detection rule for ALL alert types including alerts, detection errors, and system errors within a given time period. Use this tool to identify hot spots in your alerts, and use the list_alerts tool for specific details.
 
     Args:
         from_date: Start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z"). Defaults to today at 00:00:00Z.
         to_date: End date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z"). Defaults to today at 23:59:59Z.
-        interval_in_minutes: The grouping interval for the metrics. Defaults to 1440 minutes (1 day) but can be set as low as 60 minutes.
+        interval_in_minutes: The grouping interval for the metrics. Must be one of: 15, 30, 60, 180, 360, 720, 1440 minutes. Defaults to 1440 minutes (1 day).
         rule_ids: Optional list of rule IDs to filter results by. If not provided, returns all rules.
 
     Returns:
@@ -144,8 +190,8 @@ async def get_rule_alert_metrics(
         # Prepare variables
         variables = {
             "input": {
-                "fromDate": from_date,
-                "toDate": to_date,
+                "fromDate": graphql_date_format(from_date),
+                "toDate": graphql_date_format(to_date),
                 "intervalInMinutes": interval_in_minutes,
             }
         }
@@ -172,8 +218,8 @@ async def get_rule_alert_metrics(
             "success": True,
             "alerts_per_rule": alerts_per_rule,
             "total_alerts": metrics_data["totalAlerts"],
-            "from_date": from_date,
-            "to_date": to_date,
+            "from_date": graphql_date_format(from_date),
+            "to_date": graphql_date_format(to_date),
             "interval_in_minutes": interval_in_minutes,
         }
 
@@ -187,8 +233,8 @@ async def get_rule_alert_metrics(
 
 @mcp_tool
 async def get_bytes_processed_per_log_type_and_source(
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
+    from_date: datetime | None = None,
+    to_date: datetime | None = None,
     interval: Literal["1h", "12h", "24h"] = "24h",
 ) -> Dict[str, Any]:
     """Get the total bytes processed per log type and source for a given time period.

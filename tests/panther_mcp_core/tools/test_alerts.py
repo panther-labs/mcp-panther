@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.alerts import (
@@ -97,8 +99,8 @@ async def test_list_alerts_with_filters(mock_graphql_client):
     """Test listing alerts with various filters."""
     mock_graphql_client.execute.return_value = MOCK_ALERTS_RESPONSE
 
-    start_date = "2024-03-01T00:00:00Z"
-    end_date = "2024-03-31T23:59:59Z"
+    start_date = datetime(2024, 3, 1, 0, 0, tzinfo=timezone.utc)
+    end_date = datetime(2024, 3, 31, 23, 59, 59, tzinfo=timezone.utc)
 
     result = await list_alerts(
         cursor="next-page-plz",
@@ -123,8 +125,8 @@ async def test_list_alerts_with_filters(mock_graphql_client):
     assert call_args["input"]["cursor"] == "next-page-plz"
     assert call_args["input"]["severities"] == ["HIGH"]
     assert call_args["input"]["statuses"] == ["OPEN"]
-    assert call_args["input"]["createdAtAfter"] == start_date
-    assert call_args["input"]["createdAtBefore"] == end_date
+    assert call_args["input"]["createdAtAfter"] == start_date.isoformat()
+    assert call_args["input"]["createdAtBefore"] == end_date.isoformat()
     assert call_args["input"]["eventCountMin"] == 1
     assert call_args["input"]["eventCountMax"] == 1337
     assert call_args["input"]["logSources"] == ["my-load-balancer"]

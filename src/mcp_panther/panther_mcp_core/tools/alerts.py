@@ -3,7 +3,8 @@ Tools for interacting with Panther alerts.
 """
 
 import logging
-from typing import Any, Dict, List
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 
 from ..client import (
     _create_panther_client,
@@ -30,8 +31,8 @@ logger = logging.getLogger("mcp-panther")
     }
 )
 async def list_alerts(
-    start_date: str = None,
-    end_date: str = None,
+    start_date: Optional[Union[str, datetime]] = None,
+    end_date: Optional[Union[str, datetime]] = None,
     severities: List[str] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
     statuses: List[str] = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
     cursor: str = None,
@@ -49,8 +50,8 @@ async def list_alerts(
     """List alerts from Panther with comprehensive filtering options
 
     Args:
-        start_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z")
-        end_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z")
+        start_date: Optional start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z") or datetime object
+        end_date: Optional end date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z") or datetime object
         severities: Optional list of severities to filter by (e.g. ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"])
         statuses: Optional list of statuses to filter by (e.g. ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"])
         cursor: Optional cursor for pagination from a previous query
@@ -133,6 +134,12 @@ async def list_alerts(
                 )
             else:
                 logger.info(f"Using provided date range: {start_date} to {end_date}")
+
+            # Convert datetime objects to ISO format strings if needed
+            if isinstance(start_date, datetime):
+                start_date = start_date.isoformat()
+            if isinstance(end_date, datetime):
+                end_date = end_date.isoformat()
 
             variables["input"]["createdAtAfter"] = start_date
             variables["input"]["createdAtBefore"] = end_date

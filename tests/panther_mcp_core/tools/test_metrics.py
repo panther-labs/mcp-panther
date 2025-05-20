@@ -1,9 +1,12 @@
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
 
 from mcp_panther.panther_mcp_core.queries import METRICS_BYTES_PROCESSED_QUERY
 from mcp_panther.panther_mcp_core.tools.metrics import (
+    AlertSeverity,
+    MetricAlertType,
     get_bytes_processed_per_log_type_and_source,
     get_rule_alert_metrics,
     get_severity_alert_metrics,
@@ -70,7 +73,7 @@ def mock_get_today_date_range():
     with patch(
         "mcp_panther.panther_mcp_core.tools.metrics._get_today_date_range"
     ) as mock:
-        mock.return_value = ("2024-03-20T00:00:00Z", "2024-03-20T23:59:59Z")
+        mock.return_value = ("2024-03-20T00:00:00.000Z", "2024-03-20T23:59:59.000Z")
         yield mock
 
 
@@ -88,8 +91,8 @@ class TestGetMetricsAlertsPerRule:
         assert len(result["alerts_per_rule"]) == 2
         assert result["total_alerts"] == 200
         assert result["interval_in_minutes"] == 1440
-        assert result["from_date"] == "2024-03-20T00:00:00Z"
-        assert result["to_date"] == "2024-03-20T23:59:59Z"
+        assert result["from_date"] == "2024-03-20T00:00:00.000Z"
+        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
 
         # Verify rule data structure
         rule = result["alerts_per_rule"][0]
@@ -98,16 +101,18 @@ class TestGetMetricsAlertsPerRule:
         assert "value" in rule
         assert rule["value"] == 100
 
-    async def test_custom_date_range(self, mock_execute_query):
+    async def test_get_rule_alert_metrics_with_custom_date_range(
+        self, mock_execute_query
+    ):
         """Test function with custom date range."""
-        from_date = "2024-03-19T00:00:00Z"
-        to_date = "2024-03-19T23:59:59Z"
+        from_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
+        to_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
 
         result = await get_rule_alert_metrics(from_date=from_date, to_date=to_date)
 
         assert result["success"] is True
-        assert result["from_date"] == from_date
-        assert result["to_date"] == to_date
+        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["to_date"] == "2024-03-19T23:59:59.000Z"
         mock_execute_query.assert_called_once()
 
     async def test_custom_interval(self, mock_execute_query, mock_get_today_date_range):
@@ -138,6 +143,18 @@ class TestGetMetricsAlertsPerRule:
         assert result["success"] is False
         assert "Failed to fetch alerts per rule metrics" in result["message"]
 
+    async def test_invalid_interval_in_minutes(self, mock_execute_query):
+        """Test handling of invalid interval_in_minutes values."""
+        # Test with invalid interval
+        with pytest.raises(
+            ValueError, match="Input should be one of: 15, 30, 60, 180, 360, 720, 1440"
+        ):
+            await get_rule_alert_metrics(interval_in_minutes=45)
+
+        # Test with valid interval
+        result = await get_rule_alert_metrics(interval_in_minutes=60)
+        assert result["success"] is True
+
 
 @pytest.mark.asyncio
 class TestGetMetricsAlertsPerSeverity:
@@ -153,8 +170,8 @@ class TestGetMetricsAlertsPerSeverity:
         assert len(result["alerts_per_severity"]) == 2
         assert result["total_alerts"] == 200
         assert result["interval_in_minutes"] == 1440
-        assert result["from_date"] == "2024-03-20T00:00:00Z"
-        assert result["to_date"] == "2024-03-20T23:59:59Z"
+        assert result["from_date"] == "2024-03-20T00:00:00.000Z"
+        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
 
         # Verify severity data structure
         severity = result["alerts_per_severity"][0]
@@ -165,23 +182,27 @@ class TestGetMetricsAlertsPerSeverity:
         assert len(severity["breakdown"]) == 5
         assert all(value == 20 for value in severity["breakdown"].values())
 
-    async def test_custom_date_range(self, mock_execute_query):
+    async def test_get_severity_alert_metrics_with_custom_date_range(
+        self, mock_execute_query
+    ):
         """Test function with custom date range."""
-        from_date = "2024-03-19T00:00:00Z"
-        to_date = "2024-03-19T23:59:59Z"
+        from_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
+        to_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
 
         result = await get_severity_alert_metrics(from_date=from_date, to_date=to_date)
 
         assert result["success"] is True
-        assert result["from_date"] == from_date
-        assert result["to_date"] == to_date
+        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["to_date"] == "2024-03-19T23:59:59.000Z"
         mock_execute_query.assert_called_once()
 
     async def test_custom_alert_types(
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with custom alert types."""
-        result = await get_severity_alert_metrics(alert_types=["Rule", "Policy"])
+        result = await get_severity_alert_metrics(
+            alert_types=[MetricAlertType.RULE, MetricAlertType.POLICY]
+        )
 
         assert result["success"] is True
         assert len(result["alerts_per_severity"]) == 2
@@ -191,7 +212,9 @@ class TestGetMetricsAlertsPerSeverity:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with custom severities."""
-        result = await get_severity_alert_metrics(severities=["CRITICAL", "HIGH"])
+        result = await get_severity_alert_metrics(
+            severities=[AlertSeverity.CRITICAL, AlertSeverity.HIGH]
+        )
 
         assert result["success"] is True
         assert len(result["alerts_per_severity"]) == 2
@@ -213,6 +236,18 @@ class TestGetMetricsAlertsPerSeverity:
 
         assert result["success"] is False
         assert "Failed to fetch alerts per severity metrics" in result["message"]
+
+    async def test_invalid_interval_in_minutes(self, mock_execute_query):
+        """Test handling of invalid interval_in_minutes values."""
+        # Test with invalid interval
+        with pytest.raises(
+            ValueError, match="Input should be one of: 15, 30, 60, 180, 360, 720, 1440"
+        ):
+            await get_severity_alert_metrics(interval_in_minutes=45)
+
+        # Test with valid interval
+        result = await get_severity_alert_metrics(interval_in_minutes=60)
+        assert result["success"] is True
 
 
 @pytest.mark.asyncio
