@@ -1,0 +1,79 @@
+---
+description: Enforces repository structure and organization
+globs: *
+alwaysApply: false
+---
+<rule>
+filters:
+  - type: event
+    pattern: "file_create|file_move"
+  - type: content
+    pattern: "(?s).*"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s).*(password|secret|key|token).*=.*['\"].*['\"]"
+        message: "Sensitive data should be in environment variables or secrets management"
+      - pattern: "(?s).*node_modules|venv|.env|.DS_Store"
+        message: "Environment-specific files should be in .gitignore"
+      - pattern: "(?s).*/tmp/|/temp/|/cache/"
+        message: "Temporary directories should be in .gitignore"
+    message: |
+      Follow these repository structure guidelines:
+
+      1. Root Directory Organization:
+         - src/ or pkg/ for source code
+         - docs/ for documentation
+         - scripts/ for automation
+         - tests/ or __tests__/ for test files
+         - tools/ for development tools
+         - config/ for configuration
+      
+      2. Configuration Management:
+         - Use .env.example for environment templates
+         - Separate dev/staging/prod configs
+         - Use config/ for application settings
+         - Version control for schema migrations
+         - Infrastructure as Code files
+      
+      3. Documentation Structure:
+         - README.md in each major directory and at root
+         - API documentation in docs/api
+         - Security policies
+
+examples:
+  - input: |
+      /my-project
+      ├── src
+      │   └── main.ts
+      ├── secret.json
+      └── temp/
+    output: |
+      /my-project
+      ├── src
+      │   └── main.ts
+      ├── config
+      │   ├── .env.example
+      │   └── settings.json
+      ├── docs
+      │   └── README.md
+      └── .gitignore
+
+  - input: |
+      API_KEY="secret123"
+    output: |
+      # .env.example
+      API_KEY=""
+      
+      # config/settings.ts
+      export const config = {
+        apiKey: process.env.API_KEY
+      };
+
+metadata:
+  priority: high
+  version: "1.0"
+  category: repository_management
+  maintainer: Panther Labs Inc.
+</rule>

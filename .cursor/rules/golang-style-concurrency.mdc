@@ -1,0 +1,255 @@
+---
+description: Enforces best Go concurrency practices following Dave Cheney's recommendations
+globs: *.go
+alwaysApply: true
+---
+<rule>
+filters:
+  - type: file_extension
+    pattern: "\\.go$"
+  - type: content
+    pattern: "(?s).*go\\s+func.*|.*<-\\s*chan.*|.*chan\\s*<-.*|.*sync\\..*|.*context\\..*"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s).*go\\s+func.*(?!.*cancel|.*done|.*ctx|.*context).*"
+        message: "Goroutine without cancellation mechanism"
+      - pattern: "(?s).*select\\s*{\\s*case.*}\\s*(?!.*default).*"
+        message: "Select without default case may block indefinitely"
+      - pattern: "(?s).*close\\s*\\(.*\\).*"
+        message: "Verify channel is closed only by sender"
+      - pattern: "(?s).*var\\s+wg\\s+sync\\.WaitGroup.*(?!.*wg\\.Wait\\(\\)).*"
+        message: "WaitGroup initialized but Wait() not called"
+    message: |
+      Follow these Go concurrency best practices (Dave Cheney recommendations):
+
+      1. Goroutine Lifecycle:
+         - Never start a goroutine without knowing when it will stop
+         - Provide cancellation mechanism (context or done channel)
+         - Avoid goroutine leaks by proper cleanup
+         - Use sync.WaitGroup to wait for completion
+      
+      2. Context Usage:
+         - Pass context as first parameter
+         - Respect cancellation signals
+         - Propagate context to downstream calls
+         - Don't store contexts in structs
+      
+      3. Channel Practices:
+         - Close channels only from sender, never receiver
+         - Use buffered channels appropriately
+         - Use select with default for non-blocking operations
+         - Consider channel direction (send-only, receive-only)
+      
+      4. Synchronization:
+         - Prefer mutex for simple state protection
+         - Document concurrent access in comments
+         - Use atomic for simple counters
+         - Consider sync.Once for initialization
+      
+      5. Error Handling:
+         - Propagate errors from goroutines
+         - Use errgroup for concurrent error handling
+         - Don't panic in goroutines
+         - Log panics if recovery is necessary
+
+examples:
+  - input: |
+      // Problematic goroutine without lifecycle management
+      func processData(data []byte) {
+          go func() {
+              // This will run forever potentially causing leaks
+              for {
+                  process(data)
+              }
+          }()
+      }
+    output: |
+      // Improved goroutine with proper lifecycle management
+      func processData(ctx context.Context, data []byte) {
+          go func() {
+              // This will terminate when context is cancelled
+              for {
+                  select {
+                  case <-ctx.Done():
+                      return // Clean exit when context is cancelled
+                  default:
+                      process(data)
+                  }
+              }
+          }()
+      }
+
+  - input: |
+      // Problematic select without default
+      func readWithTimeout(ch <-chan int) int {
+          select {
+          case v := <-ch:
+              return v
+          }
+      }
+    output: |
+      // Improved select with timeout
+      func readWithTimeout(ch <-chan int, timeout time.Duration) (int, bool) {
+          select {
+          case v := <-ch:
+              return v, true
+          case <-time.After(timeout):
+              return 0, false // Timeout case
+          }
+      }
+
+  - input: |
+      // Problematic WaitGroup usage
+      func processItems(items []Item) {
+          var wg sync.WaitGroup
+          
+          for _, item := range items {
+              wg.Add(1)
+              go func(i Item) {
+                  process(i)
+                  wg.Done()
+              }(item)
+          }
+          
+          // Missing wg.Wait()
+      }
+    output: |
+      // Improved WaitGroup usage
+      func processItems(ctx context.Context, items []Item) error {
+          var wg sync.WaitGroup
+          errCh := make(chan error, 1) // Capture first error
+          
+          for _, item := range items {
+              wg.Add(1)
+              go func(i Item) {
+                  defer wg.Done()
+                  
+                  select {
+                  case <-ctx.Done():
+                      return
+                  default:
+                      if err := process(i); err != nil {
+                          select {
+                          case errCh <- err:
+                          default:
+                          }
+                      }
+                  }
+              }(item)
+          }
+          
+          wg.Wait() // Wait for all goroutines
+          
+          select {
+          case err := <-errCh:
+              return err
+          default:
+              return nil
+          }
+      }
+
+  - input: |
+      // Problematic channel closing
+      func worker(ch chan int) {
+          for i := range ch {
+              process(i)
+              if someCondition(i) {
+                  close(ch) // Receiver closing the channel
+              }
+          }
+      }
+    output: |
+      // Improved channel pattern
+      func worker(ch <-chan int, done chan<- struct{}) {
+          for i := range ch {
+              process(i)
+              if someCondition(i) {
+                  done <- struct{}{} // Signal completion instead of closing
+              }
+          }
+      }
+      
+      func coordinator() {
+          ch := make(chan int)
+          done := make(chan struct{})
+          
+          go worker(ch, done)
+          
+          // Send values
+          for i := 0; i < 10; i++ {
+              select {
+              case <-done:
+                  close(ch) // Sender closes the channel
+                  return
+              case ch <- i:
+                  // Value sent
+              }
+          }
+          
+          close(ch) // Normal termination, sender closes
+      }
+
+  - input: |
+      // Problematic concurrent error handling with manual coordination
+      func processFiles(filePaths []string) error {
+          var wg sync.WaitGroup
+          errCh := make(chan error, len(filePaths))
+          
+          for _, path := range filePaths {
+              wg.Add(1)
+              go func(p string) {
+                  defer wg.Done()
+                  if err := processFile(p); err != nil {
+                      errCh <- err
+                  }
+              }(path)
+          }
+          
+          wg.Wait()
+          
+          // Check if any errors occurred
+          select {
+          case err := <-errCh:
+              return err
+          default:
+              return nil
+          }
+      }
+    output: |
+      // Improved concurrent error handling with errgroup
+      import (
+          "context"
+          "golang.org/x/sync/errgroup"
+      )
+      
+      func processFiles(ctx context.Context, filePaths []string) error {
+          // Create a new errgroup with cancellation context
+          g, ctx := errgroup.WithContext(ctx)
+          
+          for _, path := range filePaths {
+              // Launch processing in a goroutine
+              g.Go(func() error {
+                  // Process file and return any error
+                  return processFile(ctx, path)
+              })
+          }
+          
+          // Wait for all goroutines to complete or first error
+          return g.Wait()
+      }
+      
+      // Note that in processFile, you should respect context cancellation:
+      func processFile(ctx context.Context, path string) error {
+          // Check context regularly
+          
+          // Actual file processing...
+          return nil
+      }
+metadata:
+  priority: high
+  version: "1.0"
+  category: code_style
+  maintainer: Panther Labs Inc.
+</rule>

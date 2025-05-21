@@ -1,0 +1,86 @@
+---
+description: TypeScript code style and best practices
+globs: *.ts*
+alwaysApply: true
+---
+<rule>
+filters:
+  - type: file_extension
+    pattern: "\\.(ts|tsx)$"
+  - type: event
+    pattern: "cursor_suggestion"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s).*:\\s*any\\b"
+        message: "Avoid using 'any' type - specify exact types"
+      - pattern: "(?s).*[!]\\s*\\w+\\s*[;)]"
+        message: "Avoid non-null assertions (!), handle nullability explicitly"
+      - pattern: "(?s).*type\\s+\\w+\\s*=\\s*string"
+        message: "Consider using string literal types or enums for better type safety"
+    message: |
+      Follow these TypeScript code style guidelines:
+
+      1. Type Safety:
+         - Use strict TypeScript configuration
+         - Avoid 'any' type
+         - Explicit return types on functions
+         - Use branded types for type safety
+         - Leverage const assertions
+      
+      2. Modern Patterns:
+         - Use functional programming concepts
+         - Immutable data structures
+         - Discriminated unions for state
+         - Type guards for runtime checks
+         - Utility types (Pick, Omit, etc.)
+      
+      3. React Patterns (when applicable):
+         - Functional components with hooks
+         - Props interface with exact types
+         - Proper event typing
+         - Memoization where beneficial
+         - Custom hooks for shared logic
+      
+      4. Error Handling:
+         - Use Result/Either types
+         - Type-safe error handling
+         - Custom error classes
+         - Avoid throwing in async code
+      
+      5. Testing:
+         - Jest with TypeScript support
+         - Type testing with dtslint
+         - Mock typing consistency
+         - Snapshot testing sparingly
+
+examples:
+  - input: |
+      function processUser(user: any) {
+          return user.name;
+      }
+    output: |
+      interface User {
+          name: string;
+          id: number;
+      }
+      
+      function processUser(user: User): string {
+          return user.name;
+      }
+
+  - input: |
+      const data = someApi.getData()!;
+    output: |
+      const data = someApi.getData();
+      if (data === null) {
+          throw new Error('Data should not be null');
+      }
+
+metadata:
+  priority: high
+  version: "1.0"
+  category: code_style
+  maintainer: Panther Labs Inc.
+</rule>

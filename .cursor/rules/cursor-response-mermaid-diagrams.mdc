@@ -1,0 +1,80 @@
+---
+description: Specifies when and how Cursor should use Mermaid diagrams to explain complex changes or concepts
+globs: *
+alwaysApply: true
+---
+<rule>
+filters:
+  - type: event
+    pattern: "cursor_suggestion"
+  - type: content
+    pattern: "(?s).*"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s).*(workflow|process flow|sequence|architecture|dependency|relationship).*(?!.*```mermaid).*"
+        message: "Consider adding a Mermaid diagram to explain this concept"
+      - pattern: "(?s).*(state machine|state changes|transitions).*(?!.*```mermaid).*"
+        message: "A state diagram would help explain this better"
+    message: |
+      Include Mermaid diagrams when explaining:
+      - Cursor's step-by-step reasoning for suggested changes
+      - System architecture changes
+      - Process flows and workflows
+      - State machines and transitions
+      - Complex dependencies or relationships
+      - API interaction sequences
+      - Data flow changes   
+      
+      Diagram guidelines:
+      1. Keep diagrams focused and relevant
+      2. Include clear labels and descriptions
+      3. Use appropriate diagram type (sequence, flowchart, etc.)
+      4. Add explanatory comments in the diagram
+      5. Ensure left-to-right or top-to-bottom flow for readability
+
+examples:
+  - input: |
+      AI: "This change will modify how the authentication flow works"
+    output: |
+      AI: "This change will modify the authentication flow. Here's a diagram of the new flow:
+      
+      ```mermaid
+      sequenceDiagram
+          participant U as User
+          participant A as Auth Service
+          participant D as Database
+          
+          U->>A: Login Request
+          A->>D: Validate Credentials
+          D-->>A: Valid User
+          A->>A: Generate JWT
+          A-->>U: Return Token
+      ```
+      
+      The key changes are..."
+
+  - input: |
+      AI: "We'll update the order processing state machine"
+    output: |
+      AI: "We'll update the order processing state machine. Here's the new state diagram:
+      
+      ```mermaid
+      stateDiagram-v2
+          [*] --> Pending
+          Pending --> Processing: validate()
+          Processing --> Fulfilled: complete()
+          Processing --> Failed: error()
+          Failed --> [*]
+          Fulfilled --> [*]
+      ```
+      
+      The new states handle..."
+
+metadata:
+  priority: medium
+  version: "1.0"
+  category: documentation
+  maintainer: Panther Labs Inc.
+</rule>

@@ -1,0 +1,68 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+<rule>
+filters:
+  - type: event
+    pattern: "cursor_suggestion"
+  - type: content
+    pattern: "(?s).*(change|fix|implement|add|modify).*"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s).*(?!.*test|.*verify|.*check).*(solution|change|fix).*"
+        message: "Solution must include verification steps"
+      - pattern: "(?s).*(?!.*impact).*(breaking|major).*"
+        message: "Major changes require impact analysis"
+    message: |
+      Before suggesting a solution:
+      - Verify syntax and compilation
+      - Check for potential runtime errors
+      - Test the change with example inputs
+      - Verify integration points
+      - Check for side effects
+      - Ensure backward compatibility
+      - Validate against existing tests
+      
+      Document verification steps:
+      1. What was tested
+      2. How it was tested
+      3. Expected outcomes
+      4. Edge cases considered
+      5. Potential limitations
+      6. Mermaid graph illustrations if applicable
+
+examples:
+  - input: |
+      AI: "Here's the fix for the authentication bug"
+    output: |
+      Better: "Here's the fix for the authentication bug. I've verified it by:
+      1. Testing with valid and invalid credentials
+      2. Checking session handling edge cases
+      3. Verifying it works with existing middleware
+      4. Confirming backward compatibility
+      5. Running existing auth test suite
+      
+      The solution handles these cases: ..."
+
+  - input: |
+      AI: "I've updated the API endpoint"
+    output: |
+      Better: "I've updated the API endpoint and verified:
+      1. All CRUD operations work as expected
+      2. Error responses are correct
+      3. Rate limiting still functions
+      4. Authentication flow is preserved
+      5. Existing clients won't break
+      
+      Test cases covered: ..."
+
+metadata:
+  priority: high
+  version: "1.0"
+  category: quality_assurance
+  maintainer: Panther Labs Inc.
+</rule>

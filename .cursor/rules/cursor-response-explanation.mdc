@@ -1,0 +1,59 @@
+---
+description: Ensures that Cursor provides clear explanations for all suggested code changes
+globs: *
+alwaysApply: true
+---
+<rule>
+filters:
+  - type: event
+    pattern: "cursor_suggestion"
+  - type: content
+    pattern: "(?s).*"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s)(?!.*why.*|.*because.*|.*reason.*|.*purpose.*).*(edit|change|modify|update|add|remove).*"
+        message: "Missing explanation for the proposed changes"
+      - pattern: "(?s).*(?!.*impact.*|.*effect.*).*(major|significant|breaking).*"
+        message: "Missing impact analysis for significant changes"
+    message: |
+      When suggesting changes, always include:
+      - Clear explanation of why each change is necessary
+      - How the change addresses the user's request
+      - Potential impact on existing functionality
+      - Any assumptions made about the codebase
+      - Trade-offs considered in the solution
+      - Mermaid charts to explain reasoning if applicable
+      
+      Format explanations as:
+      1. Purpose of the change
+      2. Technical approach chosen
+      3. Impact analysis
+      4. Alternative approaches considered (if applicable)
+
+examples:
+  - input: |
+      AI: "I'll change this function to use async/await"
+    output: |
+      AI: "I'll change this function to use async/await because:
+      1. It will make error handling more straightforward
+      2. The current callback pattern is causing the reported race condition
+      3. This change will affect all callers of this function, which will need to be updated
+      4. I considered using Promises directly but async/await will be more readable"
+
+  - input: |
+      AI: "Let's modify the database schema"
+    output: |
+      AI: "I'll modify the database schema to add the new column because:
+      1. The new feature requires storing user preferences
+      2. Adding a nullable column maintains backward compatibility
+      3. Impact: Existing queries won't be affected
+      4. Alternative of using a separate table was considered but would increase query complexity"
+
+metadata:
+  priority: high
+  version: "1.0"
+  category: documentation
+  maintainer: Panther Labs Inc.
+</rule>

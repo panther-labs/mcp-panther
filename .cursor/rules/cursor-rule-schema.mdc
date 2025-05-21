@@ -1,0 +1,111 @@
+---
+description: Cursor Rule Schema
+globs: *.mdc
+alwaysApply: true
+---
+<rule>
+filters:
+  # Match files that look like Cursor rules
+  - type: content
+    pattern: "(?s)<rule>.*?</rule>"
+
+actions:
+  - type: validate
+    schema:
+      type: object
+      required:
+        - name
+        - description
+        - filters
+        - actions
+      properties:
+        name:
+          type: string
+          pattern: "^[a-z][a-z0-9-]*$"
+          description: "Kebab-case name of the rule"
+        
+        description:
+          type: string
+          description: "Clear description of the rule's purpose"
+        
+        filters:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: ["type", "pattern"]
+            properties:
+              type:
+                type: string
+                enum: ["file_extension", "content", "event"]
+              pattern:
+                type: string
+                description: "Regular expression pattern to match"
+        
+        actions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: ["type"]
+            properties:
+              type:
+                type: string
+                enum: ["reject", "suggest", "validate"]
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    pattern:
+                      type: string
+                    message:
+                      type: string
+              message:
+                type: string
+              schema:
+                type: object
+        
+        examples:
+          type: array
+          items:
+            type: object
+            required: ["input", "output"]
+            properties:
+              input:
+                type: string
+              output:
+                type: string
+        
+        metadata:
+          type: object
+          properties:
+            priority:
+              type: string
+              enum: ["low", "medium", "high"]
+            version:
+              type: string
+              pattern: "^\\d+\\.\\d+$"
+
+examples:
+  - input: |
+      <rule>
+      name: example-rule
+      description: "An example rule"
+      filters:
+        - type: file_extension
+          pattern: "\\.txt$"
+      actions:
+        - type: suggest
+          message: "This is a suggestion"
+      metadata:
+        priority: high
+        version: "1.0"
+      </rule>
+    output: "Valid rule format"
+
+metadata:
+  priority: high
+  version: "1.0"
+  maintainer: Panther Labs Inc.
+</rule>

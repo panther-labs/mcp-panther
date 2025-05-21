@@ -1,0 +1,129 @@
+---
+description: Encourages use of map[string]struct{} for table-driven Go unit tests and enforces underscores in test case names.
+globs: *_test.go
+alwaysApply: true
+---
+<rule>
+name: code-style-golang-table-test-map
+filters:
+  - type: file_extension
+    pattern: "_test\\.go$"
+  - type: content
+    pattern: "(?s)\\b(var\\s+)?(test|tests|testcases|tcs|cases)\\s*(:=|=)\\s*\\[\\]\\s*struct\\s*\\{"
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s)\\b(var\\s+)?(test|tests|testcases|tcs|cases)\\s*(:=|=)\\s*\\[\\]\\s*struct\\s*\\{"
+        message: "Prefer map[string]struct{} for table-driven tests to enable named subtests and clearer test output. Supported variable names: test, tests, testcases, tcs, cases."
+      - pattern: "\"[^\"]* [^\"]*\"\\s*:"
+        message: "Use underscores (_) instead of spaces in test case names for map[string]struct{} table tests."
+    message: |
+      For table-driven Go tests, use a map[string]struct{} instead of a []struct{} for the test cases. This allows each test case to be named, making subtest output clearer and easier to debug. Also, use underscores (_) in test case names instead of spaces.
+
+      Example (discouraged):
+      ```go
+      testcases := []struct{
+          input int
+          want  int
+      }{
+          {1, 2},
+          {2, 4},
+      }
+      for _, tc := range testcases {
+          t.Run(fmt.Sprintf("%v", tc.input), func(t *testing.T) {
+              // ...
+          })
+      }
+      ```
+
+      Example (preferred):
+      ```go
+      tests := map[string]struct{
+          input int
+          want  int
+      }{
+          "one": {input: 1, want: 2},
+          "two": {input: 2, want: 4},
+      }
+      for name, tc := range tests {
+          t.Run(name, func(t *testing.T) {
+              // ...
+          })
+      }
+      ```
+
+      Example (discouraged):
+      ```go
+      // Bad: test case name with spaces
+      tests := map[string]struct{
+          input int
+          want  int
+      }{
+          "my test case": {input: 1, want: 2}, // discouraged
+      }
+
+      // Good: test case name with underscores
+      tests := map[string]struct{
+          input int
+          want  int
+      }{
+          "my_test_case": {input: 1, want: 2}, // preferred
+      }
+      ```
+
+examples:
+  - input: |
+      tests := []struct{
+          name string
+          input int
+          output  int
+      }{
+          {name: "addition works correctly", input: 1, output: 2},
+          {name: "error case", input: 1, output: 2},
+      }
+    output: |
+      tests := map[string]struct{
+          input int
+          output  int
+      }{
+          "addition_works_correctly": {input: 1, want: 2},
+          "error_case": {input: 2, output: 4},
+      }
+  - input: |
+      tests := []struct{
+          input int
+          want  int
+      }{
+          {1, 2},
+          {2, 4},
+      }
+    output: |
+      tests := map[string]struct{
+          input int
+          want  int
+      }{
+          "one": {input: 1, want: 2},
+          "two": {input: 2, want: 4},
+      }
+  - input: |
+      tests := map[string]struct{
+          input int
+          want  int
+      }{
+          "my test case": {input: 1, want: 2},
+      }
+    output: |
+      tests := map[string]struct{
+          input int
+          want  int
+      }{
+          "my_test_case": {input: 1, want: 2},
+      }
+
+metadata:
+  priority: medium
+  version: "1.0"
+  category: code_style
+  maintainer: Panther Labs Inc.
+</rule>
+

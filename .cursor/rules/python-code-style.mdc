@@ -1,0 +1,92 @@
+---
+description: Enforces enterprise-grade Python code style and best practices
+globs:  *.py
+alwaysApply: true
+---
+<rule>
+filters:
+  - type: file_extension
+    pattern: "\\.py$"
+  - type: event
+    pattern: "cursor_suggestion"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s).*def\\s+\\w+\\s*\\([^)]*\\)\\s*(?!->)\\s*:"
+        message: "Add return type annotation"
+      - pattern: "(?s).*except\\s*:\\s*"
+        message: "Specify exception types explicitly"
+      - pattern: "(?s).*from\\s+typing\\s+import\\s+Any"
+        message: "Avoid using Any type - specify concrete types"
+    message: |
+      Follow these Python code style guidelines:
+
+      1. Type Hints:
+         - Use type hints consistently
+         - Leverage typing.Protocol
+         - Use typing.TypeVar for generics
+         - Define custom types when needed
+         - Use typing.Final for constants
+      
+      2. Modern Python Features:
+         - Use dataclasses for data objects
+         - Async/await for I/O operations
+         - Pattern matching (Python 3.10+)
+         - f-strings for string formatting
+         - Walrus operator when appropriate
+      
+      3. Error Handling:
+         - Custom exception hierarchies
+         - Context managers for resources
+         - Explicit exception types
+         - Use try/except judiciously
+         - Document error conditions
+      
+      4. Project Structure:
+         - Proper package initialization
+         - Clear module boundaries
+         - Dependency injection
+         - Configuration management
+      
+      5. Testing:
+         - pytest as test framework
+         - Type checking in CI
+         - Property-based testing
+         - Fixtures for test data
+         - Mock external dependencies
+
+examples:
+  - input: |
+      def process_data(data):
+          return data.value
+    output: |
+      from typing import TypeVar, Protocol
+      from dataclasses import dataclass
+      
+      T = TypeVar('T')
+      
+      class HasValue(Protocol):
+          value: T
+      
+      def process_data(data: HasValue[T]) -> T:
+          return data.value
+
+  - input: |
+      try:
+          process_data()
+      except:
+          pass
+    output: |
+      try:
+          process_data()
+      except ValueError as e:
+          logger.error("Invalid data format: %s", e)
+          raise DataProcessingError("Failed to process data") from e
+
+metadata:
+  priority: high
+  version: "1.0"
+  category: code_style
+  maintainer: Panther Labs Inc.
+</rule>

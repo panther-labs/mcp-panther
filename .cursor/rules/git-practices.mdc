@@ -1,0 +1,55 @@
+---
+description: Git best practices
+globs: *
+alwaysApply: true
+---
+<rule>
+filters:
+  - type: event
+    pattern: "commit_message|branch_name"
+  - type: content
+    pattern: "(?s).*"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s).*fix|update|add|remove|refactor|style|test|docs|chore.*"
+        message: "Use conventional commit format"
+      - pattern: "(?s).*WIP|TODO|FIXME.*"
+        message: "Avoid temporary markers in commit messages"
+      - pattern: "(?s).*master|main|develop|release.*"
+        message: "Follow branch naming conventions"
+    message: |
+      Follow these git practice guidelines:
+
+      1. Commit Messages:
+         - Use conventional commits format
+         - Include ticket/issue reference
+         - Separate subject from body
+         - Use imperative mood
+         - Limit subject to 50 chars
+      
+      2. Branch Management:
+         - Descriptive branch names
+
+examples:
+  - input: |
+      git commit -m "fixed the bug"
+    output: |
+      git commit -m "fix(auth): resolve JWT validation error in login flow
+
+      - Updates token verification logic
+      - Adds proper error handling
+      - Fixes issue #123"
+
+  - input: |
+      git checkout -b new-feature
+    output: |
+      git checkout -b feature/auth-refresh-token
+
+metadata:
+  priority: high
+  version: "1.0"
+  category: repository_management
+  maintainer: Panther Labs Inc.
+</rule>

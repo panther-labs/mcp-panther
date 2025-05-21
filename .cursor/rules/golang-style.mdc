@@ -1,0 +1,94 @@
+---
+description: Go code style and best practices
+globs: *.go
+alwaysApply: true
+---
+
+<rule>
+  - type: event
+    pattern: "cursor_suggestion"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s).*func\\s+\\w+\\s*\\([^)]*\\)\\s*(?!error)[^{]*\\{"
+        message: "Consider error return for functions that may fail"
+      - pattern: "(?s).*if\\s+err\\s*!=\\s*nil\\s*{\\s*return\\s+[^}]*}"
+        message: "Error handling should include context"
+      - pattern: "(?s).*var\\s+\\w+\\s+interface{}"
+        message: "Avoid empty interface unless absolutely necessary"
+    message: |
+      Follow these Go code style guidelines:
+
+      1. Package Organization:
+         - One package per directory
+         - Package name matches directory name
+         - Internal packages in 'internal/'
+         - Shared packages in 'pkg/'
+      
+      2. Error Handling:
+         - Use pkg/errors for error wrapping
+         - Return errors as last return value
+         - Always handle errors explicitly
+         - Use error variables for sentinel errors
+      
+      3. Interface Design:
+         - Keep interfaces small
+         - Define interfaces at use site
+         - Use io.Reader/Writer where applicable
+         - Prefer composition over inheritance
+      
+      4. Concurrency:
+         - Use channels for communication
+         - Mutex for simple state protection
+         - Document concurrent access
+         - Close channels when done
+      
+      5. Testing:
+         - Table-driven tests
+         - Use testify for assertions
+         - Benchmark critical paths
+         - Use interfaces for mocking
+         - Use require.ErrorContains() instead of redundant require.Error() + require.ErrorContains()
+         - Use assert.ErrorContains() instead of redundant assert.Error() + assert.ErrorContains()
+
+examples:
+  - input: |
+      func processData(data []byte) {
+          // process without error handling
+      }
+    output: |
+      func processData(data []byte) error {
+          if len(data) == 0 {
+              return fmt.Errorf("processData: empty data")
+          }
+          // process with error handling
+          return nil
+      }
+
+  - input: |
+      if err != nil {
+          return err
+      }
+    output: |
+      if err != nil {
+          return fmt.Errorf("failed to process data: %w", err)
+      }
+  - input: |
+      func TestSomething(t *testing.T) {
+          err := doSomething()
+          require.Error(t, err)
+          require.ErrorContains(t, err, "expected error message")
+      }
+    output: |
+      func TestSomething(t *testing.T) {
+          err := doSomething()
+          require.ErrorContains(t, err, "expected error message")
+      }
+
+metadata:
+  priority: high
+  version: "1.0"
+  category: code_style
+  maintainer: Panther Labs Inc.
+</rule> 

@@ -1,0 +1,60 @@
+---
+description: Ensures refactoring suggestions remain focused on the specific task and requested scope
+globs: *
+alwaysApply: true
+---
+# Scope Limited Refactoring Rule
+
+<rule>
+filters:
+  - type: event
+    pattern: "cursor_suggestion"
+  - type: content
+    pattern: "(?s).*(refactor|restructure|rewrite|improve|clean|optimize).*"
+
+actions:
+  - type: reject
+    conditions:
+      - pattern: "(?s).*(?!.*requested).*(rename|move|extract|inline|decompose).*"
+        message: "Unrequested refactoring operations are not allowed"
+      - pattern: "(?s).*(?!.*task).*(pattern|architecture|design).*"
+        message: "Architectural changes must be explicitly part of the task"
+  - type: suggest
+    message: |
+      When suggesting code changes:
+      - Focus only on the specific task requirements
+      - Do not include unrequested refactoring
+      - Keep modifications within the specified scope
+      - Document potential refactoring opportunities separately
+      - Preserve existing patterns unless change is requested
+      
+      If you notice potential improvements:
+      1. Complete the requested task first
+      2. Mention potential improvements separately
+      3. Wait for explicit approval before implementing
+
+examples:
+  - input: |
+      User: "Fix the null pointer in validateUser()"
+      AI: "I'll fix that and also refactor this class to use the repository pattern"
+    output: |
+      Rejected: Scope exceeds requested changes.
+      Better: "I'll fix the null pointer issue in validateUser(). Note: I noticed this class 
+      could benefit from using the repository pattern - would you like me to suggest that 
+      refactoring separately after fixing the immediate issue?"
+
+  - input: |
+      User: "Refactor this component to use hooks"
+      AI: "I'll convert to hooks and also reorganize the folder structure"
+    output: |
+      Rejected: Folder restructuring exceeds requested scope.
+      Better: "I'll convert this component to use hooks as requested, maintaining its current 
+      location and integration points. The folder structure could be improved - would you 
+      like me to propose those changes separately?"
+
+metadata:
+  priority: high
+  version: "1.0"
+  category: code_quality
+  maintainer: Panther Labs Inc.
+</rule>

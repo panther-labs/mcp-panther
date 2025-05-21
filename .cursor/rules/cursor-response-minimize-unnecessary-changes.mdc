@@ -1,0 +1,48 @@
+---
+description: Ensures that Cursor's suggested changes are focused and directly related to the task at hand
+globs: *
+alwaysApply: true
+---
+<rule>
+filters:
+  - type: event
+    pattern: "cursor_suggestion"
+  - type: content
+    pattern: "(?s).*"
+
+actions:
+  - type: suggest
+    conditions:
+      - pattern: "(?s).*(refactor|improve|clean|optimize).*(?!requested).*"
+        message: "Avoid suggesting unrequested improvements or refactoring"
+      - pattern: "(?s).*(style changes|formatting).*(?!requested).*"
+        message: "Avoid making unrequested style or formatting changes"
+    message: |
+      When making code changes:
+      - Only implement changes directly related to the user's request
+      - Do not include unrequested optimizations or improvements
+      - Keep the scope focused on the specific task
+      - If you notice potential improvements, mention them separately without implementing
+      - Preserve existing code style unless specifically asked to change it
+
+examples:
+  - input: |
+      User: "Add error handling to this function"
+      AI: "I'll add error handling and also refactor this to use a more modern pattern..."
+    output: |
+      Suggestion: Focus only on adding error handling. Mention potential refactoring 
+      separately without implementing it.
+
+  - input: |
+      User: "Fix this bug in the error handler"
+      AI: "I'll fix the bug and also improve the variable names for clarity..."
+    output: |
+      Suggestion: Focus only on fixing the bug. Leave variable names unchanged 
+      unless they're directly related to the bug fix.
+
+metadata:
+  priority: high
+  version: "1.0"
+  category: code_quality
+  maintainer: Panther Labs Inc.
+</rule>

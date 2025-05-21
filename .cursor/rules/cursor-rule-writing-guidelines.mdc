@@ -1,0 +1,88 @@
+---
+description: Rule Writing Guidelines
+globs: *.mdc
+alwaysApply: true
+---
+<rule>
+actions:
+  - type: suggest
+    message: |
+      When writing Cursor rules, follow these key principles:
+
+      1. Rule Structure
+         - Every rule must have a clear description, following the header schema of Cursor Rules
+         - Use descriptive names that indicate the rule's function
+         - Include relevant filters to target specific files/events
+         - Provide clear, actionable messages
+
+      2. Documentation
+         - Start with a high-level overview
+         - Include examples of both correct and incorrect usage
+         - Document any assumptions or prerequisites
+         - Explain the reasoning behind the rule
+
+      3. Examples
+         - Provide multiple examples covering different scenarios
+         - Include both positive and negative cases
+         - Make examples concrete and realistic
+         - Comment examples to explain key points
+
+      4. Testing
+         - Include test cases in the examples section
+         - Verify rule triggers appropriately
+         - Test edge cases and common variations
+         - Ensure error messages are helpful
+
+      5. Maintenance
+         - Version your rules
+         - Include metadata for priority and status
+         - Document dependencies between rules
+         - Plan for future updates
+
+examples:
+  - description: "Good Rule Example"
+    input: |
+      ---
+      description: Rule Writing Guidelines
+      globs: *.mdc
+      alwaysApply: true
+      ---
+      <rule>
+      name: feature_component_structure
+      description: Enforces consistent structure for feature components
+      filters:
+        - type: file_path
+          pattern: "src/features/.+/components/.+"
+      
+      actions:
+        - type: suggest
+          message: "Feature components should follow standard structure..."
+      
+      examples:
+        - input: "Example implementation"
+          output: "Expected result"
+      
+      metadata:
+        priority: medium
+        version: 1.0
+      </rule>
+
+  - description: "Bad Rule Example"
+    input: |
+      <rule>
+      name: misc_rule
+      description: some checks
+      filters:
+        - type: any
+          pattern: ".*"
+      actions:
+        - type: suggest
+          message: "Fix this"
+      </rule>
+
+metadata:
+  priority: high
+  version: 1.0
+  category: meta
+  maintainer: Panther Labs Inc.
+</rule>
