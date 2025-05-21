@@ -11,7 +11,6 @@ from pydantic import Field
 
 from ..client import (
     _execute_query,
-    _get_today_date_range,
     get_today_date_range,
     graphql_date_format,
 )
@@ -149,39 +148,46 @@ async def get_severity_alert_metrics(
     }
 )
 async def get_rule_alert_metrics(
-    from_date: datetime | None = None,
-    to_date: datetime | None = None,
+    from_date: Annotated[
+        datetime | None,
+        Field(description="The start date of the metrics period."),
+    ] = None,
+    to_date: Annotated[
+        datetime | None,
+        Field(description="The end date of the metrics period."),
+    ] = None,
     interval_in_minutes: Annotated[
         Literal[15, 30, 60, 180, 360, 720, 1440],
         Field(
             description="How data points are aggregated over time, with smaller intervals providing more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents."
         ),
-    ] = 1440,
-    rule_ids: list[str] | None = None,
+    ] = 15,
+    rule_ids: Annotated[
+        list[str] | None,
+        Field(description="The specific Panther detection rules to get metrics for."),
+    ] = None,
 ) -> Dict[str, Any]:
     """Gets alert metrics per detection rule for ALL alert types including alerts, detection errors, and system errors within a given time period. Use this tool to identify hot spots in your alerts, and use the list_alerts tool for specific details.
 
-    Args:
-        from_date: Start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z"). Defaults to today at 00:00:00Z.
-        to_date: End date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z"). Defaults to today at 23:59:59Z.
-        interval_in_minutes: The grouping interval for the metrics. Must be one of: 15, 30, 60, 180, 360, 720, 1440 minutes. Defaults to 1440 minutes (1 day).
-        rule_ids: Optional list of rule IDs to filter results by. If not provided, returns all rules.
-
     Returns:
-        Dict containing:
-        - alerts_per_rule: Total alert count, description and entityId for each rule
-        - total_alerts: Total number of alerts in the period
+        Dict:
+        - alerts_per_rule: List of series with timestamp, value, and rule ID
         - from_date: Start date of the period
         - to_date: End date of the period
         - interval_in_minutes: Grouping interval for the metrics
+        - rule_ids: List of rule IDs if provided
     """
     try:
-        # If no dates provided, get today's date range
-        if not from_date and not to_date:
-            from_date, to_date = _get_today_date_range()
+        # If from or to date is missing, use today's date range
+        if not all([from_date, to_date]):
+            from_date_today, to_date_today = get_today_date_range()
             logger.info(
-                f"No date range provided, using today's date range: {from_date} to {to_date}"
+                f"From or To date is missing, using today's date range: {from_date_today} to {to_date_today}"
             )
+            if not from_date:
+                from_date = from_date_today
+            if not to_date:
+                to_date = to_date_today
         else:
             logger.info(f"Using provided date range: {from_date} to {to_date}")
 
@@ -199,108 +205,90 @@ async def get_rule_alert_metrics(
         # Execute query
         result = await _execute_query(METRICS_ALERTS_PER_RULE_QUERY, variables)
 
-        if not result or "metrics" not in result:
+        if not result or "data" not in result or "alertsPerRule" not in result["data"]:
             raise Exception("Failed to fetch metrics data")
 
-        metrics_data = result["metrics"]
+        metrics_data = result["data"]["alertsPerRule"]
 
         # Filter by rule IDs if provided
         if rule_ids:
             alerts_per_rule = [
                 item
-                for item in metrics_data["alertsPerRule"]
-                if item["entityId"] in rule_ids
+                for item in metrics_data["series"]
+                if item["labels"]["ruleId"] in rule_ids
             ]
         else:
-            alerts_per_rule = metrics_data["alertsPerRule"]
+            alerts_per_rule = metrics_data["series"]
 
         return {
             "success": True,
             "alerts_per_rule": alerts_per_rule,
-            "total_alerts": metrics_data["totalAlerts"],
             "from_date": graphql_date_format(from_date),
             "to_date": graphql_date_format(to_date),
             "interval_in_minutes": interval_in_minutes,
+            "rule_ids": rule_ids if rule_ids else None,
         }
 
     except Exception as e:
         logger.error(f"Failed to fetch alerts per rule metrics: {str(e)}")
         return {
             "success": False,
-            "message": f"Failed to fetch alerts per rule metrics: {str(e)}",
+            "error": f"Failed to fetch alerts per rule metrics: {str(e)}",
         }
 
 
 @mcp_tool
 async def get_bytes_processed_per_log_type_and_source(
-    from_date: datetime | None = None,
-    to_date: datetime | None = None,
-    interval: Literal["1h", "12h", "24h"] = "24h",
+    from_date: Annotated[
+        datetime | None,
+        Field(description="The start date of the metrics period."),
+    ] = None,
+    to_date: Annotated[
+        datetime | None,
+        Field(description="The end date of the metrics period."),
+    ] = None,
+    interval_in_minutes: Annotated[
+        Literal[60, 720, 1440],
+        Field(
+            description="How data points are aggregated over time, with smaller intervals providing more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents."
+        ),
+    ] = 1440,
 ) -> Dict[str, Any]:
-    """Get the total bytes processed per log type and source for a given time period.
-
-    This tool helps understand data ingestion patterns and costs by showing:
-    1. Total bytes processed per log type
-    2. Breakdown by source for each log type
-
-    Example usage:
-        # Get bytes processed for the last day
-        metrics = get_bytes_processed_per_log_type_and_source(
-            from_date="2024-03-01T00:00:00Z",
-            to_date="2024-03-02T00:00:00Z",
-            interval="24h"
-        )
-
-        # Use results to analyze ingestion patterns
-        if metrics["success"]:
-            for series in metrics["bytes_processed"]:
-                print(f"Log type: {series['label']}")
-                print(f"Total bytes: {series['value']}")
-                print("Breakdown by source:")
-                for source, value in series["breakdown"].items():
-                    print(f"  {source}: {value} bytes")
-
-    Args:
-        from_date: Start date in ISO 8601 format (e.g. "2024-03-20T00:00:00Z"). Defaults to today at 00:00:00Z.
-        to_date: End date in ISO 8601 format (e.g. "2024-03-21T00:00:00Z"). Defaults to today at 23:59:59Z.
-        interval: The time interval for the metrics ("1h", "12h", or "24h"). Defaults to "24h".
+    """Retrieves data ingestion metrics showing total bytes processed per log type and source, helping analyze data volume patterns.
 
     Returns:
-        Dict containing:
+        Dict:
         - success: Boolean indicating if the query was successful
         - bytes_processed: List of series with breakdown by log type and source
         - total_bytes: Total bytes processed in the period
         - from_date: Start date of the period
         - to_date: End date of the period
-        - interval: The time interval used
+        - interval_in_minutes: Grouping interval for the metrics
     """
     try:
-        # If no dates provided, get today's date range
-        if not from_date and not to_date:
-            from_date, to_date = _get_today_date_range()
+        # If from or to date is missing, use today's date range
+        if not all([from_date, to_date]):
+            from_date_today, to_date_today = get_today_date_range()
             logger.info(
-                f"No date range provided, using today's date range: {from_date} to {to_date}"
+                f"From or To date is missing, using today's date range: {from_date_today} to {to_date_today}"
             )
+            if not from_date:
+                from_date = from_date_today
+            if not to_date:
+                to_date = to_date_today
         else:
             logger.info(f"Using provided date range: {from_date} to {to_date}")
 
         logger.info(
-            f"Fetching bytes processed metrics from {from_date} to {to_date} with {interval} interval"
+            f"Fetching bytes processed metrics from {from_date} to {to_date} with {interval_in_minutes} minute interval"
         )
-
-        # Calculate interval in minutes based on the interval parameter
-        interval_minutes = {
-            "1h": 60,  # 1 hour
-            "12h": 720,  # 12 hours
-            "24h": 1440,  # 24 hours
-        }[interval]
 
         # Prepare variables
         variables = {
             "input": {
-                "fromDate": from_date,
-                "toDate": to_date,
-                "intervalInMinutes": interval_minutes,
+                "fromDate": graphql_date_format(from_date),
+                "toDate": graphql_date_format(to_date),
+                "intervalInMinutes": interval_in_minutes,
             }
         }
 
@@ -320,9 +308,9 @@ async def get_bytes_processed_per_log_type_and_source(
             "success": True,
             "bytes_processed": bytes_processed,
             "total_bytes": total_bytes,
-            "from_date": from_date,
-            "to_date": to_date,
-            "interval": interval,
+            "from_date": graphql_date_format(from_date),
+            "to_date": graphql_date_format(to_date),
+            "interval_in_minutes": interval_in_minutes,
         }
 
     except Exception as e:
