@@ -8,7 +8,7 @@ and can be registered with the MCP server using register_all_resources().
 
 import logging
 from functools import wraps
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional, Set
 
 logger = logging.getLogger("mcp-panther")
 
@@ -16,7 +16,14 @@ logger = logging.getLogger("mcp-panther")
 _resource_registry: Dict[str, Callable] = {}
 
 
-def mcp_resource(resource_path: str):
+def mcp_resource(
+    uri: str,
+    *,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    mime_type: Optional[str] = None,
+    tags: Optional[Set[str]] = None,
+):
     """
     Decorator to mark a function as an MCP resource.
 
@@ -24,16 +31,28 @@ def mcp_resource(resource_path: str):
     when register_all_resources() is called.
 
     Args:
-        resource_path: The resource path to register (e.g., "config://panther")
+        uri: The resource URI to register (e.g., "config://panther")
+        name: Optional name for the resource
+        description: Optional description of the resource
+        mime_type: Optional MIME type for the resource
+        tags: Optional set of tags for the resource
 
     Example:
-        @mcp_resource("config://panther")
-        def get_panther_config(...):
+        @mcp_resource("config://panther", name="Panther Config", description="Panther configuration data")
+        def get_panther_config():
             ...
     """
 
     def decorator(func: Callable) -> Callable:
-        _resource_registry[resource_path] = func
+        # Store metadata on the function
+        func._mcp_resource_metadata = {
+            "uri": uri,
+            "name": name,
+            "description": description,
+            "mime_type": mime_type,
+            "tags": tags,
+        }
+        _resource_registry[uri] = func
 
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -53,11 +72,22 @@ def register_all_resources(mcp_instance) -> None:
     """
     logger.info(f"Registering {len(_resource_registry)} resources with MCP")
 
-    for resource_path, resource_func in _resource_registry.items():
-        logger.debug(
-            f"Registering resource: {resource_path} -> {resource_func.__name__}"
+    for uri, resource_func in _resource_registry.items():
+        logger.debug(f"Registering resource: {uri} -> {resource_func.__name__}")
+        # Get resource metadata if it exists
+        metadata = getattr(resource_func, "_mcp_resource_metadata", {})
+
+        # Create resource decorator with metadata
+        resource_decorator = mcp_instance.resource(
+            uri=metadata["uri"],
+            name=metadata.get("name"),
+            description=metadata.get("description"),
+            mime_type=metadata.get("mime_type"),
+            tags=metadata.get("tags"),
         )
-        mcp_instance.resource(resource_path)(resource_func)
+
+        # Register the resource
+        resource_decorator(resource_func)
 
     logger.info("All resources registered successfully")
 
