@@ -6,13 +6,16 @@ import logging
 from typing import Any, Dict
 
 from ..client import _create_panther_client
+from ..permissions import requires_permissions, Permission
 from ..queries import GET_SCHEMA_DETAILS_QUERY, LIST_SCHEMAS_QUERY
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
 
 
-@mcp_tool
+@mcp_tool(
+    annotations=requires_permissions().require(Permission.LOG_SOURCE_READ).build()
+)
 async def list_log_type_schemas(
     contains: str = None,
     is_archived: bool = None,
@@ -93,7 +96,7 @@ async def list_log_type_schemas(
         }
 
 
-@mcp_tool
+@mcp_tool(annotations=requires_permissions().require(Permission.RULE_READ).build())
 async def get_panther_log_type_schema(schema_names: list[str]) -> Dict[str, Any]:
     """Get detailed information for specific log type schemas, including their full specifications.
     Limited to 5 schemas at a time to prevent response size issues.

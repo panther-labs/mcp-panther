@@ -15,7 +15,18 @@ __all__ = [
     "users",
     "schemas",
     "helpers",
+    "permissions",
 ]
 
 # Import all tool modules to ensure decorators are processed
-from . import alerts, data_lake, helpers, metrics, rules, schemas, sources, users
+from . import (
+    alerts,
+    data_lake,
+    helpers,
+    metrics,
+    rules,
+    schemas,
+    sources,
+    users,
+    permissions,
+)

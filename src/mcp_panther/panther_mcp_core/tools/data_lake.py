@@ -10,6 +10,7 @@ import anyascii
 from pydantic import Field
 
 from ..client import _create_panther_client, _get_today_date_range
+from ..permissions import requires_permissions, Permission
 from ..queries import (
     EXECUTE_DATA_LAKE_QUERY,
     GET_COLUMNS_FOR_TABLE_QUERY,
@@ -22,7 +23,11 @@ from .registry import mcp_tool
 logger = logging.getLogger("mcp-panther")
 
 
-@mcp_tool
+@mcp_tool(
+    annotations=requires_permissions()
+    .require_any(Permission.DATA_ANALYTICS_READ)
+    .build()
+)
 async def summarize_alert_events(
     alert_ids: Annotated[
         List[str],
@@ -112,7 +117,11 @@ LIMIT 1000
     return await execute_data_lake_query(query, "panther_signals.public")
 
 
-@mcp_tool
+@mcp_tool(
+    annotations=requires_permissions()
+    .require_any(Permission.DATA_ANALYTICS_READ)
+    .build()
+)
 async def execute_data_lake_query(
     sql: Annotated[
         str,
@@ -284,7 +293,11 @@ async def get_data_lake_query_results(query_id: str) -> Dict[str, Any]:
         }
 
 
-@mcp_tool
+@mcp_tool(
+    annotations=requires_permissions()
+    .require_any(Permission.DATA_ANALYTICS_READ)
+    .build()
+)
 async def list_databases() -> Dict[str, Any]:
     """List all available datalake databases in Panther.
 
@@ -332,7 +345,11 @@ async def list_databases() -> Dict[str, Any]:
         }
 
 
-@mcp_tool
+@mcp_tool(
+    annotations=requires_permissions()
+    .require_any(Permission.DATA_ANALYTICS_READ)
+    .build()
+)
 async def list_database_tables(database: str) -> Dict[str, Any]:
     """List all available tables in a Panther Database.
 
@@ -401,7 +418,11 @@ async def list_database_tables(database: str) -> Dict[str, Any]:
         return {"success": False, "message": f"Failed to fetch tables: {str(e)}"}
 
 
-@mcp_tool
+@mcp_tool(
+    annotations=requires_permissions()
+    .require_any(Permission.DATA_ANALYTICS_READ)
+    .build()
+)
 async def get_table_schema(database_name: str, table_name: str) -> Dict[str, Any]:
     """Get column details for a specific datalake table.
 
@@ -469,7 +490,11 @@ async def get_table_schema(database_name: str, table_name: str) -> Dict[str, Any
         }
 
 
-@mcp_tool
+@mcp_tool(
+    annotations=requires_permissions()
+    .require_any(Permission.DATA_ANALYTICS_READ)
+    .build()
+)
 async def get_sample_log_events(log_type: str) -> Dict[str, Any]:
     """Get a sample of 10 log events for a specific log type from the panther_logs.public database.
 

@@ -6,13 +6,14 @@ import logging
 from typing import Any, Dict
 
 from ..client import _execute_query
+from ..permissions import requires_permissions, Permission
 from ..queries import LIST_USERS_QUERY
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
 
 
-@mcp_tool
+@mcp_tool(annotations=requires_permissions().require(Permission.USER_READ).build())
 async def list_panther_users() -> Dict[str, Any]:
     """List all Panther user accounts.
 

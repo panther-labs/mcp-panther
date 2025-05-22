@@ -88,6 +88,15 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 </details>
 
+<details>
+<summary><strong>Permissions</strong></summary>
+
+| Tool Name | Description | Sample Prompt |
+|-----------|-------------|---------------|
+| `get_permissions` | Get the current user's permissions | "What permissions do I have?" |
+
+</details>
+
 ## Security Best Practices
 
 Panther highly recommends the following MCP best practices:
