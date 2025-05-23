@@ -2,17 +2,19 @@ from enum import Enum
 from typing import List, Dict, Optional, Union, Any
 
 
-class Permission(str, Enum):
-    RULE_READ = "View Rules"
-    RULE_MODIFY = "Manage Rules"
-    POLICY_READ = "View Policies"
-    USER_READ = "View Users"
-    DATA_ANALYTICS_READ = "Query Data Lake"
-    ALERT_READ = "View Alerts"
+class Permission(Enum):
+    """Panther permissions that can be required for tools."""
+
     ALERT_MODIFY = "Manage Alerts"
-    SUMMARY_READ = "View Overview"
+    ALERT_READ = "View Alerts"
+    DATA_ANALYTICS_READ = "Query Data Lake"
     LOG_SOURCE_READ = "View Log Sources"
     ORGANIZATION_API_TOKEN_READ = "Read API Token Info"
+    POLICY_READ = "View Policies"
+    RULE_MODIFY = "Manage Rules"
+    RULE_READ = "View Rules"
+    SUMMARY_READ = "View Overview"
+    USER_READ = "View Users"
 
 
 # Mapping from raw values to enum values

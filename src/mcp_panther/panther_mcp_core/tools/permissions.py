@@ -13,10 +13,7 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool
 async def get_permissions() -> Dict[str, Any]:
     """
-    Use this tool to understand what permissions the user has.
-
-    REQUIRED:
-     - This tool should be ran if any 403 or forbidden errors are detected when calling other tools
+    Get the current user's permissions. Use this to diagnose permission errors and determine if a new API token is needed.
     """
 
     logger.info("Getting permissions")

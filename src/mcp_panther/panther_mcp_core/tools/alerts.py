@@ -363,7 +363,12 @@ async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
         }
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.ALERT_MODIFY).build())
+@mcp_tool(
+    annotations=requires_permissions()
+    .require(Permission.ALERT_MODIFY)
+    .with_annotation("readyOnly", True)
+    .build()
+)
 async def update_alert_assignee_by_id(
     alert_ids: List[str], assignee_id: str
 ) -> Dict[str, Any]:
