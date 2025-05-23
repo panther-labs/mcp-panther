@@ -1,7 +1,6 @@
 import asyncio
 
 from agent import Agent
-
 from src.mcp_panther.server import mcp
 
 REQUESTED_TOOLS = [
@@ -9,6 +8,7 @@ REQUESTED_TOOLS = [
     "list_log_type_schemas",
     "list_databases",
 ]
+
 
 async def main():
     """

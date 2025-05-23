@@ -27,6 +27,13 @@ Your workflow is as follows:
 
 
 async def main(rule_file: str):
+    """
+    This is the main function that converts a Splunk rule to a Panther rule.
+    Args:
+        rule_file: The path to the Splunk rule file.
+    Usage:
+        python spl_converter.py <rule_file>
+    """
     agent = Agent(
         name="Spl Converter",
         mcp=mcp,
