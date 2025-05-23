@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Dict, Optional, Union, Any
+from typing import Dict, List, Optional, Union
 
 
 class Permission(Enum):
@@ -94,86 +94,3 @@ def all_perms(*permissions: Union[Permission, str]) -> Dict[str, List[str]]:
         Dict with 'all_of' key mapping to the permission list
     """
     return perms(all_of=list(permissions))
-
-
-class PermissionBuilder:
-    """
-    A builder class for creating permission specifications with a fluent interface.
-
-    Example:
-        ```python
-        @mcp_tool(annotations=requires_permissions()
-            .require_any(Permission.ALERT_READ)
-            .with_annotation("rate_limit", {"requests": 100, "period": "1m"})
-            .build())
-        ```
-    """
-
-    def __init__(self):
-        self._annotations = {}
-
-    def require(self, *permissions: Union[Permission, str]) -> "PermissionBuilder":
-        """
-        Require all of the given permissions.
-
-        Args:
-            *permissions: Variable number of permissions where all are required
-
-        Returns:
-            Self for method chaining
-        """
-        self._annotations["permissions"] = all_perms(*permissions)
-        return self
-
-    def require_any(self, *permissions: Union[Permission, str]) -> "PermissionBuilder":
-        """
-        Require any of the given permissions.
-
-        Args:
-            *permissions: Variable number of permissions where any one is sufficient
-
-        Returns:
-            Self for method chaining
-        """
-        self._annotations["permissions"] = any_perms(*permissions)
-        return self
-
-    def with_annotation(self, key: str, value: Any) -> "PermissionBuilder":
-        """
-        Add any additional annotation.
-
-        Args:
-            key: The annotation key
-            value: The annotation value
-
-        Returns:
-            Self for method chaining
-        """
-        self._annotations[key] = value
-        return self
-
-    def build(self) -> Dict[str, Any]:
-        """
-        Get the final annotations dictionary.
-
-        Returns:
-            Dict containing all annotations
-        """
-        return self._annotations
-
-
-def requires_permissions() -> PermissionBuilder:
-    """
-    Start building permission requirements.
-
-    Returns:
-        A new PermissionBuilder instance
-
-    Example:
-        ```python
-        @mcp_tool(annotations=requires_permissions()
-            .require_any(Permission.ALERT_READ)
-            .build())
-        ```
-    """
-    return PermissionBuilder()

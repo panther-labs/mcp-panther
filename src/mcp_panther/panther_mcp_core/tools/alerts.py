@@ -11,6 +11,7 @@ from ..client import (
     _get_today_date_range,
     get_rest_client,
 )
+from ..permissions import Permission, all_perms
 from ..queries import (
     ADD_ALERT_COMMENT_MUTATION,
     GET_ALERT_BY_ID_QUERY,
@@ -19,12 +20,15 @@ from ..queries import (
     UPDATE_ALERTS_ASSIGNEE_BY_ID_MUTATION,
 )
 from .registry import mcp_tool
-from ..permissions import Permission, requires_permissions
 
 logger = logging.getLogger("mcp-panther")
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.ALERT_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.ALERT_READ),
+    }
+)
 async def list_alerts(
     start_date: str = None,
     end_date: str = None,
@@ -214,7 +218,11 @@ async def list_alerts(
         return {"success": False, "message": f"Failed to fetch alerts: {str(e)}"}
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.ALERT_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.ALERT_READ),
+    }
+)
 async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
     """Get detailed information about a specific Panther alert by ID"""
     logger.info(f"Fetching alert details for ID: {alert_id}")
@@ -246,7 +254,11 @@ async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
         return {"success": False, "message": f"Failed to fetch alert details: {str(e)}"}
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.ALERT_MODIFY).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.ALERT_MODIFY),
+    }
+)
 async def update_alert_status(alert_ids: List[str], status: str) -> Dict[str, Any]:
     """Update the status of one or more Panther alerts.
 
@@ -315,7 +327,11 @@ async def update_alert_status(alert_ids: List[str], status: str) -> Dict[str, An
         }
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.ALERT_MODIFY).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.ALERT_MODIFY),
+    }
+)
 async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
     """Add a comment to a Panther alert. Comments support Markdown formatting.
 
@@ -364,10 +380,9 @@ async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
 
 
 @mcp_tool(
-    annotations=requires_permissions()
-    .require(Permission.ALERT_MODIFY)
-    .with_annotation("readyOnly", True)
-    .build()
+    annotations={
+        "permissions": all_perms(Permission.ALERT_MODIFY),
+    }
 )
 async def update_alert_assignee_by_id(
     alert_ids: List[str], assignee_id: str
@@ -418,7 +433,11 @@ async def update_alert_assignee_by_id(
         }
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.ALERT_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.ALERT_READ),
+    }
+)
 async def get_alert_events(alert_id: str, limit: int = 10) -> Dict[str, Any]:
     """
     Get events for a specific Panther alert by ID.

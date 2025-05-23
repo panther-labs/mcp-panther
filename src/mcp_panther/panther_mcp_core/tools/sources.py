@@ -6,14 +6,18 @@ import logging
 from typing import Any, Dict, List
 
 from ..client import _create_panther_client
-from ..permissions import requires_permissions, Permission
+from ..permissions import Permission, all_perms
 from ..queries import GET_SOURCES_QUERY
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.RULE_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RULE_READ),
+    }
+)
 async def list_log_sources(
     cursor: str = None,
     log_types: List[str] = None,

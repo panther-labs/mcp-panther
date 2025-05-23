@@ -6,7 +6,7 @@ import logging
 from typing import Any, Dict, List, Literal, Optional
 
 from ..client import _execute_query, _get_today_date_range
-from ..permissions import requires_permissions, Permission
+from ..permissions import Permission, all_perms
 from ..queries import (
     METRICS_ALERTS_PER_RULE_QUERY,
     METRICS_ALERTS_PER_SEVERITY_QUERY,
@@ -18,9 +18,9 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool(
-    annotations=requires_permissions()
-    .require_any(Permission.DATA_ANALYTICS_READ)
-    .build()
+    annotations={
+        "permissions": all_perms(Permission.ALERT_READ),
+    }
 )
 async def get_severity_alert_metrics(
     from_date: Optional[str] = None,
@@ -102,7 +102,11 @@ async def get_severity_alert_metrics(
         }
 
 
-@mcp_tool
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.ALERT_READ),
+    }
+)
 async def get_rule_alert_metrics(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,

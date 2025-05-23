@@ -24,9 +24,9 @@ from . import (
     data_lake,
     helpers,
     metrics,
+    permissions,
     rules,
     schemas,
     sources,
     users,
-    permissions,
 )

@@ -1,10 +1,8 @@
 import logging
 from typing import Any, Dict
 
-from ..client import _execute_query
-from ..permissions import requires_permissions, Permission, convert_permissions
-from ..queries import LIST_USERS_QUERY
 from ..client import get_rest_client
+from ..permissions import convert_permissions
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")

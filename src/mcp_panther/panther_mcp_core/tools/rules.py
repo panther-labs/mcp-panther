@@ -6,13 +6,17 @@ import logging
 from typing import Any, Dict
 
 from ..client import get_rest_client
+from ..permissions import Permission, all_perms
 from .registry import mcp_tool
-from ..permissions import requires_permissions, Permission
 
 logger = logging.getLogger("mcp-panther")
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.RULE_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RULE_READ),
+    }
+)
 async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
     """List all rules from your Panther instance.
 
@@ -68,7 +72,11 @@ async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
         return {"success": False, "message": f"Failed to list rules: {str(e)}"}
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.RULE_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RULE_READ),
+    }
+)
 async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
     """Get detailed information about a Panther rule, including the rule body and tests
 
@@ -98,7 +106,11 @@ async def get_rule_by_id(rule_id: str) -> Dict[str, Any]:
         return {"success": False, "message": f"Failed to get rule details: {str(e)}"}
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.RULE_MODIFY).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RULE_MODIFY),
+    }
+)
 async def disable_rule(rule_id: str) -> Dict[str, Any]:
     """Disable a Panther rule by setting enabled to false.
 
@@ -148,7 +160,11 @@ async def disable_rule(rule_id: str) -> Dict[str, Any]:
         }
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.RULE_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RULE_READ),
+    }
+)
 async def list_scheduled_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
     """List all scheduled rules from Panther with optional pagination
 
@@ -210,7 +226,11 @@ async def list_scheduled_rules(cursor: str = None, limit: int = 100) -> Dict[str
         }
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.RULE_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RULE_READ),
+    }
+)
 async def get_scheduled_rule_by_id(rule_id: str) -> Dict[str, Any]:
     """Get detailed information about a Panther scheduled rule by ID including the rule body and tests
 
@@ -245,7 +265,11 @@ async def get_scheduled_rule_by_id(rule_id: str) -> Dict[str, Any]:
         }
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.RULE_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RULE_READ),
+    }
+)
 async def list_simple_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
     """List all simple rules from Panther with optional pagination
 
@@ -304,7 +328,11 @@ async def list_simple_rules(cursor: str = None, limit: int = 100) -> Dict[str, A
         return {"success": False, "message": f"Failed to fetch simple rules: {str(e)}"}
 
 
-@mcp_tool(annotations=requires_permissions().require(Permission.RULE_READ).build())
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RULE_READ),
+    }
+)
 async def get_simple_rule_by_id(rule_id: str) -> Dict[str, Any]:
     """Get detailed information about a Panther simple rule by ID including the rule body and tests
 
@@ -337,3 +365,13 @@ async def get_simple_rule_by_id(rule_id: str) -> Dict[str, Any]:
             "success": False,
             "message": f"Failed to fetch simple rule details: {str(e)}",
         }
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RULE_MODIFY),
+    }
+)
+async def put_rule(rule_id: str, rule: Dict[str, Any]) -> Dict[str, Any]:
+    # Implementation of put_rule method
+    pass
