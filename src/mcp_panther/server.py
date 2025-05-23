@@ -13,8 +13,8 @@ from starlette.routing import Mount
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
 
-# Get log level from environment variable, default to DEBUG if not set
-log_level_name = os.environ.get("LOG_LEVEL", "DEBUG")
+# Get log level from environment variable, default to WARNING if not set
+log_level_name = os.environ.get("LOG_LEVEL", "WARNING")
 
 # Convert string log level to logging constant
 log_level = getattr(logging, log_level_name.upper(), logging.DEBUG)

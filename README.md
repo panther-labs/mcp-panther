@@ -119,24 +119,11 @@ Panther highly recommends the following MCP best practices:
 
 ## MCP Installation
 
-Clone this repository:
-```bash
-git clone git@github.com:panther-labs/mcp-panther.git
-```
+**Choose one of the following installation methods:**
 
-**Choose one of the following installation methods below.**
+### Docker Setup (Recommended)
+The easiest way to get started is using our pre-built Docker image:
 
-### Docker Setup
-1. Ensure Docker is installed on your system
-2. Build the Docker image:
-```bash
-make build-docker
-```
-3. Verify the image was built successfully:
-```bash
-docker images | grep mcp-panther
-```
-4. Configure your MCP client of choice (below):
 ```json
 {
   "mcpServers": {
@@ -148,7 +135,7 @@ docker images | grep mcp-panther
         "-e", "PANTHER_INSTANCE_URL",
         "-e", "PANTHER_API_TOKEN",
         "--rm",
-        "mcp-panther"
+        "ghcr.io/panther-labs/mcp-panther"
       ],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
@@ -159,52 +146,18 @@ docker images | grep mcp-panther
 }
 ```
 
-### UV Setup
-1. Ensure Python 3.12 is installed:
-```bash
-pyenv install 3.12  # if using pyenv
-```
+### UVX Setup
+For Python users, you can run directly from PyPI using uvx:
 
-2. [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
+1. [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
 
-3. Create virtual environment and install dependencies:
-
-#### macOS/Linux
-```bash
-uv venv
-source .venv/bin/activate
-uv sync
-```
-
-`uv synv` will install all dependencies from `requirements.txt` with exact versions.
-
-#### Windows
-```bash
-uv venv
-.venv\Scripts\activate
-uv sync
-```
-
-4. Configure your MCP client of choice (below):
+2. Configure your MCP client:
 ```json
 {
   "mcpServers": {
     "mcp-panther": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--with",
-        "fastmcp",
-        "--with",
-        "anyascii",
-        "--with",
-        "aiohttp",
-        "--with",
-        "gql[aiohttp]",
-        "fastmcp",
-        "run",
-        "FULL-PATH-TO-REPO/src/mcp_panther/server.py"
-      ],
+      "command": "uvx",
+      "args": ["mcp-panther"],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
         "PANTHER_API_TOKEN": "YOUR-PANTHER-API-TOKEN"
@@ -229,33 +182,41 @@ Once configured, navigate to Cursor Settings > MCP to view the running server:
 * If your MCP Client is failing to find any tools from the Panther MCP Server, try restarting the Client and ensuring the MCP server is running. In Cursor, refresh the MCP Server and start a new chat.
 
 ### Claude Desktop
-Install the server directly:
-```bash
-uv run fastmcp install src/mcp_panther/server.py
+To use with Claude Desktop, manually configure your `claude_desktop_config.json`:
+
+1. Open the Claude Desktop settings and navigate to the Developer tab
+2. Click "Edit Config" to open the configuration file
+3. Add the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "mcp-panther": {
+      "command": "uvx",
+      "args": ["mcp-panther"],
+      "env": {
+        "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
+        "PANTHER_API_TOKEN": "YOUR-PANTHER-API-TOKEN"
+      }
+    }
+  }
+}
 ```
 
-Then open the `claude_desktop_config.json` and add the `env` fields (as shown above).
+4. Save the file and restart Claude Desktop
 
 If you run into any issues, [try the troubleshooting steps here](https://modelcontextprotocol.io/quickstart/user#troubleshooting).
 
 ### Goose
 Use with [Goose](https://block.github.io/goose/), Block's open-source AI agent:
 ```bash
-# Install the package with entry points
-uv pip install .
-
 # Start Goose with the MCP server
-goose session --with-extension "uv run /path/to/mcp-panther/.venv/bin/mcp-panther"
+goose session --with-extension "uvx mcp-panther"
 ```
-> NOTE: Adjust the path to match your installation directory
 
 ## Troubleshooting
 
 Check the server logs for detailed error messages: `tail -n 20 -F ~/Library/Logs/Claude/mcp*.log`. Common issues and solutions are listed below.
-
-### Initializing mcp-panther
-
-- Ensure the `npm` and `uv` are installed **globally** on your system.
 
 ### Running tools
 

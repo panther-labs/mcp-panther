@@ -1,9 +1,28 @@
 [project]
 name = "mcp-panther"
-version = "0.1.1"
+version = "0.1.1rc2"
 description = "Panther Labs MCP Server"
-readme = "README.md"
+#readme = "README.md"
 requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Panther Labs Inc", email = "pypi@runpanther.io" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+keywords = ["security", "ai", "mcp", "mcp-server", "panther"]
 dependencies = [
     "aiohttp>=3.11.14",
     "anyascii>=0.3.2",
@@ -15,6 +34,10 @@ dependencies = [
     "starlette>=0.35.0",
     "fastmcp>=2.3.3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/panther-labs/mcp-panther"
+Repository = "https://github.com/panther-labs/mcp-panther.git"
 
 [dependency-groups]
 dev = [
