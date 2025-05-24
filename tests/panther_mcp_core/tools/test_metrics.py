@@ -19,7 +19,7 @@ def mock_execute_query():
     """Fixture to mock the _execute_query function."""
     with patch("mcp_panther.panther_mcp_core.tools.metrics._execute_query") as mock:
         mock.return_value = {
-            "data": {
+            "metrics": {
                 "alertsPerRule": [
                     {
                         "entityId": "Cloudflare.Firewall.L7DDoS",
@@ -83,52 +83,50 @@ class TestGetMetricsAlertsPerRule:
         """Set up common mock responses."""
         # Default mock response for successful query
         mock_execute_query.return_value = {
-            "data": {
-                "metrics": {
-                    "alertsPerRule": [
-                        {
-                            "entityId": "AWS.CloudTrail.UnauthorizedAPICall",
-                            "label": "AWS.CloudTrail.UnauthorizedAPICall",
-                            "value": 49,
-                        },
-                        {
-                            "entityId": "AWS.EC2.Startup.Script.Change",
-                            "label": "AWS EC2 Startup Script Change",
-                            "value": 48,
-                        },
-                        {
-                            "entityId": "AWS.EC2.SecurityGroupModified",
-                            "label": "AWS.EC2.SecurityGroupModified",
-                            "value": 26,
-                        },
-                        {
-                            "entityId": "AWS.EC2.RouteTableModified",
-                            "label": "AWS.EC2.RouteTableModified",
-                            "value": 23,
-                        },
-                        {
-                            "entityId": "AWS.EC2.VPCModified",
-                            "label": "AWS.EC2.VPCModified",
-                            "value": 22,
-                        },
-                        {
-                            "entityId": "AWS.EC2.GatewayModified",
-                            "label": "AWS.EC2.GatewayModified",
-                            "value": 22,
-                        },
-                        {
-                            "entityId": "Crowdstrike.EppDetectionSummary",
-                            "label": "Crowdstrike Detection Summary",
-                            "value": 0,
-                        },
-                        {
-                            "entityId": "Crowdstrike.AllowlistRemoved",
-                            "label": "Crowdstrike Allowlist Removed",
-                            "value": 0,
-                        },
-                    ],
-                    "totalAlerts": 190,
-                }
+            "metrics": {
+                "alertsPerRule": [
+                    {
+                        "entityId": "AWS.CloudTrail.UnauthorizedAPICall",
+                        "label": "AWS.CloudTrail.UnauthorizedAPICall",
+                        "value": 49,
+                    },
+                    {
+                        "entityId": "AWS.EC2.Startup.Script.Change",
+                        "label": "AWS EC2 Startup Script Change",
+                        "value": 48,
+                    },
+                    {
+                        "entityId": "AWS.EC2.SecurityGroupModified",
+                        "label": "AWS.EC2.SecurityGroupModified",
+                        "value": 26,
+                    },
+                    {
+                        "entityId": "AWS.EC2.RouteTableModified",
+                        "label": "AWS.EC2.RouteTableModified",
+                        "value": 23,
+                    },
+                    {
+                        "entityId": "AWS.EC2.VPCModified",
+                        "label": "AWS.EC2.VPCModified",
+                        "value": 22,
+                    },
+                    {
+                        "entityId": "AWS.EC2.GatewayModified",
+                        "label": "AWS.EC2.GatewayModified",
+                        "value": 22,
+                    },
+                    {
+                        "entityId": "Crowdstrike.EppDetectionSummary",
+                        "label": "Crowdstrike Detection Summary",
+                        "value": 0,
+                    },
+                    {
+                        "entityId": "Crowdstrike.AllowlistRemoved",
+                        "label": "Crowdstrike Allowlist Removed",
+                        "value": 0,
+                    },
+                ],
+                "totalAlerts": 190,
             }
         }
 

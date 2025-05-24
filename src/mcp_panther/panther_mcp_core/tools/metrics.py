@@ -113,6 +113,7 @@ async def get_severity_alert_metrics(
         result = await _execute_query(METRICS_ALERTS_PER_SEVERITY_QUERY, variables)
 
         if not result or "metrics" not in result:
+            logger.error(f"Could not find key 'metrics' in result: {result}")
             raise Exception("Failed to fetch metrics data")
 
         metrics_data = result["metrics"]
@@ -206,10 +207,11 @@ async def get_rule_alert_metrics(
         # Execute query
         result = await _execute_query(METRICS_ALERTS_PER_RULE_QUERY, variables)
 
-        if not result or "data" not in result or "metrics" not in result["data"]:
+        if not result or "metrics" not in result:
+            logger.error(f"Could not find key 'metrics' in result: {result}")
             raise Exception("Failed to fetch metrics data")
 
-        metrics_data = result["data"]["metrics"]
+        metrics_data = result["metrics"]
 
         # Filter by rule IDs if provided
         if rule_ids:
@@ -298,6 +300,7 @@ async def get_bytes_processed_per_log_type_and_source(
         result = await _execute_query(METRICS_BYTES_PROCESSED_QUERY, variables)
 
         if not result or "metrics" not in result:
+            logger.error(f"Could not find key 'metrics' in result: {result}")
             raise Exception("Failed to fetch metrics data")
 
         metrics_data = result["metrics"]
