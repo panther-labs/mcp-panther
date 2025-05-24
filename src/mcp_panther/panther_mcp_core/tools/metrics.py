@@ -40,7 +40,8 @@ class AlertSeverity(str, Enum):
 
 @mcp_tool(
     annotations={
-        "permissions": all_perms(Permission.ALERT_READ),
+        "permissions": all_perms(Permission.METRICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_severity_alert_metrics(
@@ -145,7 +146,8 @@ async def get_severity_alert_metrics(
 
 @mcp_tool(
     annotations={
-        "permissions": all_perms(Permission.ALERT_READ),
+        "permissions": all_perms(Permission.METRICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_rule_alert_metrics(
@@ -250,7 +252,12 @@ async def get_rule_alert_metrics(
         }
 
 
-@mcp_tool
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.METRICS_READ),
+        "readOnlyHint": True,
+    }
+)
 async def get_bytes_processed_per_log_type_and_source(
     from_date: Annotated[
         datetime | None,

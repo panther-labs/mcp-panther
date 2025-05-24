@@ -13,11 +13,11 @@ def test_permission_enum():
     assert Permission.ALERT_MODIFY.value == "Manage Alerts"
     assert Permission.DATA_ANALYTICS_READ.value == "Query Data Lake"
     assert Permission.LOG_SOURCE_READ.value == "View Log Sources"
+    assert Permission.METRICS_READ.value == "Read Panther Metrics"
     assert Permission.ORGANIZATION_API_TOKEN_READ.value == "Read API Token Info"
     assert Permission.POLICY_READ.value == "View Policies"
     assert Permission.RULE_MODIFY.value == "Manage Rules"
     assert Permission.RULE_READ.value == "View Rules"
-    assert Permission.SUMMARY_READ.value == "View Overview"
     assert Permission.USER_READ.value == "View Users"
 
 

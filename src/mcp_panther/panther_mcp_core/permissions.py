@@ -9,26 +9,26 @@ class Permission(Enum):
     ALERT_READ = "View Alerts"
     DATA_ANALYTICS_READ = "Query Data Lake"
     LOG_SOURCE_READ = "View Log Sources"
+    METRICS_READ = "Read Panther Metrics"
     ORGANIZATION_API_TOKEN_READ = "Read API Token Info"
     POLICY_READ = "View Policies"
     RULE_MODIFY = "Manage Rules"
     RULE_READ = "View Rules"
-    SUMMARY_READ = "View Overview"
     USER_READ = "View Users"
 
 
 # Mapping from raw values to enum values
 RAW_TO_TITLE = {
-    "RuleRead": Permission.RULE_READ,
-    "RuleModify": Permission.RULE_MODIFY,
-    "PolicyRead": Permission.POLICY_READ,
-    "UserRead": Permission.USER_READ,
-    "DataAnalyticsRead": Permission.DATA_ANALYTICS_READ,
-    "AlertRead": Permission.ALERT_READ,
     "AlertModify": Permission.ALERT_MODIFY,
-    "SummaryRead": Permission.SUMMARY_READ,
+    "AlertRead": Permission.ALERT_READ,
+    "DataAnalyticsRead": Permission.DATA_ANALYTICS_READ,
     "LogSourceRead": Permission.LOG_SOURCE_READ,
     "OrganizationAPITokenRead": Permission.ORGANIZATION_API_TOKEN_READ,
+    "PolicyRead": Permission.POLICY_READ,
+    "RuleModify": Permission.RULE_MODIFY,
+    "RuleRead": Permission.RULE_READ,
+    "SummaryRead": Permission.METRICS_READ,  # Allows reading data & alert metrics
+    "UserRead": Permission.USER_READ,
 }
 
 
