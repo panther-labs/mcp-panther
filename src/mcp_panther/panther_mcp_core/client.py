@@ -195,6 +195,9 @@ async def _create_panther_client() -> Client:
 def graphql_date_format(input_date: datetime) -> str:
     """Format a datetime object for GraphQL queries.
 
+    Before: 2025-05-20 00:00:00+00:00
+    After: 2025-05-20T00:00:00.000Z
+
     Args:
         input_date: The datetime object to format
 

@@ -16,56 +16,25 @@ from tests.utils.helpers import patch_graphql_client
 
 METRICS_MODULE_PATH = "mcp_panther.panther_mcp_core.client"
 
-# Sample response data
-MOCK_METRICS_RESPONSE = {
-    "metrics": {
-        "alertsPerRule": [
-            {
-                "entityId": "Cloudflare.Firewall.L7DDoS",
-                "label": "Cloudflare L7 DDoS",
-                "value": 100,
-            },
-            {
-                "entityId": "AWS.GuardDuty.Disabled",
-                "label": "AWS GuardDuty Disabled",
-                "value": 100,
-            },
-        ],
-        "alertsPerSeverity": [
-            {
-                "label": "Rule CRITICAL",
-                "value": 100,
-                "breakdown": {
-                    "2024-03-20T00:00:00Z": 20,
-                    "2024-03-20T00:01:00Z": 20,
-                    "2024-03-20T00:02:00Z": 20,
-                    "2024-03-20T00:03:00Z": 20,
-                    "2024-03-20T00:04:00Z": 20,
-                },
-            },
-            {
-                "label": "Rule HIGH",
-                "value": 100,
-                "breakdown": {
-                    "2024-03-20T00:00:00Z": 20,
-                    "2024-03-20T00:01:00Z": 20,
-                    "2024-03-20T00:02:00Z": 20,
-                    "2024-03-20T00:03:00Z": 20,
-                    "2024-03-20T00:04:00Z": 20,
-                },
-            },
-        ],
-        "totalAlerts": 200,
-    }
-}
-
 
 @pytest.fixture
 def mock_execute_query():
     """Fixture to mock the _execute_query function."""
     with patch("mcp_panther.panther_mcp_core.tools.metrics._execute_query") as mock:
         mock.return_value = {
-            "metrics": {
+            "data": {
+                "alertsPerRule": [
+                    {
+                        "entityId": "Cloudflare.Firewall.L7DDoS",
+                        "label": "Cloudflare L7 DDoS",
+                        "value": 100,
+                    },
+                    {
+                        "entityId": "AWS.GuardDuty.Disabled",
+                        "label": "AWS GuardDuty Disabled",
+                        "value": 100,
+                    },
+                ],
                 "alertsPerSeverity": [
                     {
                         "label": "Rule CRITICAL",
@@ -118,19 +87,50 @@ class TestGetMetricsAlertsPerRule:
         # Default mock response for successful query
         mock_execute_query.return_value = {
             "data": {
-                "alertsPerRule": {
-                    "series": [
+                "metrics": {
+                    "alertsPerRule": [
                         {
-                            "timestamp": "2024-03-20T00:00:00Z",
-                            "value": 10,
-                            "labels": {"ruleId": "test-rule-1"},
+                            "entityId": "AWS.CloudTrail.UnauthorizedAPICall",
+                            "label": "AWS.CloudTrail.UnauthorizedAPICall",
+                            "value": 49,
                         },
                         {
-                            "timestamp": "2024-03-20T00:00:00Z",
-                            "value": 5,
-                            "labels": {"ruleId": "test-rule-2"},
+                            "entityId": "AWS.EC2.Startup.Script.Change",
+                            "label": "AWS EC2 Startup Script Change",
+                            "value": 48,
                         },
-                    ]
+                        {
+                            "entityId": "AWS.EC2.SecurityGroupModified",
+                            "label": "AWS.EC2.SecurityGroupModified",
+                            "value": 26,
+                        },
+                        {
+                            "entityId": "AWS.EC2.RouteTableModified",
+                            "label": "AWS.EC2.RouteTableModified",
+                            "value": 23,
+                        },
+                        {
+                            "entityId": "AWS.EC2.VPCModified",
+                            "label": "AWS.EC2.VPCModified",
+                            "value": 22,
+                        },
+                        {
+                            "entityId": "AWS.EC2.GatewayModified",
+                            "label": "AWS.EC2.GatewayModified",
+                            "value": 22,
+                        },
+                        {
+                            "entityId": "Crowdstrike.EppDetectionSummary",
+                            "label": "Crowdstrike Detection Summary",
+                            "value": 0,
+                        },
+                        {
+                            "entityId": "Crowdstrike.AllowlistRemoved",
+                            "label": "Crowdstrike Allowlist Removed",
+                            "value": 0,
+                        },
+                    ],
+                    "totalAlerts": 190,
                 }
             }
         }
@@ -150,8 +150,8 @@ class TestGetMetricsAlertsPerRule:
         assert result["success"] is True
         assert "alerts_per_rule" in result
         assert len(result["alerts_per_rule"]) == 2
-        assert result["from_date"] == "2024-03-20T00:00:00Z"
-        assert result["to_date"] == "2024-03-20T23:59:59Z"
+        assert result["from_date"] == "2024-03-20T00:00:00.000Z"
+        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
         assert result["interval_in_minutes"] == 15
 
         # Verify mock calls
@@ -170,8 +170,8 @@ class TestGetMetricsAlertsPerRule:
         assert result["success"] is True
         assert "alerts_per_rule" in result
         assert len(result["alerts_per_rule"]) == 2
-        assert result["from_date"] == "2024-03-19T00:00:00Z"
-        assert result["to_date"] == "2024-03-19T23:59:59Z"
+        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["to_date"] == "2024-03-19T23:59:59.000Z"
 
         # Verify mock calls
         mock_execute_query.assert_called_once()
@@ -187,8 +187,8 @@ class TestGetMetricsAlertsPerRule:
         assert result["success"] is True
         assert "alerts_per_rule" in result
         assert len(result["alerts_per_rule"]) == 2
-        assert result["from_date"] == "2024-03-19T00:00:00Z"
-        assert result["to_date"] == "2024-03-20T23:59:59Z"
+        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
 
         # Verify mock calls
         mock_get_today_date_range.assert_called_once()
@@ -215,7 +215,7 @@ class TestGetMetricsAlertsPerRule:
 
         assert result["success"] is True
         assert "alerts_per_rule" in result
-        assert len(result["alerts_per_rule"]) == 2
+        assert len(result["alerts_per_rule"]) == 1
         assert result["rule_ids"] == ["Cloudflare.Firewall.L7DDoS"]
 
         # Verify mock calls
@@ -311,7 +311,7 @@ class TestGetMetricsAlertsPerSeverity:
         """Test function with custom alert types."""
         # Update mock response for this test
         mock_execute_query.return_value = {
-            "metrics": {
+            "data": {
                 "alertsPerSeverity": [
                     {
                         "label": "Policy CRITICAL",

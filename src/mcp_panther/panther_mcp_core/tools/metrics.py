@@ -171,7 +171,8 @@ async def get_rule_alert_metrics(
 
     Returns:
         Dict:
-        - alerts_per_rule: List of series with timestamp, value, and rule ID
+        - alerts_per_rule: List of series with entityId, label, and value
+        - total_alerts: Total number of alerts in the period
         - from_date: Start date of the period
         - to_date: End date of the period
         - interval_in_minutes: Grouping interval for the metrics
@@ -205,24 +206,25 @@ async def get_rule_alert_metrics(
         # Execute query
         result = await _execute_query(METRICS_ALERTS_PER_RULE_QUERY, variables)
 
-        if not result or "data" not in result or "alertsPerRule" not in result["data"]:
+        if not result or "data" not in result or "metrics" not in result["data"]:
             raise Exception("Failed to fetch metrics data")
 
-        metrics_data = result["data"]["alertsPerRule"]
+        metrics_data = result["data"]["metrics"]
 
         # Filter by rule IDs if provided
         if rule_ids:
             alerts_per_rule = [
                 item
-                for item in metrics_data["series"]
-                if item["labels"]["ruleId"] in rule_ids
+                for item in metrics_data["alertsPerRule"]
+                if item["entityId"] in rule_ids
             ]
         else:
-            alerts_per_rule = metrics_data["series"]
+            alerts_per_rule = metrics_data["alertsPerRule"]
 
         return {
             "success": True,
             "alerts_per_rule": alerts_per_rule,
+            "total_alerts": len(alerts_per_rule),
             "from_date": graphql_date_format(from_date),
             "to_date": graphql_date_format(to_date),
             "interval_in_minutes": interval_in_minutes,
@@ -230,10 +232,10 @@ async def get_rule_alert_metrics(
         }
 
     except Exception as e:
-        logger.error(f"Failed to fetch alerts per rule metrics: {str(e)}")
+        logger.error(f"Failed to fetch rule alert metrics: {str(e)}")
         return {
             "success": False,
-            "error": f"Failed to fetch alerts per rule metrics: {str(e)}",
+            "message": f"Failed to fetch rule alert metrics: {str(e)}",
         }
 
 
