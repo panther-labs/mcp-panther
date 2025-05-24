@@ -160,15 +160,24 @@ async def get_rule_alert_metrics(
     interval_in_minutes: Annotated[
         Literal[15, 30, 60, 180, 360, 720, 1440],
         Field(
-            description="How data points are aggregated over time, with smaller intervals providing more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents."
+            description="Intervals for aggregating data points. Smaller intervals provide more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents."
         ),
     ] = 15,
     rule_ids: Annotated[
-        list[str] | None,
-        Field(description="The specific Panther detection rules to get metrics for."),
+        list[
+            Annotated[
+                str,
+                Field(
+                    description="A Panther detection rule ID",
+                    pattern=r"^[A-Za-z0-9][A-Za-z0-9!'_\-)(\'*]*(\.[A-Za-z0-9][A-Za-z0-9!'_\-)(\'*]*)*$",
+                ),
+            ]
+        ]
+        | None,
+        Field(description="A valid JSON list of Panther rule IDs to get metrics for"),
     ] = None,
 ) -> Dict[str, Any]:
-    """Gets alert metrics per detection rule for ALL alert types including alerts, detection errors, and system errors within a given time period. Use this tool to identify hot spots in your alerts, and use the list_alerts tool for specific details.
+    """Gets alert metrics grouped by detection rule for ALL alert types, including alerts, detection errors, and system errors within a given time period. Use this tool to identify hot spots in alerts and use list_alerts for specific alert details.
 
     Returns:
         Dict:
