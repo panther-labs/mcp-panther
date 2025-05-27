@@ -259,12 +259,15 @@ async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
         "permissions": all_perms(Permission.ALERT_READ),
     }
 )
-async def list_alert_comments(alert_id: str, limit: int = 25) -> Dict[str, Any]:
+async def list_alert_comments(
+    alert_id: str, limit: int = 25, cursor: str = None
+) -> Dict[str, Any]:
     """Get all comments for a specific Panther alert by ID.
 
     Args:
         alert_id: The ID of the alert to get comments for
         limit: Maximum number of comments to return (default: 25)
+        cursor: Optional pagination token for fetching the next page
 
     Returns:
         Dict containing:
@@ -274,15 +277,19 @@ async def list_alert_comments(alert_id: str, limit: int = 25) -> Dict[str, Any]:
             - body: The comment text
             - createdAt: Timestamp when the comment was created
             - createdBy: Information about the user who created the comment
-            - format: The format of the comment (HTML or PLAIN_TEXT)
+            - format: The format of the comment (HTML or PLAIN_TEXT or JSON_SCHEMA)
+        - next_cursor: The pagination token for the next page (if present)
         - message: Error message if unsuccessful
     """
     logger.info(f"Fetching comments for alert ID: {alert_id}")
     try:
+        params = {"alert-id": alert_id, "limit": limit}
+        if cursor:
+            params["cursor"] = cursor
         async with get_rest_client() as client:
             result, status = await client.get(
                 "/alert-comments",
-                params={"alert-id": alert_id, "limit": limit},
+                params=params,
                 expected_codes=[200, 400],
             )
 
@@ -294,12 +301,18 @@ async def list_alert_comments(alert_id: str, limit: int = 25) -> Dict[str, Any]:
             }
 
         comments = result.get("results", [])
+        next_cursor = result.get("next")
 
         logger.info(
             f"Successfully retrieved {len(comments)} comments for alert ID: {alert_id}"
         )
 
-        return {"success": True, "comments": comments, "total_comments": len(comments)}
+        return {
+            "success": True,
+            "comments": comments,
+            "total_comments": len(comments),
+            "next_cursor": next_cursor,
+        }
     except Exception as e:
         logger.error(f"Failed to fetch alert comments: {str(e)}")
         return {

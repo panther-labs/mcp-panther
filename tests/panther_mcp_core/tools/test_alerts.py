@@ -533,3 +533,51 @@ async def test_list_alert_comments_custom_limit(mock_rest_client):
         params={"alert-id": "alert-123", "limit": 10},
         expected_codes=[200, 400],
     )
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_list_alert_comments_with_pagination(mock_rest_client):
+    """Test pagination: passing cursor and receiving next_cursor in response."""
+    mock_comments = [
+        {
+            "id": "c1",
+            "body": "Test comment",
+            "createdAt": "2024-01-01T00:00:00Z",
+            "createdBy": {"id": "u1"},
+            "format": "PLAIN_TEXT",
+        },
+    ]
+    mock_rest_client.get.return_value = (
+        {"results": mock_comments, "next": "abc123"},
+        200,
+    )
+    result = await list_alert_comments("alert-123", limit=1, cursor="prev456")
+    assert result["success"] is True
+    assert result["comments"] == mock_comments
+    assert result["next_cursor"] == "abc123"
+    mock_rest_client.get.assert_called_once_with(
+        "/alert-comments",
+        params={"alert-id": "alert-123", "limit": 1, "cursor": "prev456"},
+        expected_codes=[200, 400],
+    )
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_list_alert_comments_no_next_cursor(mock_rest_client):
+    """Test response when no next field is present in the API response."""
+    mock_comments = [
+        {
+            "id": "c1",
+            "body": "Test comment",
+            "createdAt": "2024-01-01T00:00:00Z",
+            "createdBy": {"id": "u1"},
+            "format": "PLAIN_TEXT",
+        },
+    ]
+    mock_rest_client.get.return_value = ({"results": mock_comments}, 200)
+    result = await list_alert_comments("alert-123", limit=1)
+    assert result["success"] is True
+    assert result["comments"] == mock_comments
+    assert result["next_cursor"] is None
