@@ -427,12 +427,34 @@ async def list_database_tables(database: str) -> Dict[str, Any]:
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
     }
 )
-async def get_table_schema(database_name: str, table_name: str) -> Dict[str, Any]:
+async def get_table_schema(
+    database_name: Annotated[
+        str,
+        Field(
+            description="The name of the database where the table is located",
+            example="panther_logs.public",
+        ),
+    ],
+    table_name: Annotated[
+        str,
+        Field(
+            description="The name of the table to get columns for",
+            example="Panther.Audit",
+        ),
+    ],
+) -> Dict[str, Any]:
     """Get column details for a specific datalake table.
 
-    Args:
-        database_name: The name of the database where the table is located
-        table_name: The name of the table to get columns for
+    IMPORTANT: This returns the table structure in Snowflake/Redshift. For writing
+    optimal queries, ALSO call get_panther_log_type_schema() to understand:
+    - Nested object structures (only shown as 'object' type here)
+    - Which fields map to p_any_* indicator columns
+    - Array element structures
+
+    Example workflow:
+    1. get_panther_log_type_schema(["AWS.CloudTrail"]) - understand structure
+    2. get_table_schema("panther_logs.public", "aws_cloudtrail") - get column names/types
+    3. Write query using both: nested paths from log schema, column names from table schema
 
     Returns:
         Dict containing:
