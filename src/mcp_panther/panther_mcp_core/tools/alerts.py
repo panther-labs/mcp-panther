@@ -256,6 +256,57 @@ async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
 
 @mcp_tool(
     annotations={
+        "permissions": all_perms(Permission.ALERT_READ),
+    }
+)
+async def list_alert_comments(alert_id: str) -> Dict[str, Any]:
+    """Get all comments for a specific Panther alert by ID.
+
+    Args:
+        alert_id: The ID of the alert to get comments for
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the request was successful
+        - comments: List of comments if successful, each containing:
+            - id: The comment ID
+            - body: The comment text
+            - createdAt: Timestamp when the comment was created
+            - createdBy: Information about the user who created the comment
+            - format: The format of the comment (HTML or PLAIN_TEXT)
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Fetching comments for alert ID: {alert_id}")
+    try:
+        async with get_rest_client() as client:
+            result, status = await client.get(
+                f"/alerts/{alert_id}/comments", expected_codes=[200, 404]
+            )
+
+            if status == 404:
+                logger.warning(f"No alert found with ID: {alert_id}")
+                return {
+                    "success": False,
+                    "message": f"No alert found with ID: {alert_id}",
+                }
+
+        comments = result.get("results", [])
+
+        logger.info(
+            f"Successfully retrieved {len(comments)} comments for alert ID: {alert_id}"
+        )
+
+        return {"success": True, "comments": comments, "total_comments": len(comments)}
+    except Exception as e:
+        logger.error(f"Failed to fetch alert comments: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch alert comments: {str(e)}",
+        }
+
+
+@mcp_tool(
+    annotations={
         "permissions": all_perms(Permission.ALERT_MODIFY),
     }
 )
