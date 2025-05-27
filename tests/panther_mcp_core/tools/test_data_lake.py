@@ -21,7 +21,7 @@ async def test_get_sample_log_events_success(mock_graphql_client):
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
-    result = await get_sample_log_events("AWS.CloudTrail")
+    result = await get_sample_log_events(schema_name="AWS.CloudTrail")
 
     assert result["success"] is True
     assert result["query_id"] == MOCK_QUERY_ID
@@ -40,7 +40,7 @@ async def test_get_sample_log_events_error(mock_graphql_client):
     """Test handling of errors when getting sample log events."""
     mock_graphql_client.execute.side_effect = Exception("Test error")
 
-    result = await get_sample_log_events("AWS.CloudTrail")
+    result = await get_sample_log_events(schema_name="AWS.CloudTrail")
 
     assert result["success"] is False
     assert "Failed to execute data lake query" in result["message"]
@@ -53,7 +53,7 @@ async def test_get_sample_log_events_no_query_id(mock_graphql_client):
     """Test handling when no query ID is returned."""
     mock_graphql_client.execute.return_value = {}
 
-    result = await get_sample_log_events("AWS.CloudTrail")
+    result = await get_sample_log_events(schema_name="AWS.CloudTrail")
 
     assert result["success"] is False
     assert "No query ID returned" in result["message"]
