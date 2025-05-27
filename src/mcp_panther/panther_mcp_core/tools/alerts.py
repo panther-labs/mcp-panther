@@ -259,11 +259,12 @@ async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
         "permissions": all_perms(Permission.ALERT_READ),
     }
 )
-async def list_alert_comments(alert_id: str) -> Dict[str, Any]:
+async def list_alert_comments(alert_id: str, limit: int = 25) -> Dict[str, Any]:
     """Get all comments for a specific Panther alert by ID.
 
     Args:
         alert_id: The ID of the alert to get comments for
+        limit: Maximum number of comments to return (default: 25)
 
     Returns:
         Dict containing:
@@ -280,15 +281,17 @@ async def list_alert_comments(alert_id: str) -> Dict[str, Any]:
     try:
         async with get_rest_client() as client:
             result, status = await client.get(
-                f"/alerts/{alert_id}/comments", expected_codes=[200, 404]
+                "/alert-comments",
+                params={"alert-id": alert_id, "limit": limit},
+                expected_codes=[200, 400],
             )
 
-            if status == 404:
-                logger.warning(f"No alert found with ID: {alert_id}")
-                return {
-                    "success": False,
-                    "message": f"No alert found with ID: {alert_id}",
-                }
+        if status == 400:
+            logger.error(f"Bad request when fetching comments for alert ID: {alert_id}")
+            return {
+                "success": False,
+                "message": f"Bad request when fetching comments for alert ID: {alert_id}",
+            }
 
         comments = result.get("results", [])
 

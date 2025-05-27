@@ -4,6 +4,7 @@ from mcp_panther.panther_mcp_core.tools.alerts import (
     add_alert_comment,
     get_alert_by_id,
     get_alert_events,
+    list_alert_comments,
     list_alerts,
     update_alert_assignee_by_id,
     update_alert_status,
@@ -453,3 +454,82 @@ async def test_get_alert_events_limit_exceeds_max(mock_rest_client):
     args, kwargs = mock_rest_client.get.call_args
     assert args[0] == f"/alerts/{MOCK_ALERT['id']}/events"
     assert kwargs["params"]["limit"] == 10
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_list_alert_comments_success(mock_rest_client):
+    """Test successful retrieval of alert comments."""
+    mock_comments = [
+        {
+            "id": "c1",
+            "body": "Test comment",
+            "createdAt": "2024-01-01T00:00:00Z",
+            "createdBy": {"id": "u1"},
+            "format": "PLAIN_TEXT",
+        },
+        {
+            "id": "c2",
+            "body": "Another comment",
+            "createdAt": "2024-01-02T00:00:00Z",
+            "createdBy": {"id": "u2"},
+            "format": "HTML",
+        },
+    ]
+    mock_rest_client.get.return_value = ({"results": mock_comments}, 200)
+
+    result = await list_alert_comments("alert-123")
+    assert result["success"] is True
+    assert result["total_comments"] == 2
+    assert result["comments"] == mock_comments
+    mock_rest_client.get.assert_called_once_with(
+        "/alert-comments",
+        params={"alert-id": "alert-123", "limit": 25},
+        expected_codes=[200, 400],
+    )
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_list_alert_comments_empty_results(mock_rest_client):
+    """Test empty results returns success with empty list."""
+    mock_rest_client.get.return_value = ({"results": []}, 200)
+    result = await list_alert_comments("alert-123")
+    assert result["success"] is True
+    assert result["total_comments"] == 0
+    assert result["comments"] == []
+    mock_rest_client.get.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_list_alert_comments_400_error(mock_rest_client):
+    """Test 400 error returns failure."""
+    mock_rest_client.get.return_value = ({"results": []}, 400)
+    result = await list_alert_comments("alert-123")
+    assert result["success"] is False
+    assert "Bad request" in result["message"]
+    mock_rest_client.get.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_list_alert_comments_error(mock_rest_client):
+    """Test error handling when REST client raises exception."""
+    mock_rest_client.get.side_effect = Exception("Boom!")
+    result = await list_alert_comments("alert-err")
+    assert result["success"] is False
+    assert "Failed to fetch alert comments" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_list_alert_comments_custom_limit(mock_rest_client):
+    """Test custom limit parameter is passed correctly."""
+    mock_rest_client.get.return_value = ({"results": []}, 200)
+    await list_alert_comments("alert-123", limit=10)
+    mock_rest_client.get.assert_called_once_with(
+        "/alert-comments",
+        params={"alert-id": "alert-123", "limit": 10},
+        expected_codes=[200, 400],
+    )
