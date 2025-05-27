@@ -20,6 +20,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `list_alerts` | List alerts with comprehensive filtering options (date range, severity, status, etc.) | "Show me all high severity alerts from the last 24 hours" |
 | `update_alert_assignee_by_id` | Update the assignee of one or more alerts | "Assign alerts abc123 and def456 to John" |
 | `update_alert_status` | Update the status of one or more alerts | "Mark alerts abc123 and def456 as resolved" |
+| `list_alert_comments` | List all comments for a specific alert | "Show me all comments for alert abc123" |
 
 </details>
 
