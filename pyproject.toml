@@ -1,8 +1,8 @@
 [project]
 name = "mcp-panther"
-version = "1.0.0rc2"
+version = "1.0.0"
 description = "Panther Labs MCP Server"
-#readme = "README.md"
+readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [
