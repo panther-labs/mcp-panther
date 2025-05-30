@@ -108,8 +108,8 @@ Panther highly recommends the following MCP best practices:
    - <details>
      <summary><strong>View Required Permissions</strong></summary>
 
-     ![Screenshot of Panther Token permissions](panther-token-perms-1.png)
-     ![Screenshot of Panther Token permissions](panther-token-perms-2.png)
+     ![Screenshot of Panther Token permissions](.github/panther-token-perms-1.png)
+     ![Screenshot of Panther Token permissions](.github/panther-token-perms-2.png)
 
      </details>
 
@@ -175,7 +175,7 @@ For Python users, you can run directly from PyPI using uvx:
 
 Once configured, navigate to Cursor Settings > MCP to view the running server:
 
-<img src="panther-mcp-cursor-config.png" width="500" />
+<img src=".github/panther-mcp-cursor-config.png" width="500" />
 
 **Tips:**
 * Be specific about where you want to generate new rules by using the `@` symbol and then typing a specific directory.
