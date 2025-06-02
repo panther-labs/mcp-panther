@@ -33,6 +33,36 @@ uv run fastmcp dev src/mcp_panther/server.py
 
 This command runs the server in development mode, which provides additional debugging information and automatically reloads when changes are detected.
 
+Or add the following to your MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "panther": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with",
+        "fastmcp",
+        "--with",
+        "anyascii",
+        "--with",
+        "aiohttp",
+        "--with",
+        "gql[aiohttp]",
+        "fastmcp",
+        "run",
+        "/<PATH-TO-MCP-PANTHER-REPO>/src/mcp_panther/server.py"
+      ],
+      "env": {
+        "PANTHER_API_TOKEN": "<TOKEN-HERE>",
+        "PANTHER_INSTANCE_URL": "https://<INSTANCE-URL-HERE>"
+      }
+    }
+  }
+}
+```
+
 ### Debugging
 
 When running the server, you can set the logging level to DEBUG in `server.py` for more detailed logs:

@@ -48,10 +48,12 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `create_rule` | Create a new Panther rule | "Create a new rule to detect more than 7 failed logins within a day across any user in the AWS Console" |
 | `disable_rule` | Disable a rule by setting enabled to false | "Disable rule abc123" |
 | `get_global_helper_by_id` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
+| `get_policy_by_id` | Get detailed information about a specific policy | "Get details for policy ID AWS.S3.Bucket.PublicReadACP" |
 | `get_rule_by_id` | Get detailed information about a specific rule | "Get details for rule ID abc123" |
 | `get_scheduled_rule_by_id` | Get detailed information about a specific scheduled rule | "Get details for scheduled rule abc123" |
 | `get_simple_rule_by_id` | Get detailed information about a specific simple rule | "Get details for simple rule abc123" |
 | `list_global_helpers` | List all Panther global helpers with optional pagination | "Show me all global helpers for CrowdStrike events" |
+| `list_policies` | List all Panther policies with optional pagination | "Show me all policies for AWS resources" |
 | `list_rules` | List all Panther rules with optional pagination | "Show me all enabled rules" |
 | `list_scheduled_rules` | List all scheduled rules with optional pagination | "List all scheduled rules in Panther" |
 | `list_simple_rules` | List all simple rules with optional pagination | "Show me all simple rules in Panther" |
