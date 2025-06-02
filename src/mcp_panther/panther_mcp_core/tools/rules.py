@@ -369,6 +369,108 @@ async def get_simple_rule_by_id(rule_id: str) -> Dict[str, Any]:
 
 @mcp_tool(
     annotations={
+        "permissions": all_perms(Permission.POLICY_READ),
+    }
+)
+async def list_policies(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
+    """List all policies from Panther with optional pagination
+
+    Args:
+        cursor: Optional cursor for pagination from a previous query
+        limit: Optional maximum number of results to return (default: 100)
+    """
+    logger.info("Fetching policies from Panther")
+
+    try:
+        # Prepare query parameters
+        params = {"limit": limit}
+        if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
+            params["cursor"] = cursor
+            logger.info(f"Using cursor for pagination: {cursor}")
+
+        async with get_rest_client() as client:
+            result, _ = await client.get("/policies", params=params)
+
+        # Extract policies and pagination info
+        policies = result.get("results", [])
+        next_cursor = result.get("next")
+
+        # Keep only specific fields for each policy to limit the amount of data returned
+        filtered_policies_metadata = [
+            {
+                "id": policy["id"],
+                "description": policy.get("description"),
+                "displayName": policy.get("displayName"),
+                "enabled": policy.get("enabled", False),
+                "severity": policy.get("severity"),
+                "resourceTypes": policy.get("resourceTypes", []),
+                "tags": policy.get("tags", []),
+                "reports": policy.get("reports", {}),
+                "managed": policy.get("managed", False),
+                "createdAt": policy.get("createdAt"),
+                "lastModified": policy.get("lastModified"),
+            }
+            for policy in policies
+        ]
+
+        logger.info(
+            f"Successfully retrieved {len(filtered_policies_metadata)} policies"
+        )
+
+        # Format the response
+        return {
+            "success": True,
+            "policies": filtered_policies_metadata,
+            "total_policies": len(filtered_policies_metadata),
+            "has_next_page": bool(next_cursor),
+            "next_cursor": next_cursor,
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch policies: {str(e)}")
+        return {"success": False, "message": f"Failed to fetch policies: {str(e)}"}
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.POLICY_READ),
+    }
+)
+async def get_policy_by_id(policy_id: str) -> Dict[str, Any]:
+    """Get detailed information about a Panther policy by ID including the policy body and tests
+
+    Args:
+        policy_id: The ID of the policy to fetch
+    """
+    logger.info(f"Fetching policy details for ID: {policy_id}")
+
+    try:
+        async with get_rest_client() as client:
+            # Allow 404 as a valid response to handle not found case
+            result, status = await client.get(
+                f"/policies/{policy_id}", expected_codes=[200, 404]
+            )
+
+            if status == 404:
+                logger.warning(f"No policy found with ID: {policy_id}")
+                return {
+                    "success": False,
+                    "message": f"No policy found with ID: {policy_id}",
+                }
+
+        logger.info(f"Successfully retrieved policy details for ID: {policy_id}")
+
+        # Format the response
+        return {"success": True, "policy": result}
+    except Exception as e:
+        logger.error(f"Failed to fetch policy details: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch policy details: {str(e)}",
+        }
+
+
+@mcp_tool(
+    annotations={
         "permissions": all_perms(Permission.RULE_MODIFY),
     }
 )

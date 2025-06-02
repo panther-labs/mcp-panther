@@ -2,9 +2,11 @@ import pytest
 
 from mcp_panther.panther_mcp_core.tools.rules import (
     disable_rule,
+    get_policy_by_id,
     get_rule_by_id,
     get_scheduled_rule_by_id,
     get_simple_rule_by_id,
+    list_policies,
     list_rules,
     list_scheduled_rules,
     list_simple_rules,
@@ -427,3 +429,142 @@ async def test_get_simple_rule_by_id_error(mock_rest_client):
 
     assert result["success"] is False
     assert "Failed" in result["message"]
+
+
+# Policy Tests
+MOCK_POLICY = {
+    "id": "AWS.S3.Bucket.PublicReadACP",
+    "body": 'def policy(resource):\n    # Return True if the resource fails the policy check\n    return resource.get("Grants", []) != []\n',
+    "description": "S3 bucket should not allow public read access to ACL",
+    "displayName": "S3 Bucket Public Read ACP",
+    "enabled": True,
+    "resourceTypes": ["AWS.S3.Bucket"],
+    "managed": False,
+    "severity": "HIGH",
+    "createdAt": "2024-11-14T17:09:49.841715953Z",
+    "lastModified": "2024-11-14T17:09:49.841716265Z",
+    "tags": ["AWS", "S3", "Security"],
+    "tests": [
+        {
+            "expectedResult": False,
+            "name": "Private Bucket",
+            "resource": '{"Grants": []}',
+        },
+        {
+            "expectedResult": True,
+            "name": "Public Bucket",
+            "resource": '{"Grants": [{"Grantee": {"Type": "Group", "URI": "http://acs.amazonaws.com/groups/global/AllUsers"}}]}',
+        },
+    ],
+    "reports": {"SOC2": ["CC6.1"], "CIS": ["2.1.1"]},
+}
+
+MOCK_POLICY_MEDIUM_SEVERITY = {
+    **MOCK_POLICY,
+    "id": "AWS.EC2.Instance.UnencryptedVolume",
+    "displayName": "EC2 Instance with Unencrypted Volume",
+    "severity": "MEDIUM",
+    "resourceTypes": ["AWS.EC2.Instance"],
+}
+
+MOCK_POLICIES_RESPONSE = {
+    "results": [MOCK_POLICY, MOCK_POLICY_MEDIUM_SEVERITY],
+    "next": "next-policy-token",
+}
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_policies_success(mock_rest_client):
+    """Test successful listing of policies."""
+    mock_rest_client.get.return_value = (MOCK_POLICIES_RESPONSE, 200)
+
+    result = await list_policies()
+
+    assert result["success"] is True
+    assert len(result["policies"]) == 2
+    assert result["total_policies"] == 2
+    assert result["has_next_page"] is True
+    assert result["next_cursor"] == "next-policy-token"
+
+    first_policy = result["policies"][0]
+    assert first_policy["id"] == MOCK_POLICY["id"]
+    assert first_policy["severity"] == MOCK_POLICY["severity"]
+    assert first_policy["displayName"] == MOCK_POLICY["displayName"]
+    assert first_policy["enabled"] is True
+    assert first_policy["resourceTypes"] == MOCK_POLICY["resourceTypes"]
+
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == "/policies"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_policies_with_pagination(mock_rest_client):
+    """Test listing policies with pagination."""
+    mock_rest_client.get.return_value = (MOCK_POLICIES_RESPONSE, 200)
+
+    await list_policies(cursor="some-policy-cursor", limit=50)
+
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == "/policies"
+    assert kwargs["params"]["cursor"] == "some-policy-cursor"
+    assert kwargs["params"]["limit"] == 50
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_policies_error(mock_rest_client):
+    """Test handling of errors when listing policies."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+
+    result = await list_policies()
+
+    assert result["success"] is False
+    assert "Failed to fetch policies" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_policy_by_id_success(mock_rest_client):
+    """Test successful retrieval of a single policy."""
+    mock_rest_client.get.return_value = (MOCK_POLICY, 200)
+
+    result = await get_policy_by_id(MOCK_POLICY["id"])
+
+    assert result["success"] is True
+    assert result["policy"]["id"] == MOCK_POLICY["id"]
+    assert result["policy"]["severity"] == MOCK_POLICY["severity"]
+    assert result["policy"]["body"] == MOCK_POLICY["body"]
+    assert len(result["policy"]["tests"]) == 2
+    assert result["policy"]["resourceTypes"] == MOCK_POLICY["resourceTypes"]
+
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == f"/policies/{MOCK_POLICY['id']}"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_policy_by_id_not_found(mock_rest_client):
+    """Test handling of non-existent policy."""
+    mock_rest_client.get.return_value = ({}, 404)
+
+    result = await get_policy_by_id("nonexistent-policy")
+
+    assert result["success"] is False
+    assert "No policy found with ID" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_policy_by_id_error(mock_rest_client):
+    """Test handling of errors when getting policy by ID."""
+    mock_rest_client.get.side_effect = Exception("Test error")
+
+    result = await get_policy_by_id(MOCK_POLICY["id"])
+
+    assert result["success"] is False
+    assert "Failed to fetch policy details" in result["message"]
