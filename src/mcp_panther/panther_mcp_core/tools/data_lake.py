@@ -98,7 +98,7 @@ SNOWFLAKE_RESERVED_WORDS = {
 # These include words that are officially "forbidden in SHOW commands" but also fail in SELECTs
 ADDITIONAL_PROBLEMATIC_WORDS = {
     "ACCOUNT",
-    "CONNECTION", 
+    "CONNECTION",
     "DATABASE",
     "GSCLUSTER",
     "ISSUE",
@@ -113,7 +113,7 @@ SCALAR_EXPRESSION_FORBIDDEN = {"CASE", "CAST", "FALSE", "TRUE", "TRY_CAST", "WHE
 # Cannot be used as column name (reserved by ANSI) - should error as column name
 COLUMN_NAME_FORBIDDEN = {
     "CURRENT_DATE",
-    "CURRENT_TIME", 
+    "CURRENT_TIME",
     "CURRENT_TIMESTAMP",
     "CURRENT_USER",
     "LOCALTIME",
@@ -121,7 +121,9 @@ COLUMN_NAME_FORBIDDEN = {
 }
 
 # All quotable reserved words (ANSI + Snowflake + Additional problematic words)
-QUOTABLE_RESERVED_WORDS = ANSI_RESERVED_WORDS | SNOWFLAKE_RESERVED_WORDS | ADDITIONAL_PROBLEMATIC_WORDS
+QUOTABLE_RESERVED_WORDS = (
+    ANSI_RESERVED_WORDS | SNOWFLAKE_RESERVED_WORDS | ADDITIONAL_PROBLEMATIC_WORDS
+)
 
 
 def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
@@ -148,10 +150,14 @@ def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
         if forbidden_word in ["CASE", "WHEN"]:
             # Skip CASE and WHEN when they're part of valid CASE expressions
             # Pattern looks for these words as standalone column names, not in CASE...WHEN...THEN...ELSE...END
-            pattern = r"\bSELECT\b[^;]*\b" + re.escape(forbidden_word) + r"\b(?!\s*\()(?![^,]*\b(?:WHEN|THEN|ELSE|END)\b)"
+            pattern = (
+                r"\bSELECT\b[^;]*\b"
+                + re.escape(forbidden_word)
+                + r"\b(?!\s*\()(?![^,]*\b(?:WHEN|THEN|ELSE|END)\b)"
+            )
         else:
             pattern = r"\bSELECT\b[^;]*\b" + re.escape(forbidden_word) + r"\b(?!\s*\()"
-        
+
         if re.search(pattern, sql, re.IGNORECASE):
             return (
                 sql,
@@ -172,46 +178,71 @@ def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
     # Only quote words that are actually problematic as column references
     column_context_words = QUOTABLE_RESERVED_WORDS - {
         # Exclude common SQL keywords that shouldn't be quoted when used as keywords
-        "ALL", "AND", "AS", "BY", "DISTINCT", "ELSE", "EXISTS", "FOR", "FROM", 
-        "GROUP", "HAVING", "IN", "IS", "LIKE", "NOT", "NULL", "OF", "ON", "OR", 
-        "ORDER", "SELECT", "SET", "THEN", "TO", "UNION", "UPDATE", "WHERE", "WITH"
+        "ALL",
+        "AND",
+        "AS",
+        "BY",
+        "DISTINCT",
+        "ELSE",
+        "EXISTS",
+        "FOR",
+        "FROM",
+        "GROUP",
+        "HAVING",
+        "IN",
+        "IS",
+        "LIKE",
+        "NOT",
+        "NULL",
+        "OF",
+        "ON",
+        "OR",
+        "ORDER",
+        "SELECT",
+        "SET",
+        "THEN",
+        "TO",
+        "UNION",
+        "UPDATE",
+        "WHERE",
+        "WITH",
     }
-    
+
     def quote_reserved_word_match(match):
         word = match.group(0)
         return f'"{word}"'
 
     # Build pattern for words that should be quoted in column contexts
     column_words = "|".join(re.escape(word) for word in column_context_words)
-    
+
     # Pattern to match reserved words that should be quoted
     # (?<!["`'])       - Not preceded by quote
     # \b({words})\b    - Word boundary with reserved words
     # (?!\s*\()        - Not followed by opening parenthesis (function calls)
     reserved_word_pattern = rf"(?<![\"'`])\b({column_words})\b(?!\s*\()"
-    
+
     # Apply the pattern only to the SELECT clause
     def process_select_clause(match):
         select_keyword = match.group(1)  # "SELECT"
         select_content = match.group(2)  # Everything after SELECT until FROM
-        
+
         # Quote reserved words in the SELECT content
         processed_content = re.sub(
-            reserved_word_pattern, 
-            quote_reserved_word_match, 
-            select_content, 
-            flags=re.IGNORECASE
+            reserved_word_pattern,
+            quote_reserved_word_match,
+            select_content,
+            flags=re.IGNORECASE,
         )
-        
+
         return select_keyword + processed_content
 
     # Pattern to match SELECT clause until FROM (including multiline)
     select_clause_pattern = r"\b(SELECT\s+)(.*?)(?=\s+FROM\s|\s*$)"
     modified_sql = re.sub(
-        select_clause_pattern, 
-        process_select_clause, 
-        sql, 
-        flags=re.IGNORECASE | re.DOTALL
+        select_clause_pattern,
+        process_select_clause,
+        sql,
+        flags=re.IGNORECASE | re.DOTALL,
     )
 
     return modified_sql, None
