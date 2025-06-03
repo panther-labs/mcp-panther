@@ -22,6 +22,200 @@ from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
 
+# Snowflake reserved words categorized by their constraints
+# Based on official Snowflake documentation
+
+# Reserved by ANSI - can be quoted when used as column names
+ANSI_RESERVED_WORDS = {
+    "ALL",
+    "ALTER",
+    "AND",
+    "ANY",
+    "AS",
+    "BETWEEN",
+    "BY",
+    "CHECK",
+    "COLUMN",
+    "CONNECT",
+    "CREATE",
+    "CURRENT",
+    "DELETE",
+    "DISTINCT",
+    "DROP",
+    "ELSE",
+    "EXISTS",
+    "FOR",
+    "FROM",
+    "GRANT",
+    "GROUP",
+    "HAVING",
+    "IN",
+    "INSERT",
+    "INTERSECT",
+    "INTO",
+    "IS",
+    "LIKE",
+    "NOT",
+    "NULL",
+    "OF",
+    "ON",
+    "OR",
+    "ORDER",
+    "REVOKE",
+    "ROW",
+    "ROWS",
+    "SAMPLE",
+    "SELECT",
+    "SET",
+    "START",
+    "TABLE",
+    "TABLESAMPLE",
+    "THEN",
+    "TO",
+    "TRIGGER",
+    "UNION",
+    "UNIQUE",
+    "UPDATE",
+    "VALUES",
+    "WHENEVER",
+    "WHERE",
+    "WINDOW",
+    "WITH",
+}
+
+# Reserved by Snowflake (non-ANSI) - can be quoted when used as column names
+SNOWFLAKE_RESERVED_WORDS = {
+    "ILIKE",
+    "INCREMENT",
+    "MINUS",
+    "QUALIFY",
+    "REGEXP",
+    "RLIKE",
+    "SOME",
+}
+
+# Words that cause issues in SELECT statements and can be quoted
+# These include words that are officially "forbidden in SHOW commands" but also fail in SELECTs
+ADDITIONAL_PROBLEMATIC_WORDS = {
+    "ACCOUNT",
+    "CONNECTION", 
+    "DATABASE",
+    "GSCLUSTER",
+    "ISSUE",
+    "ORGANIZATION",
+    "SCHEMA",
+    "VIEW",
+}
+
+# Cannot be used as column reference in scalar expressions - should error
+SCALAR_EXPRESSION_FORBIDDEN = {"CASE", "CAST", "FALSE", "TRUE", "TRY_CAST", "WHEN"}
+
+# Cannot be used as column name (reserved by ANSI) - should error as column name
+COLUMN_NAME_FORBIDDEN = {
+    "CURRENT_DATE",
+    "CURRENT_TIME", 
+    "CURRENT_TIMESTAMP",
+    "CURRENT_USER",
+    "LOCALTIME",
+    "LOCALTIMESTAMP",
+}
+
+# All quotable reserved words (ANSI + Snowflake + Additional problematic words)
+QUOTABLE_RESERVED_WORDS = ANSI_RESERVED_WORDS | SNOWFLAKE_RESERVED_WORDS | ADDITIONAL_PROBLEMATIC_WORDS
+
+
+def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
+    """
+    Validate and wrap Snowflake reserved words according to their usage constraints.
+
+    This implementation:
+    - Wraps ANSI/Snowflake reserved words with double quotes when used as column names
+    - Handles reserved words inside function calls (e.g., COUNT(DISTINCT account))
+    - Returns errors for forbidden words in specific contexts
+
+    Args:
+        sql: The SQL query string to process
+
+    Returns:
+        Tuple of (processed_sql, error_message). If error_message is not None,
+        the query contains forbidden usage and should be rejected.
+    """
+    import re
+
+    # 1. Check for forbidden scalar expression words (but not function calls or SQL keywords)
+    for forbidden_word in SCALAR_EXPRESSION_FORBIDDEN:
+        # More precise check: exclude valid SQL contexts like CASE WHEN expressions
+        if forbidden_word in ["CASE", "WHEN"]:
+            # Skip CASE and WHEN when they're part of valid CASE expressions
+            # Pattern looks for these words as standalone column names, not in CASE...WHEN...THEN...ELSE...END
+            pattern = r"\bSELECT\b[^;]*\b" + re.escape(forbidden_word) + r"\b(?!\s*\()(?![^,]*\b(?:WHEN|THEN|ELSE|END)\b)"
+        else:
+            pattern = r"\bSELECT\b[^;]*\b" + re.escape(forbidden_word) + r"\b(?!\s*\()"
+        
+        if re.search(pattern, sql, re.IGNORECASE):
+            return (
+                sql,
+                f"Query contains forbidden keyword usage: '{forbidden_word}' cannot be used as column reference in scalar expressions",
+            )
+
+    # 2. Check for forbidden column names (but not function calls)
+    for forbidden_word in COLUMN_NAME_FORBIDDEN:
+        # Simple check: if forbidden word appears after SELECT (as column), but not as function call
+        pattern = r"\bSELECT\b[^;]*\b" + re.escape(forbidden_word) + r"\b(?!\s*\()"
+        if re.search(pattern, sql, re.IGNORECASE):
+            return (
+                sql,
+                f"Query contains forbidden keyword usage: '{forbidden_word}' cannot be used as column name (reserved by ANSI)",
+            )
+
+    # 3. Quote reserved words in specific column contexts (including inside functions)
+    # Only quote words that are actually problematic as column references
+    column_context_words = QUOTABLE_RESERVED_WORDS - {
+        # Exclude common SQL keywords that shouldn't be quoted when used as keywords
+        "ALL", "AND", "AS", "BY", "DISTINCT", "ELSE", "EXISTS", "FOR", "FROM", 
+        "GROUP", "HAVING", "IN", "IS", "LIKE", "NOT", "NULL", "OF", "ON", "OR", 
+        "ORDER", "SELECT", "SET", "THEN", "TO", "UNION", "UPDATE", "WHERE", "WITH"
+    }
+    
+    def quote_reserved_word_match(match):
+        word = match.group(0)
+        return f'"{word}"'
+
+    # Build pattern for words that should be quoted in column contexts
+    column_words = "|".join(re.escape(word) for word in column_context_words)
+    
+    # Pattern to match reserved words that should be quoted
+    # (?<!["`'])       - Not preceded by quote
+    # \b({words})\b    - Word boundary with reserved words
+    # (?!\s*\()        - Not followed by opening parenthesis (function calls)
+    reserved_word_pattern = rf"(?<![\"'`])\b({column_words})\b(?!\s*\()"
+    
+    # Apply the pattern only to the SELECT clause
+    def process_select_clause(match):
+        select_keyword = match.group(1)  # "SELECT"
+        select_content = match.group(2)  # Everything after SELECT until FROM
+        
+        # Quote reserved words in the SELECT content
+        processed_content = re.sub(
+            reserved_word_pattern, 
+            quote_reserved_word_match, 
+            select_content, 
+            flags=re.IGNORECASE
+        )
+        
+        return select_keyword + processed_content
+
+    # Pattern to match SELECT clause until FROM (including multiline)
+    select_clause_pattern = r"\b(SELECT\s+)(.*?)(?=\s+FROM\s|\s*$)"
+    modified_sql = re.sub(
+        select_clause_pattern, 
+        process_select_clause, 
+        sql, 
+        flags=re.IGNORECASE | re.DOTALL
+    )
+
+    return modified_sql, None
+
 
 @mcp_tool(
     annotations={
@@ -144,6 +338,15 @@ async def execute_data_lake_query(
     Returns a dictionary with query execution status and a query_id for retrieving results.
     """
     logger.info("Executing data lake query")
+
+    # Validate and wrap reserved words according to Snowflake constraints
+    sql, validation_error = _validate_and_wrap_reserved_words(sql)
+    if validation_error:
+        logger.error(validation_error)
+        return {
+            "success": False,
+            "message": validation_error,
+        }
 
     # Validate that the query includes a p_event_time filter after WHERE or AND
     sql_lower = sql.lower().replace("\n", " ")

@@ -3,6 +3,7 @@ import pytest
 from mcp_panther.panther_mcp_core.tools.data_lake import (
     _is_name_normalized,
     _normalize_name,
+    _validate_and_wrap_reserved_words,
     execute_data_lake_query,
     get_sample_log_events,
 )
@@ -238,3 +239,178 @@ def test_is_normalized():
         assert result == tc["expected"], (
             f"Input: {tc['input']}, Expected:  {tc['expected']}, Got: {result}"
         )
+
+
+def test_validate_and_wrap_reserved_words():
+    """Test that Snowflake reserved words are properly validated and wrapped."""
+
+    # Test cases that should succeed with wrapping
+    success_cases = [
+        # Non-reserved words should remain unchanged
+        {
+            "input": "SELECT all_items, order_id FROM table WHERE p_event_time >= '2024-01-01'",
+            "expected": "SELECT all_items, order_id FROM table WHERE p_event_time >= '2024-01-01'",
+            "description": "Non-reserved words should remain unchanged",
+        },
+        # Snowflake reserved words that can be quoted
+        {
+            "input": "SELECT regexp, qualify FROM table WHERE p_event_time >= '2024-01-01'",
+            "expected": 'SELECT "regexp", "qualify" FROM table WHERE p_event_time >= \'2024-01-01\'',
+            "description": "Snowflake reserved words as columns should be quoted",
+        },
+        # Additional problematic words that can be quoted
+        {
+            "input": "SELECT database, schema, view FROM table WHERE p_event_time >= '2024-01-01'",
+            "expected": 'SELECT "database", "schema", "view" FROM table WHERE p_event_time >= \'2024-01-01\'',
+            "description": "Words that cause issues in SELECT statements should be quoted",
+        },
+        # Test account as direct column reference (should be quoted)
+        {
+            "input": "SELECT account, organization, normal_field FROM table WHERE p_event_time >= '2024-01-01'",
+            "expected": 'SELECT "account", "organization", normal_field FROM table WHERE p_event_time >= \'2024-01-01\'',
+            "description": "ACCOUNT and ORGANIZATION should be quoted when used as direct column references",
+        },
+        # ANSI reserved words that can be quoted
+        {
+            "input": "SELECT action, column FROM mytable WHERE p_event_time >= '2024-01-01'",
+            "expected": 'SELECT action, "column" FROM mytable WHERE p_event_time >= \'2024-01-01\'',
+            "description": "COLUMN is reserved (ANSI) and should be quoted, ACTION is not reserved",
+        },
+        # Mixed reserved and non-reserved
+        {
+            "input": "SELECT normal_col, action, another_col FROM table WHERE p_event_time >= '2024-01-01'",
+            "expected": "SELECT normal_col, action, another_col FROM table WHERE p_event_time >= '2024-01-01'",
+            "description": "Only reserved words should be quoted, ACTION is not reserved",
+        },
+        # Already quoted words should remain unchanged
+        {
+            "input": "SELECT \"action\", `column` FROM table WHERE p_event_time >= '2024-01-01'",
+            "expected": "SELECT \"action\", `column` FROM table WHERE p_event_time >= '2024-01-01'",
+            "description": "Already quoted words should remain unchanged",
+        },
+        # Real-world VPC Flow logs query with mixed reserved/non-reserved words
+        {
+            "input": """SELECT COUNT(*) as total_rejected_flows, COUNT(DISTINCT srcAddr) as unique_source_ips, COUNT(DISTINCT dstAddr) as unique_dest_ips, COUNT(DISTINCT account) as affected_accounts, SUM(bytes) as total_bytes_rejected, SUM(packets) as total_packets_rejected, -- Most targeted destination addresses
+    dstAddr as most_targeted_dest, COUNT(*) as flows_to_dest
+FROM panther_logs.public.aws_vpcflow 
+WHERE p_event_time >= DATEADD(hour, -4, CURRENT_TIMESTAMP())
+  AND action = 'REJECT'
+GROUP BY dstAddr
+ORDER BY flows_to_dest DESC
+LIMIT 10""",
+            "expected": """SELECT COUNT(*) as total_rejected_flows, COUNT(DISTINCT srcAddr) as unique_source_ips, COUNT(DISTINCT dstAddr) as unique_dest_ips, COUNT(DISTINCT "account") as affected_accounts, SUM(bytes) as total_bytes_rejected, SUM(packets) as total_packets_rejected, -- Most targeted destination addresses
+    dstAddr as most_targeted_dest, COUNT(*) as flows_to_dest
+FROM panther_logs.public.aws_vpcflow 
+WHERE p_event_time >= DATEADD(hour, -4, CURRENT_TIMESTAMP())
+  AND action = 'REJECT'
+GROUP BY dstAddr
+ORDER BY flows_to_dest DESC
+LIMIT 10""",
+            "description": "Real-world VPC Flow query: account quoted even in function calls, action not quoted (correct)",
+        },
+        # CASE WHEN expressions should work (CASE and WHEN are valid in this context)
+        {
+            "input": "SELECT SUM(CASE WHEN account IS NOT NULL THEN 1 ELSE 0 END) as account_count FROM table WHERE p_event_time >= '2024-01-01'",
+            "expected": 'SELECT SUM(CASE WHEN "account" IS NOT NULL THEN 1 ELSE 0 END) as account_count FROM table WHERE p_event_time >= \'2024-01-01\'',
+            "description": "CASE WHEN expressions should work, with account quoted inside the expression",
+        },
+    ]
+
+    for tc in success_cases:
+        result, error = _validate_and_wrap_reserved_words(tc["input"])
+        assert error is None, f"Unexpected error for {tc['description']}: {error}"
+        assert result == tc["expected"], (
+            f"{tc['description']}\nInput: {tc['input']}\nExpected: {tc['expected']}\nGot: {result}"
+        )
+
+    # Test cases that should fail with errors
+    error_cases = [
+        {
+            "input": "SELECT false FROM table WHERE p_event_time >= '2024-01-01'",
+            "description": "FALSE cannot be used as column reference in scalar expressions",
+            "expected_error": "cannot be used as column reference in scalar expressions",
+        },
+        {
+            "input": "SELECT true, case FROM table WHERE p_event_time >= '2024-01-01'",
+            "description": "TRUE and CASE cannot be used as column references",
+            "expected_error": "cannot be used as column reference in scalar expressions",
+        },
+        {
+            "input": "SELECT current_date FROM table WHERE p_event_time >= '2024-01-01'",
+            "description": "CURRENT_DATE cannot be used as column name",
+            "expected_error": "cannot be used as column name (reserved by ANSI)",
+        },
+    ]
+
+    for tc in error_cases:
+        result, error = _validate_and_wrap_reserved_words(tc["input"])
+        assert error is not None, (
+            f"Expected error for {tc['description']}, but got none"
+        )
+        assert tc["expected_error"] in error, (
+            f"{tc['description']}\nExpected error containing: {tc['expected_error']}\nGot: {error}"
+        )
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_execute_data_lake_query_with_quotable_reserved_words(
+    mock_graphql_client,
+):
+    """Test that quotable reserved words are properly wrapped when executing queries."""
+    mock_graphql_client.execute.return_value = {
+        "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+    }
+
+    # Query with ANSI reserved words that can be quoted as column names
+    sql = 'SELECT sourceaddress, "order", "all" FROM panther_logs.public.test_table WHERE p_event_time >= DATEADD(day, -1, CURRENT_TIMESTAMP()) LIMIT 10'
+    result = await execute_data_lake_query(sql)
+
+    assert result["success"] is True
+    assert result["query_id"] == MOCK_QUERY_ID
+
+    # Verify the query was processed without errors
+    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    modified_sql = call_args["input"]["sql"]
+    assert '"order"' in modified_sql
+    assert '"all"' in modified_sql
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_execute_data_lake_query_with_forbidden_words(mock_graphql_client):
+    """Test that forbidden reserved words cause query rejection."""
+    # Query with forbidden words (FALSE cannot be used as column reference in scalar expressions)
+    sql = "SELECT false, true FROM panther_logs.public.test_table WHERE p_event_time >= DATEADD(day, -1, CURRENT_TIMESTAMP()) LIMIT 10"
+    result = await execute_data_lake_query(sql)
+
+    assert result["success"] is False
+    assert "forbidden keyword usage" in result["message"]
+    assert (
+        "cannot be used as column reference in scalar expressions" in result["message"]
+    )
+
+    # Verify the GraphQL client was not called since validation failed
+    mock_graphql_client.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_execute_data_lake_query_snowflake_reserved_words(mock_graphql_client):
+    """Test that Snowflake-specific reserved words are properly wrapped."""
+    mock_graphql_client.execute.return_value = {
+        "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+    }
+
+    # Query with Snowflake reserved words that can be quoted
+    sql = "SELECT regexp, qualify, minus FROM panther_logs.public.test_table WHERE p_event_time >= DATEADD(day, -1, CURRENT_TIMESTAMP())"
+    result = await execute_data_lake_query(sql)
+
+    assert result["success"] is True
+
+    # Verify the query was modified to wrap Snowflake reserved words
+    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    modified_sql = call_args["input"]["sql"]
+    assert '"regexp"' in modified_sql
+    assert '"qualify"' in modified_sql
+    assert '"minus"' in modified_sql
