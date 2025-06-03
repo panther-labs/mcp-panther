@@ -126,6 +126,23 @@ QUOTABLE_RESERVED_WORDS = (
 )
 
 
+def get_reserved_words_info() -> dict[str, list[str]]:
+    """
+    Get categorized information about Snowflake reserved words for reference.
+
+    Returns:
+        Dictionary with categorized lists of reserved words:
+        - quotable_reserved_words: Words that can be quoted when used as column names
+        - forbidden_scalar_expressions: Words that cannot be used as column references in scalar expressions
+        - forbidden_column_names: Words that cannot be used as column names (reserved by ANSI)
+    """
+    return {
+        "quotable_reserved_words": sorted(QUOTABLE_RESERVED_WORDS),
+        "forbidden_scalar_expressions": sorted(SCALAR_EXPRESSION_FORBIDDEN),
+        "forbidden_column_names": sorted(COLUMN_NAME_FORBIDDEN),
+    }
+
+
 def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
     """
     Validate and wrap Snowflake reserved words according to their usage constraints.
@@ -134,13 +151,15 @@ def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
     - Wraps ANSI/Snowflake reserved words with double quotes when used as column names
     - Handles reserved words inside function calls (e.g., COUNT(DISTINCT account))
     - Returns errors for forbidden words in specific contexts
+    - Provides lists of related reserved words in error messages to help avoid future mistakes
 
     Args:
         sql: The SQL query string to process
 
     Returns:
         Tuple of (processed_sql, error_message). If error_message is not None,
-        the query contains forbidden usage and should be rejected.
+        the query contains forbidden usage and should be rejected. Error messages
+        include lists of related forbidden words to help avoid similar mistakes.
     """
     import re
 
@@ -159,9 +178,11 @@ def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
             pattern = r"\bSELECT\b[^;]*\b" + re.escape(forbidden_word) + r"\b(?!\s*\()"
 
         if re.search(pattern, sql, re.IGNORECASE):
+            forbidden_list = ", ".join(sorted(SCALAR_EXPRESSION_FORBIDDEN))
             return (
                 sql,
-                f"Query contains forbidden keyword usage: '{forbidden_word}' cannot be used as column reference in scalar expressions",
+                f"Query contains forbidden keyword usage: '{forbidden_word}' cannot be used as column reference in scalar expressions. "
+                f"Forbidden scalar expression words: {forbidden_list}",
             )
 
     # 2. Check for forbidden column names (but not function calls)
@@ -169,9 +190,11 @@ def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
         # Simple check: if forbidden word appears after SELECT (as column), but not as function call
         pattern = r"\bSELECT\b[^;]*\b" + re.escape(forbidden_word) + r"\b(?!\s*\()"
         if re.search(pattern, sql, re.IGNORECASE):
+            forbidden_list = ", ".join(sorted(COLUMN_NAME_FORBIDDEN))
             return (
                 sql,
-                f"Query contains forbidden keyword usage: '{forbidden_word}' cannot be used as column name (reserved by ANSI)",
+                f"Query contains forbidden keyword usage: '{forbidden_word}' cannot be used as column name (reserved by ANSI). "
+                f"Forbidden column names: {forbidden_list}",
             )
 
     # 3. Quote reserved words in specific column contexts (including inside functions)

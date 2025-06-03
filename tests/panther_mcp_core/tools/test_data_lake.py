@@ -273,7 +273,7 @@ def test_validate_and_wrap_reserved_words():
         # ANSI reserved words that can be quoted
         {
             "input": "SELECT action, column FROM mytable WHERE p_event_time >= '2024-01-01'",
-            "expected": 'SELECT action, "column" FROM mytable WHERE p_event_time >= \'2024-01-01\'',
+            "expected": "SELECT action, \"column\" FROM mytable WHERE p_event_time >= '2024-01-01'",
             "description": "COLUMN is reserved (ANSI) and should be quoted, ACTION is not reserved",
         },
         # Mixed reserved and non-reserved
@@ -311,7 +311,7 @@ LIMIT 10""",
         # CASE WHEN expressions should work (CASE and WHEN are valid in this context)
         {
             "input": "SELECT SUM(CASE WHEN account IS NOT NULL THEN 1 ELSE 0 END) as account_count FROM table WHERE p_event_time >= '2024-01-01'",
-            "expected": 'SELECT SUM(CASE WHEN "account" IS NOT NULL THEN 1 ELSE 0 END) as account_count FROM table WHERE p_event_time >= \'2024-01-01\'',
+            "expected": "SELECT SUM(CASE WHEN \"account\" IS NOT NULL THEN 1 ELSE 0 END) as account_count FROM table WHERE p_event_time >= '2024-01-01'",
             "description": "CASE WHEN expressions should work, with account quoted inside the expression",
         },
     ]
