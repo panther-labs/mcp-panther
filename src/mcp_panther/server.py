@@ -19,12 +19,37 @@ log_level_name = os.environ.get("LOG_LEVEL", "WARNING")
 # Convert string log level to logging constant
 log_level = getattr(logging, log_level_name.upper(), logging.DEBUG)
 
-# Configure logging with more detail
-logging.basicConfig(
-    level=log_level,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    stream=sys.stderr,
-)
+
+# Configure logging
+def configure_logging(log_file: str | None = None, *, force: bool = False) -> None:
+    """Configure logging to stderr or the specified file.
+
+    This also reconfigures the ``FastMCP`` logger so that all FastMCP output
+    uses the same handler as the rest of the application.
+    """
+
+    handler: logging.Handler
+    if log_file:
+        handler = logging.FileHandler(log_file)
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[handler],
+        force=force,
+    )
+
+    # Ensure FastMCP logs propagate to the root logger
+    fastmcp_logger = logging.getLogger("FastMCP")
+    for hdlr in list(fastmcp_logger.handlers):
+        fastmcp_logger.removeHandler(hdlr)
+    fastmcp_logger.propagate = True
+    fastmcp_logger.setLevel(log_level)
+
+
+configure_logging(os.environ.get("MCP_LOG_FILE"))
 logger = logging.getLogger(MCP_SERVER_NAME)
 
 # Support multiple import paths to accommodate different execution contexts:
@@ -85,10 +110,20 @@ def handle_signals():
     default=os.environ.get("MCP_HOST", default="127.0.0.1"),
     help="Host to bind to for SSE transport",
 )
-def main(transport: str, port: int, host: str):
+@click.option(
+    "--log-file",
+    type=click.Path(),
+    default=os.environ.get("MCP_LOG_FILE"),
+    help="Write logs to this file instead of stderr",
+)
+def main(transport: str, port: int, host: str, log_file: str | None):
     """Run the Panther MCP server with the specified transport"""
     # Set up signal handling
     handle_signals()
+
+    # Reconfigure logging if a log file is provided
+    if log_file:
+        configure_logging(log_file, force=True)
 
     if transport == "sse":
         # Create the Starlette app
