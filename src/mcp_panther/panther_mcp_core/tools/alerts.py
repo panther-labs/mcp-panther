@@ -30,20 +30,20 @@ logger = logging.getLogger("mcp-panther")
     }
 )
 async def list_alerts(
-    start_date: str = None,
-    end_date: str = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     severities: List[str] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
     statuses: List[str] = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
-    cursor: str = None,
-    detection_id: str = None,
-    event_count_max: int = None,
-    event_count_min: int = None,
-    log_sources: List[str] = None,
-    log_types: List[str] = None,
-    name_contains: str = None,
+    cursor: str | None = None,
+    detection_id: str | None = None,
+    event_count_max: int | None = None,
+    event_count_min: int | None = None,
+    log_sources: List[str] | None = None,
+    log_types: List[str] | None = None,
+    name_contains: str | None = None,
     page_size: int = 25,  # Default to 25, max is 50
-    resource_types: List[str] = None,
-    subtypes: List[str] = None,
+    resource_types: List[str] | None = None,
+    subtypes: List[str] | None = None,
     alert_type: str = "ALERT",  # Defaults to ALERT per schema
 ) -> Dict[str, Any]:
     """List alerts from Panther with comprehensive filtering options

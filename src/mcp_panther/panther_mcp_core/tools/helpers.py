@@ -62,7 +62,9 @@ async def get_global_helper_by_id(helper_id: str) -> Dict[str, Any]:
         "permissions": any_perms(Permission.RULE_READ, Permission.POLICY_READ),
     }
 )
-async def list_global_helpers(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
+async def list_global_helpers(
+    cursor: str | None = None, limit: int = 100
+) -> Dict[str, Any]:
     """List all global helpers from Panther with optional pagination
 
     Args:

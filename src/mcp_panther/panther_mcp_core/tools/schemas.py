@@ -19,10 +19,10 @@ logger = logging.getLogger("mcp-panther")
     }
 )
 async def list_log_type_schemas(
-    contains: str = None,
-    is_archived: bool = None,
-    is_in_use: bool = None,
-    is_managed: bool = None,
+    contains: str | None = None,
+    is_archived: bool | None = None,
+    is_in_use: bool | None = None,
+    is_managed: bool | None = None,
 ) -> Dict[str, Any]:
     """List all available log type schemas in Panther. Schemas are transformation instructions that convert raw audit logs
     into structured data for the data lake and real-time Python rules.

@@ -19,10 +19,10 @@ logger = logging.getLogger("mcp-panther")
     }
 )
 async def list_log_sources(
-    cursor: str = None,
-    log_types: List[str] = None,
-    is_healthy: bool = None,
-    integration_type: str = None,
+    cursor: str | None = None,
+    log_types: List[str] | None = None,
+    is_healthy: bool | None = None,
+    integration_type: str | None = None,
 ) -> Dict[str, Any]:
     """List log sources from Panther with optional filters.
 

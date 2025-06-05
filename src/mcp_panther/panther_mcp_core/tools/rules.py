@@ -17,7 +17,7 @@ logger = logging.getLogger("mcp-panther")
         "permissions": all_perms(Permission.RULE_READ),
     }
 )
-async def list_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
+async def list_rules(cursor: str | None = None, limit: int = 100) -> Dict[str, Any]:
     """List all rules from your Panther instance.
 
     Args:
@@ -165,7 +165,9 @@ async def disable_rule(rule_id: str) -> Dict[str, Any]:
         "permissions": all_perms(Permission.RULE_READ),
     }
 )
-async def list_scheduled_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
+async def list_scheduled_rules(
+    cursor: str | None = None, limit: int = 100
+) -> Dict[str, Any]:
     """List all scheduled rules from Panther with optional pagination
 
     Args:
@@ -270,7 +272,9 @@ async def get_scheduled_rule_by_id(rule_id: str) -> Dict[str, Any]:
         "permissions": all_perms(Permission.RULE_READ),
     }
 )
-async def list_simple_rules(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
+async def list_simple_rules(
+    cursor: str | None = None, limit: int = 100
+) -> Dict[str, Any]:
     """List all simple rules from Panther with optional pagination
 
     Args:
@@ -372,7 +376,7 @@ async def get_simple_rule_by_id(rule_id: str) -> Dict[str, Any]:
         "permissions": all_perms(Permission.POLICY_READ),
     }
 )
-async def list_policies(cursor: str = None, limit: int = 100) -> Dict[str, Any]:
+async def list_policies(cursor: str | None = None, limit: int = 100) -> Dict[str, Any]:
     """List all policies from Panther with optional pagination
 
     Args:
