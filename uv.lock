@@ -410,7 +410,7 @@ cli = [
 
 [[package]]
 name = "mcp-panther"
-version = "0.1.1rc2"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -438,7 +438,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.14" },
     { name = "anyascii", specifier = ">=0.3.2" },
     { name = "click", specifier = ">=8.1.0" },
-    { name = "fastmcp", specifier = ">=2.3.3" },
+    { name = "fastmcp", specifier = ">=2.3.0" },
     { name = "gql", specifier = ">=3.5.2" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.6.0" },
     { name = "pip-system-certs", specifier = ">=0.1.0" },

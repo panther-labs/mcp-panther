@@ -32,7 +32,7 @@ dependencies = [
     "click>=8.1.0",
     "uvicorn>=0.24.0",
     "starlette>=0.35.0",
-    "fastmcp>=2.3.3",
+    "fastmcp>=2.3.0",
 ]
 
 [project.urls]

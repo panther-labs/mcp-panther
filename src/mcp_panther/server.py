@@ -1,14 +1,10 @@
-import asyncio
 import logging
 import os
 import signal
 import sys
 
 import click
-import uvicorn
 from fastmcp import FastMCP
-from starlette.applications import Starlette
-from starlette.routing import Mount
 
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
@@ -96,19 +92,19 @@ def handle_signals():
 @click.command()
 @click.option(
     "--transport",
-    type=click.Choice(["stdio", "sse"]),
+    type=click.Choice(["stdio", "streamable-http"]),
     default=os.environ.get("MCP_TRANSPORT", default="stdio"),
-    help="Transport type (stdio or sse)",
+    help="Transport type (stdio or streamable-http)",
 )
 @click.option(
     "--port",
     default=int(os.environ.get("MCP_PORT", default="3000")),
-    help="Port to use for SSE transport",
+    help="Port to use for streamable HTTP transport",
 )
 @click.option(
     "--host",
     default=os.environ.get("MCP_HOST", default="127.0.0.1"),
-    help="Host to bind to for SSE transport",
+    help="Host to bind to for streamable HTTP transport",
 )
 @click.option(
     "--log-file",
@@ -125,25 +121,13 @@ def main(transport: str, port: int, host: str, log_file: str | None):
     if log_file:
         configure_logging(log_file, force=True)
 
-    if transport == "sse":
-        # Create the Starlette app
-        app = Starlette(
-            debug=True,
-            routes=[
-                Mount("/", app=mcp.sse_app()),
-            ],
+    if transport == "streamable-http":
+        logger.info(
+            f"Starting Panther MCP Server with streamable HTTP transport on {host}:{port}"
         )
 
-        logger.info(f"Starting Panther MCP Server with SSE transport on {host}:{port}")
-        # Use Uvicorn's Config and Server classes for more control
-        config = uvicorn.Config(app, host=host, port=port, timeout_graceful_shutdown=1)
-        server = uvicorn.Server(config)
-
-        # Override the default behavior
-        server.force_exit = True  # This makes Ctrl+C force exit
-
         try:
-            asyncio.run(server.serve())
+            mcp.run(transport="streamable-http", host=host, port=port)
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received, forcing immediate exit")
             os._exit(0)
