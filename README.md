@@ -257,6 +257,43 @@ This project exists thanks to all the people who contribute. Special thanks to [
 
 See our [CONTRIBUTORS.md](.github/CONTRIBUTORS.md) for a complete list of contributors.
 
+## Running the Server
+
+The MCP Panther server supports multiple transport protocols:
+
+### STDIO (Default)
+For local development and MCP client integration:
+```bash
+uv run python -m mcp_panther.server
+```
+
+### Streamable HTTP (Recommended for Web Deployments)
+For running as a persistent web service:
+```bash
+uv run python -m mcp_panther.server --transport streamable-http --port 8000 --host 0.0.0.0
+```
+
+You can then connect to the server at `http://localhost:8000/mcp`.
+
+To test the connection using FastMCP client:
+```python
+import asyncio
+from fastmcp import Client
+
+async def test_connection():
+    async with Client("http://localhost:8000/mcp") as client:
+        tools = await client.list_tools()
+        print(f"Available tools: {len(tools)}")
+
+asyncio.run(test_connection())
+```
+
+### Environment Variables
+- `MCP_TRANSPORT`: Set transport type (`stdio` or `streamable-http`)
+- `MCP_PORT`: Port for HTTP transport (default: 3000)
+- `MCP_HOST`: Host for HTTP transport (default: 127.0.0.1)
+- `MCP_LOG_FILE`: Log file path (optional)
+
 ## Contributing
 
 We welcome contributions to improve MCP-Panther! Here's how you can help:
