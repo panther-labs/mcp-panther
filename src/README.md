@@ -102,6 +102,29 @@ uv run python -m mcp_panther.server --transport streamable-http --port 8000 --ho
 
 The streamable HTTP transport will start the server at http://127.0.0.1:8000/mcp
 
+### Running with Docker
+
+Build and run the MCP server using Docker:
+
+```bash
+# Build the Docker image
+make docker
+
+# Setup a basic .env file
+echo "PANTHER_INSTANCE_URL=https://your-instance.runpanther.net" >> .env
+echo "PANTHER_API_TOKEN=your-api-token-here" >> .env
+
+# Run with default stdio transport
+docker run --env-file .env mcp-panther:<branch-name>
+
+# Run with streamable HTTP transport
+docker run -p 3000:3000 --env-file .env mcp-panther:<branch-name> --transport streamable-http
+
+# Access the HTTP endpoint at http://localhost:3000/mcp
+```
+
+The Docker container exposes port 3000 and binds to `0.0.0.0` when using streamable HTTP transport.
+
 ## Extending Functionality
 
 The MCP Panther server functionality can be extended by adding tools, prompts, and resources.

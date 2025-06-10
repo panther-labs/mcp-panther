@@ -28,10 +28,18 @@ WORKDIR /app
 # Set environment variable to indicate Docker environment
 ENV MCP_PANTHER_DOCKER_RUNTIME=true
 
+# Default environment variables
+ENV MCP_PORT=3000
+ENV MCP_HOST=0.0.0.0
+
 # Copy only the installed packages and project files
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/mcp-panther /usr/local/bin/mcp-panther
 COPY . .
 
-# Command to run the server
-CMD ["mcp-panther"] 
+# Expose the default port
+EXPOSE 3000
+
+# Command to run the server (use --transport streamable-http for HTTP mode)
+ENTRYPOINT ["mcp-panther"]
+CMD ["--transport", "streamable-http"]
