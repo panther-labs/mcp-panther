@@ -10,6 +10,7 @@ from mcp_panther.panther_mcp_core.tools.data_lake import (
     _normalize_name,
     _validate_and_wrap_reserved_words,
     _validate_fully_qualified_tables,
+    cancel_data_lake_query,
     execute_data_lake_query,
     format_database_reference,
     get_current_timestamp_function,
@@ -18,6 +19,7 @@ from mcp_panther.panther_mcp_core.tools.data_lake import (
     get_query_syntax_help,
     get_reserved_words_info,
     get_sample_log_events,
+    list_data_lake_queries,
 )
 from tests.utils.helpers import patch_graphql_client
 
@@ -757,3 +759,184 @@ async def test_execute_data_lake_query_database_reference_conversion(
         modified_sql = call_args["input"]["sql"]
         assert "panther_logs.aws_cloudtrail" in modified_sql
         assert "panther_logs.public.aws_cloudtrail" not in modified_sql
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_list_data_lake_queries_success(mock_graphql_client):
+    """Test successful listing of data lake queries."""
+    mock_response = {
+        "dataLakeQueries": {
+            "edges": [
+                {
+                    "node": {
+                        "id": "query1",
+                        "sql": "SELECT * FROM panther_logs.aws_cloudtrail",
+                        "name": "Test Query",
+                        "status": "running",
+                        "message": "Query executing",
+                        "startedAt": "2024-01-01T10:00:00Z",
+                        "completedAt": None,
+                        "isScheduled": False,
+                        "issuedBy": {
+                            "id": "user1",
+                            "email": "test@example.com",
+                            "givenName": "John",
+                            "familyName": "Doe",
+                        },
+                    }
+                },
+                {
+                    "node": {
+                        "id": "query2",
+                        "sql": "SELECT COUNT(*) FROM panther_logs.aws_cloudtrail",
+                        "name": None,
+                        "status": "succeeded",
+                        "message": "Query completed successfully",
+                        "startedAt": "2024-01-01T09:00:00Z",
+                        "completedAt": "2024-01-01T09:05:00Z",
+                        "isScheduled": True,
+                        "issuedBy": {
+                            "id": "token1",
+                            "name": "API Token 1",
+                        },
+                    }
+                },
+            ],
+            "pageInfo": {
+                "hasNextPage": False,
+                "endCursor": None,
+                "hasPreviousPage": False,
+                "startCursor": None,
+            },
+        }
+    }
+    mock_graphql_client.execute.return_value = mock_response
+
+    result = await list_data_lake_queries()
+
+    assert result["success"] is True
+    assert len(result["queries"]) == 2
+
+    # Check first query (user-issued)
+    query1 = result["queries"][0]
+    assert query1["id"] == "query1"
+    assert query1["status"] == "running"
+    assert query1["is_scheduled"] is False
+    assert query1["issued_by"]["type"] == "user"
+    assert query1["issued_by"]["email"] == "test@example.com"
+
+    # Check second query (API token-issued)
+    query2 = result["queries"][1]
+    assert query2["id"] == "query2"
+    assert query2["status"] == "succeeded"
+    assert query2["is_scheduled"] is True
+    assert query2["issued_by"]["type"] == "api_token"
+    assert query2["issued_by"]["name"] == "API Token 1"
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_list_data_lake_queries_with_filters(mock_graphql_client):
+    """Test listing data lake queries with filters."""
+    mock_graphql_client.execute.return_value = {
+        "dataLakeQueries": {"edges": [], "pageInfo": {}}
+    }
+
+    # Test with status filter
+    await list_data_lake_queries(status=["running", "failed"])
+
+    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    assert call_args["input"]["status"] == ["running", "failed"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_list_data_lake_queries_invalid_status(mock_graphql_client):
+    """Test listing data lake queries with invalid status values."""
+    result = await list_data_lake_queries(status=["invalid_status"])
+
+    assert result["success"] is False
+    assert "Invalid status values" in result["message"]
+    mock_graphql_client.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_list_data_lake_queries_error(mock_graphql_client):
+    """Test error handling when listing data lake queries fails."""
+    mock_graphql_client.execute.side_effect = Exception("GraphQL error")
+
+    result = await list_data_lake_queries()
+
+    assert result["success"] is False
+    assert "Failed to list data lake queries" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_cancel_data_lake_query_success(mock_graphql_client):
+    """Test successful cancellation of a data lake query."""
+    mock_response = {"cancelDataLakeQuery": {"id": "query123"}}
+    mock_graphql_client.execute.return_value = mock_response
+
+    result = await cancel_data_lake_query("query123")
+
+    assert result["success"] is True
+    assert result["query_id"] == "query123"
+    assert "Successfully cancelled" in result["message"]
+
+    # Verify correct GraphQL call
+    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    assert call_args["input"]["id"] == "query123"
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_cancel_data_lake_query_not_found(mock_graphql_client):
+    """Test cancellation of a non-existent query."""
+    mock_graphql_client.execute.side_effect = Exception("Query not found")
+
+    result = await cancel_data_lake_query("nonexistent")
+
+    assert result["success"] is False
+    assert "not found" in result["message"]
+    assert "already completed or been cancelled" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_cancel_data_lake_query_cannot_cancel(mock_graphql_client):
+    """Test cancellation of a query that cannot be cancelled."""
+    mock_graphql_client.execute.side_effect = Exception("Query cannot be cancelled")
+
+    result = await cancel_data_lake_query("completed_query")
+
+    assert result["success"] is False
+    assert "cannot be cancelled" in result["message"]
+    assert "Only running queries" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_cancel_data_lake_query_permission_error(mock_graphql_client):
+    """Test cancellation with permission error."""
+    mock_graphql_client.execute.side_effect = Exception("Permission denied")
+
+    result = await cancel_data_lake_query("query123")
+
+    assert result["success"] is False
+    assert "Permission denied" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_cancel_data_lake_query_no_id_returned(mock_graphql_client):
+    """Test cancellation when no ID is returned."""
+    mock_response = {"cancelDataLakeQuery": {}}
+    mock_graphql_client.execute.return_value = mock_response
+
+    result = await cancel_data_lake_query("query123")
+
+    assert result["success"] is False
+    assert "No query ID returned" in result["message"]
