@@ -6,7 +6,7 @@ import logging
 import os
 import re
 from enum import Enum
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List
 
 import anyascii
 from pydantic import Field
@@ -27,11 +27,20 @@ from .registry import mcp_tool
 logger = logging.getLogger("mcp-panther")
 
 
-class DatastoreType(Enum):
+class DatastoreType(str, Enum):
     """Supported datastore types for Panther data lake."""
 
     SNOWFLAKE = "snowflake"
     REDSHIFT = "redshift"
+
+
+class QueryStatus(str, Enum):
+    """Valid data lake query status values."""
+
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 def get_datastore_type() -> DatastoreType:
@@ -562,14 +571,14 @@ async def summarize_alert_events(
         ),
     ] = 30,
     start_date: Annotated[
-        Optional[str],
+        str | None,
         Field(
             description='The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to start of today UTC.',
             pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
         ),
     ] = None,
     end_date: Annotated[
-        Optional[str],
+        str | None,
         Field(
             description='The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to end of today UTC.',
             pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
@@ -692,13 +701,7 @@ async def execute_data_lake_query(
             description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND. Must use fully qualified table references (database.table or database.schema.table format). Reserved words will be automatically quoted and database references will be converted for your datastore type (Snowflake or Redshift)."
         ),
     ],
-    database_name: Annotated[
-        Optional[str],
-        Field(
-            description="The database to query. Will be automatically formatted for your datastore (e.g., 'panther_logs.public' for Snowflake, 'panther_logs' for Redshift).",
-            default="panther_logs.public",
-        ),
-    ] = "panther_logs.public",
+    database_name: str = "panther_logs.public",
 ) -> Dict[str, Any]:
     """Execute SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. For simple log sampling, use get_sample_log_events instead.
 
@@ -959,6 +962,7 @@ async def list_databases() -> Dict[str, Any]:
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_database_tables(
@@ -1040,6 +1044,7 @@ async def list_database_tables(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_table_schema(
@@ -1135,6 +1140,7 @@ async def get_table_schema(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_sample_log_events(
@@ -1303,58 +1309,45 @@ def _normalize_name(name):
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_data_lake_queries(
-    cursor: Annotated[
-        Optional[str],
-        Field(
-            description="An opaque string used when paginating across multiple pages of results",
-            default=None,
-        ),
-    ] = None,
+    cursor: str | None = None,
     page_size: Annotated[
         int,
         Field(
             description="The number of results that each page will contain. Defaults to 25 with a maximum value of 999.",
             ge=1,
             le=999,
-            default=25,
         ),
     ] = 25,
     contains: Annotated[
-        Optional[str],
-        Field(
-            description="Filter queries by their name and/or SQL statement",
-            default=None,
-        ),
+        str | None,
+        Field(description="Filter queries by their name and/or SQL statement"),
     ] = None,
     status: Annotated[
-        Optional[List[str]],
-        Field(
-            description="A list of query statuses to filter queries by. Valid values: 'running', 'succeeded', 'failed', 'cancelled'",
-            default=None,
-        ),
+        list[QueryStatus] | None,
+        Field(description="A list of query statuses to filter queries by"),
     ] = None,
     is_scheduled: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
-            description="Only return queries that are either scheduled or not (i.e. issued by a user). Leave blank to return both.",
-            default=None,
+            description="Only return queries that are either scheduled or not (i.e. issued by a user). Leave blank to return both."
         ),
     ] = None,
     started_at_after: Annotated[
-        Optional[str],
+        str | None,
         Field(
-            description="Only return queries that started after this date (YYYY-MM-DDTHH:MM:SS.000Z format)",
-            default=None,
+            description="Only return queries that started after this date",
+            pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$",
         ),
     ] = None,
     started_at_before: Annotated[
-        Optional[str],
+        str | None,
         Field(
-            description="Only return queries that started before this date (YYYY-MM-DDTHH:MM:SS.000Z format)",
-            default=None,
+            description="Only return queries that started before this date",
+            pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$",
         ),
     ] = None,
 ) -> Dict[str, Any]:
@@ -1392,15 +1385,7 @@ async def list_data_lake_queries(
         if contains:
             input_params["contains"] = contains
         if status:
-            # Validate status values
-            valid_statuses = {"running", "succeeded", "failed", "cancelled"}
-            invalid_statuses = set(status) - valid_statuses
-            if invalid_statuses:
-                return {
-                    "success": False,
-                    "message": f"Invalid status values: {', '.join(invalid_statuses)}. Valid values: {', '.join(valid_statuses)}",
-                }
-            input_params["status"] = status
+            input_params["status"] = [s.value for s in status]
         if is_scheduled is not None:
             input_params["isScheduled"] = is_scheduled
         if started_at_after:
@@ -1482,15 +1467,13 @@ async def list_data_lake_queries(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "destructiveHint": True,
     }
 )
 async def cancel_data_lake_query(
     query_id: Annotated[
         str,
-        Field(
-            description="The ID of the query to cancel",
-            example="1234567890",
-        ),
+        Field(description="The ID of the query to cancel"),
     ],
 ) -> Dict[str, Any]:
     """Cancel a running data lake query to free up resources and prevent system overload.

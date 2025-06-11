@@ -5,6 +5,7 @@ import pytest
 
 from mcp_panther.panther_mcp_core.tools.data_lake import (
     DatastoreType,
+    QueryStatus,
     _convert_database_references_in_sql,
     _is_name_normalized,
     _normalize_name,
@@ -844,21 +845,13 @@ async def test_list_data_lake_queries_with_filters(mock_graphql_client):
     }
 
     # Test with status filter
-    await list_data_lake_queries(status=["running", "failed"])
+    await list_data_lake_queries(status=[QueryStatus.RUNNING, QueryStatus.FAILED])
 
     call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
     assert call_args["input"]["status"] == ["running", "failed"]
 
 
-@pytest.mark.asyncio
-@patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_list_data_lake_queries_invalid_status(mock_graphql_client):
-    """Test listing data lake queries with invalid status values."""
-    result = await list_data_lake_queries(status=["invalid_status"])
-
-    assert result["success"] is False
-    assert "Invalid status values" in result["message"]
-    mock_graphql_client.execute.assert_not_called()
+# Remove this test since we now use enums for validation
 
 
 @pytest.mark.asyncio
