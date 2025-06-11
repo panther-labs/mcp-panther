@@ -7,7 +7,7 @@ lint:
 	ruff check $(dirs)
 
 docker: test
-	docker build -t mcp-panther .
+	docker build -t mcp-panther:$(shell git branch --show-current | sed 's/[^a-zA-Z0-9._-]/-/g') .
 
 # Create a virtual environment using uv (https://github.com/astral-sh/uv)
 # After creating, run: source .venv/bin/activate
