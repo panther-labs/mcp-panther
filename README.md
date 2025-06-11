@@ -135,12 +135,14 @@ The easiest way to get started is using our pre-built Docker image:
         "-i",
         "-e", "PANTHER_INSTANCE_URL",
         "-e", "PANTHER_API_TOKEN",
+        "-e", "PANTHER_DATASTORE_TYPE",
         "--rm",
         "ghcr.io/panther-labs/mcp-panther"
       ],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-        "PANTHER_API_TOKEN": "YOUR-API-KEY"
+        "PANTHER_API_TOKEN": "YOUR-API-KEY",
+        "PANTHER_DATASTORE_TYPE": "snowflake"
       }
     }
   }
@@ -161,9 +163,38 @@ For Python users, you can run directly from PyPI using uvx:
       "args": ["mcp-panther"],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-        "PANTHER_API_TOKEN": "YOUR-PANTHER-API-TOKEN"
+        "PANTHER_API_TOKEN": "YOUR-PANTHER-API-TOKEN",
+        "PANTHER_DATASTORE_TYPE": "snowflake"
       }
     }
+  }
+}
+```
+
+## Configuration Options
+
+### Environment Variables
+
+| Variable | Description | Required | Default | Values |
+|----------|-------------|----------|---------|---------|
+| `PANTHER_INSTANCE_URL` | Your Panther instance URL (e.g., `https://yourinstance.panther.com`) | Yes | None | Valid HTTPS URL |
+| `PANTHER_API_TOKEN` | API token with appropriate permissions | Yes | None | Valid API token |
+| `PANTHER_DATASTORE_TYPE` | Datastore type for your Panther instance | No | `snowflake` | `snowflake`, `redshift` |
+
+### Datastore Support
+
+MCP-Panther supports both Snowflake and Redshift datastores:
+
+- **Snowflake** (default): Uses `.public` schema references for database queries
+- **Redshift**: Automatically removes `.public` schema references for compatibility
+
+**For Redshift instances:**
+```json
+{
+  "env": {
+    "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
+    "PANTHER_API_TOKEN": "YOUR-API-TOKEN",
+    "PANTHER_DATASTORE_TYPE": "redshift"
   }
 }
 ```
@@ -197,7 +228,8 @@ To use with Claude Desktop, manually configure your `claude_desktop_config.json`
       "args": ["mcp-panther"],
       "env": {
         "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-        "PANTHER_API_TOKEN": "YOUR-PANTHER-API-TOKEN"
+        "PANTHER_API_TOKEN": "YOUR-PANTHER-API-TOKEN",
+        "PANTHER_DATASTORE_TYPE": "snowflake"
       }
     }
   }

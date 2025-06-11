@@ -3,7 +3,9 @@ Tools for interacting with Panther's data lake.
 """
 
 import logging
+import os
 import re
+from enum import Enum
 from typing import Annotated, Any, Dict, List, Optional
 
 import anyascii
@@ -21,6 +23,54 @@ from ..queries import (
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
+
+
+class DatastoreType(Enum):
+    """Supported datastore types for Panther data lake."""
+
+    SNOWFLAKE = "snowflake"
+    REDSHIFT = "redshift"
+
+
+def get_datastore_type() -> DatastoreType:
+    """Get the configured datastore type from environment variable.
+
+    Returns:
+        DatastoreType: The configured datastore type, defaults to SNOWFLAKE
+    """
+    datastore_env = os.getenv("PANTHER_DATASTORE_TYPE", "snowflake").lower()
+
+    try:
+        return DatastoreType(datastore_env)
+    except ValueError:
+        logger.warning(
+            f"Invalid PANTHER_DATASTORE_TYPE '{datastore_env}', defaulting to snowflake. "
+            f"Valid values: {', '.join([dt.value for dt in DatastoreType])}"
+        )
+        return DatastoreType.SNOWFLAKE
+
+
+def format_database_reference(database_name: str) -> str:
+    """Format database reference based on datastore type.
+
+    Args:
+        database_name: Database name like 'panther_logs.public'
+
+    Returns:
+        Formatted database reference:
+        - Snowflake: 'panther_logs.public' (unchanged)
+        - Redshift: 'panther_logs' (removes .public)
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        # Remove .public suffix for Redshift
+        if database_name.endswith(".public"):
+            return database_name[:-7]  # Remove '.public'
+
+    # Snowflake or other datastores use the full reference
+    return database_name
+
 
 # Snowflake reserved words categorized by their constraints
 # Based on official Snowflake documentation
@@ -120,24 +170,98 @@ COLUMN_NAME_FORBIDDEN = {
     "LOCALTIMESTAMP",
 }
 
+# Redshift reserved words (PostgreSQL-based subset)
+# Redshift uses PostgreSQL syntax, so fewer reserved words need quoting
+REDSHIFT_RESERVED_WORDS = {
+    "AES128",
+    "AES256",
+    "ALLOWOVERWRITE",
+    "ANALYSE",
+    "ANALYZE",
+    "ARRAY",
+    "CAST",
+    "COPY",
+    "CREDENTIALS",
+    "CURRENT_USER_ID",
+    "DELTA",
+    "DELTA32K",
+    "DISABLE",
+    "ENABLE",
+    "ENCRYPT",
+    "ENCRYPTION",
+    "EXPLICIT",
+    "FALSE",
+    "GLOBALDICT256",
+    "GLOBALDICT64K",
+    "IDENTITY",
+    "IGNORE",
+    "IMPLICIT",
+    "LUN",
+    "LUNS",
+    "LZO",
+    "MINUS",
+    "MODIFY",
+    "MOSTLY16",
+    "MOSTLY32",
+    "MOSTLY8",
+    "NEW",
+    "OFF",
+    "OLD",
+    "ONLY",
+    "OPEN",
+    "OVERLAPS",
+    "PARALLEL",
+    "PARTITION",
+    "PERCENT",
+    "PERMISSIONS",
+    "PRESERVE",
+    "RAW",
+    "READRATIO",
+    "RECOVER",
+    "RESPECT",
+    "RESTORE",
+    "REJECTLOG",
+    "RESORT",
+    "SYSDATE",
+    "SYSTEM",
+    "TEXT255",
+    "TEXT32K",
+    "TOP",
+    "TRUE",
+    "TRUNCATECOLUMNS",
+    "WALLET",
+}
+
 # All quotable reserved words (ANSI + Snowflake + Additional problematic words)
 QUOTABLE_RESERVED_WORDS = (
     ANSI_RESERVED_WORDS | SNOWFLAKE_RESERVED_WORDS | ADDITIONAL_PROBLEMATIC_WORDS
 )
 
+# All quotable reserved words for Redshift
+REDSHIFT_QUOTABLE_RESERVED_WORDS = ANSI_RESERVED_WORDS | REDSHIFT_RESERVED_WORDS
+
 
 def get_reserved_words_info() -> dict[str, list[str]]:
     """
-    Get categorized information about Snowflake reserved words for reference.
+    Get categorized information about reserved words for the current datastore.
 
     Returns:
         Dictionary with categorized lists of reserved words:
         - quotable_reserved_words: Words that can be quoted when used as column names
         - forbidden_scalar_expressions: Words that cannot be used as column references in scalar expressions
         - forbidden_column_names: Words that cannot be used as column names (reserved by ANSI)
+        - datastore_type: Current datastore type
     """
+    datastore = get_datastore_type()
+    quotable_words = (
+        QUOTABLE_RESERVED_WORDS
+        if datastore == DatastoreType.SNOWFLAKE
+        else REDSHIFT_QUOTABLE_RESERVED_WORDS
+    )
+
     return {
-        "quotable_reserved_words": sorted(QUOTABLE_RESERVED_WORDS),
+        "datastore_type": datastore.value,
+        "quotable_reserved_words": sorted(quotable_words),
         "forbidden_scalar_expressions": sorted(SCALAR_EXPRESSION_FORBIDDEN),
         "forbidden_column_names": sorted(COLUMN_NAME_FORBIDDEN),
     }
@@ -145,13 +269,14 @@ def get_reserved_words_info() -> dict[str, list[str]]:
 
 def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
     """
-    Validate and wrap Snowflake reserved words according to their usage constraints.
+    Validate and wrap reserved words according to datastore-specific constraints.
 
     This implementation:
-    - Wraps ANSI/Snowflake reserved words with double quotes when used as column names
+    - Wraps ANSI/datastore-specific reserved words with double quotes when used as column names
     - Handles reserved words inside function calls (e.g., COUNT(DISTINCT account))
     - Returns errors for forbidden words in specific contexts
     - Provides lists of related reserved words in error messages to help avoid future mistakes
+    - Adapts behavior based on current datastore type (Snowflake vs Redshift)
 
     Args:
         sql: The SQL query string to process
@@ -198,8 +323,16 @@ def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
             )
 
     # 3. Quote reserved words in specific column contexts (including inside functions)
+    # Get datastore-appropriate reserved words
+    datastore = get_datastore_type()
+    quotable_words = (
+        QUOTABLE_RESERVED_WORDS
+        if datastore == DatastoreType.SNOWFLAKE
+        else REDSHIFT_QUOTABLE_RESERVED_WORDS
+    )
+
     # Only quote words that are actually problematic as column references
-    column_context_words = QUOTABLE_RESERVED_WORDS - {
+    column_context_words = quotable_words - {
         # Exclude common SQL keywords that shouldn't be quoted when used as keywords
         "ALL",
         "AND",
@@ -324,6 +457,9 @@ async def summarize_alert_events(
     # Convert alert IDs list to SQL array
     alert_ids_str = ", ".join(f"'{aid}'" for aid in alert_ids)
 
+    # Format database reference based on datastore type
+    signals_db = format_database_reference("panther_signals.public")
+
     query = f"""
 SELECT
     DATE_TRUNC('DAY', cs.p_event_time) AS event_day,
@@ -341,7 +477,7 @@ SELECT
     MAX(cs.p_event_time) AS last_event,
     ARRAY_AGG(DISTINCT cs.p_alert_severity) AS severities
 FROM
-    panther_signals.public.correlation_signals cs
+    {signals_db}.correlation_signals cs
 WHERE
     cs.p_alert_id IN ({alert_ids_str})
 AND 
@@ -362,7 +498,7 @@ ORDER BY
     alert_count DESC
 LIMIT 1000
 """
-    return await execute_data_lake_query(query, "panther_signals.public")
+    return await execute_data_lake_query(query, signals_db)
 
 
 @mcp_tool(
@@ -420,8 +556,11 @@ async def execute_data_lake_query(
     try:
         client = await _create_panther_client()
 
+        # Format database name for current datastore
+        formatted_database_name = format_database_reference(database_name)
+
         # Prepare input variables
-        variables = {"input": {"sql": sql, "databaseName": database_name}}
+        variables = {"input": {"sql": sql, "databaseName": formatted_database_name}}
 
         logger.debug(f"Query variables: {variables}")
 
@@ -837,10 +976,13 @@ async def get_sample_log_events(
     database_name = "panther_logs.public"
     table_name = _normalize_name(schema_name)
 
+    # Format database reference for current datastore
+    formatted_db = format_database_reference(database_name)
+
     try:
         sql = f"""
         SELECT *
-        FROM {database_name}.{table_name}
+        FROM {formatted_db}.{table_name}
         WHERE p_event_time >= DATEADD(day, -7, CURRENT_TIMESTAMP())
         ORDER BY p_event_time DESC
         LIMIT 10

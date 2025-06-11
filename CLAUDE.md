@@ -58,6 +58,7 @@ Tools can specify required permissions via annotations:
 ### Environment Variables
 - `PANTHER_INSTANCE_URL` - Panther instance URL (required)
 - `PANTHER_API_TOKEN` - API authentication token (required)
+- `PANTHER_DATASTORE_TYPE` - Datastore type: `snowflake` or `redshift` (default: snowflake)
 - `LOG_LEVEL` - Logging level (default: WARNING)
 
 ### Development vs Production
@@ -115,12 +116,23 @@ Follow the existing error handling patterns for API failures and permission deni
 
 ## Data Lake Query Features
 
-### Snowflake Reserved Words Handling
-The data lake query execution automatically handles Snowflake reserved words according to their official usage constraints:
+### Multi-Datastore Support
+The data lake queries support both Snowflake and Redshift datastores:
+
+#### Datastore Configuration
+- **Environment Variable**: Set `PANTHER_DATASTORE_TYPE=redshift` for Redshift instances
+- **Default Behavior**: Defaults to Snowflake if not specified
+- **Schema Handling**: 
+  - Snowflake: Uses `.public` schema references (e.g., `panther_logs.public`)
+  - Redshift: Removes `.public` references (e.g., `panther_logs`)
+
+### Reserved Words Handling
+The data lake query execution automatically handles datastore-specific reserved words:
 
 #### Automatic Column Quoting
 - **ANSI Reserved Words**: Automatically quotes reserved words like `column`, `order`, `table` when used as column names
-- **Snowflake Reserved Words**: Quotes Snowflake-specific reserved words like `action`, `regexp`, `qualify`, `ilike`
+- **Snowflake Reserved Words**: Quotes Snowflake-specific reserved words like `action`, `regexp`, `qualify`, `ilike` (when `PANTHER_DATASTORE_TYPE=snowflake`)
+- **Redshift Reserved Words**: Quotes Redshift-specific reserved words like `delta`, `identity`, `analyze` (when `PANTHER_DATASTORE_TYPE=redshift`)
 - **Smart Context Detection**: Only quotes words when they appear as column names in SELECT clauses
 - **Function Preservation**: Functions like `CURRENT_TIMESTAMP()` are left unchanged
 
@@ -148,4 +160,4 @@ SELECT false, true FROM logs WHERE p_event_time >= '2024-01-01'
 -- Error: 'FALSE' cannot be used as column reference in scalar expressions
 ```
 
-The implementation follows the official Snowflake reserved words documentation and provides clear error messages for forbidden usage patterns.
+The implementation follows the official Snowflake and Redshift reserved words documentation and provides clear error messages for forbidden usage patterns.

@@ -19,7 +19,7 @@ This guide provides instructions for developers working on the MCP Panther proje
 
 ## Getting Started
 
-The MCP Panther project is a server implementation for the Model Control Protocol (MCP) that provides integration with Panther Labs services.
+The MCP Panther project is a server implementation for the Model Control Protocol (MCP) that provides integration with Panther Labs services. It supports both Snowflake and Redshift datastores with automatic configuration based on environment variables.
 
 ## Testing Changes
 
@@ -64,6 +64,40 @@ uv run python -m mcp_panther.server
 ```
 
 This will start the server at http://127.0.0.1:8000/
+
+### Environment Variables for Development
+
+When testing locally, set these environment variables:
+
+```bash
+export PANTHER_INSTANCE_URL="https://your-instance.panther.com"
+export PANTHER_API_TOKEN="your-api-token"
+export PANTHER_DATASTORE_TYPE="snowflake"  # or "redshift"
+```
+
+## Datastore Support
+
+The MCP server supports both Snowflake and Redshift datastores:
+
+### Snowflake (Default)
+- Uses `.public` schema references in SQL queries
+- Supports comprehensive Snowflake-specific reserved words handling
+- Uses Snowflake SQL syntax (e.g., `DATEADD`, `DATE_TRUNC`)
+
+### Redshift
+- Automatically removes `.public` schema references from database names
+- Uses Redshift-specific reserved words list (PostgreSQL-based)
+- Maintains ANSI SQL compatibility
+
+### Configuration
+Set `PANTHER_DATASTORE_TYPE` environment variable:
+- `snowflake` (default) - for Snowflake instances
+- `redshift` - for Redshift instances
+
+The datastore type affects:
+- Database reference formatting (`panther_logs.public` vs `panther_logs`)
+- Reserved words validation and quoting
+- SQL syntax compatibility
 
 ## Extending Functionality
 
