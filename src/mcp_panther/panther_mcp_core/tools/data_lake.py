@@ -72,6 +72,80 @@ def format_database_reference(database_name: str) -> str:
     return database_name
 
 
+def get_current_timestamp_function() -> str:
+    """Get the appropriate current timestamp function for the datastore.
+
+    Returns:
+        String containing the timestamp function:
+        - Snowflake: 'CURRENT_TIMESTAMP()'
+        - Redshift: 'GETDATE()'
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        return "GETDATE()"
+    else:
+        return "CURRENT_TIMESTAMP()"
+
+
+def get_dateadd_function(interval: str, amount: int, date_expr: str) -> str:
+    """Get the appropriate date addition function for the datastore.
+
+    Args:
+        interval: Time interval ('day', 'hour', 'minute', etc.)
+        amount: Amount to add (can be negative for subtraction)
+        date_expr: Date expression to add to
+
+    Returns:
+        String containing the date add function:
+        - Snowflake: 'DATEADD(interval, amount, date_expr)'
+        - Redshift: 'date_expr + INTERVAL 'amount interval''
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        # Redshift uses PostgreSQL-style interval syntax
+        if amount >= 0:
+            return f"{date_expr} + INTERVAL '{amount} {interval}'"
+        else:
+            return f"{date_expr} - INTERVAL '{-amount} {interval}'"
+    else:
+        # Snowflake uses DATEADD function
+        return f"DATEADD({interval}, {amount}, {date_expr})"
+
+
+@mcp_tool()
+def get_query_syntax_help() -> dict[str, str]:
+    """Get datastore-specific query syntax guidance.
+
+    Returns:
+        Dictionary containing syntax examples and best practices for the current datastore:
+        - datastore_type: Current datastore type
+        - database_references: How to reference databases and tables
+        - date_functions: Examples of date/time functions
+        - reserved_words: How reserved words are handled
+        - best_practices: General tips for writing compatible queries
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        return {
+            "datastore_type": "redshift",
+            "database_references": "REQUIRED: Use fully qualified table references like 'panther_logs.public.aws_cloudtrail' or 'panther_logs.aws_cloudtrail'. References with .public are automatically converted to remove .public for Redshift compatibility.",
+            "date_functions": f"Current timestamp: {get_current_timestamp_function()}, Date arithmetic: date_column + INTERVAL '7 day'",
+            "reserved_words": "PostgreSQL-style reserved words are automatically quoted when used as column names. ANSI reserved words like 'column', 'order' are also handled.",
+            "best_practices": "Use standard SQL syntax. Nested fields: field.nested_field format. Always include p_event_time filter. Always use fully qualified table names.",
+        }
+    else:
+        return {
+            "datastore_type": "snowflake",
+            "database_references": "REQUIRED: Use fully qualified table references like 'panther_logs.public.aws_cloudtrail' or 'panther_logs.aws_cloudtrail'. Schema references like .public are preserved for Snowflake.",
+            "date_functions": f"Current timestamp: {get_current_timestamp_function()}, Date arithmetic: {get_dateadd_function('day', -7, 'CURRENT_TIMESTAMP()')}",
+            "reserved_words": "Snowflake reserved words like 'regexp', 'qualify' and ANSI words like 'column', 'order' are automatically quoted when used as column names.",
+            "best_practices": "Use standard SQL syntax. Nested fields: field:nested_field format. Always include p_event_time filter. Always use fully qualified table names.",
+        }
+
+
 # Snowflake reserved words categorized by their constraints
 # Based on official Snowflake documentation
 
@@ -161,10 +235,8 @@ ADDITIONAL_PROBLEMATIC_WORDS = {
 SCALAR_EXPRESSION_FORBIDDEN = {"CASE", "CAST", "FALSE", "TRUE", "TRY_CAST", "WHEN"}
 
 # Cannot be used as column name (reserved by ANSI) - should error as column name
+# Note: Only enforce this for column names in SELECT, not for functions in WHERE clauses
 COLUMN_NAME_FORBIDDEN = {
-    "CURRENT_DATE",
-    "CURRENT_TIME",
-    "CURRENT_TIMESTAMP",
     "CURRENT_USER",
     "LOCALTIME",
     "LOCALTIMESTAMP",
@@ -265,6 +337,66 @@ def get_reserved_words_info() -> dict[str, list[str]]:
         "forbidden_scalar_expressions": sorted(SCALAR_EXPRESSION_FORBIDDEN),
         "forbidden_column_names": sorted(COLUMN_NAME_FORBIDDEN),
     }
+
+
+def _convert_database_references_in_sql(sql: str) -> str:
+    """Convert database references in SQL based on datastore type.
+
+    For Redshift, converts 'database.public.table' to 'database.table'
+    For Snowflake, preserves references as-is
+
+    Args:
+        sql: The SQL query string to process
+
+    Returns:
+        SQL with converted database references
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        # Convert database.public.table to database.table for Redshift
+        # Use regex to find patterns like 'word.public.word'
+        import re
+
+        pattern = r"\b(\w+)\.public\.(\w+)\b"
+        converted_sql = re.sub(pattern, r"\1.\2", sql)
+        return converted_sql
+
+    # Snowflake preserves references as-is
+    return sql
+
+
+def _validate_fully_qualified_tables(sql: str) -> str | None:
+    """Validate that all table references in SQL are fully qualified.
+
+    Looks for FROM and JOIN clauses and ensures table references include database names.
+
+    Args:
+        sql: The SQL query string to validate
+
+    Returns:
+        Error message if validation fails, None if valid
+    """
+    import re
+
+    # Find FROM and JOIN clauses
+    # This regex looks for FROM/JOIN followed by a table reference
+    from_join_pattern = (
+        r"\b(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)"
+    )
+
+    matches = re.findall(from_join_pattern, sql, re.IGNORECASE)
+
+    for table_ref in matches:
+        # Check if table reference has at least one dot (database.table or database.schema.table)
+        if "." not in table_ref:
+            return (
+                f"Table reference '{table_ref}' is not fully qualified. "
+                f"Please use database.table format (e.g., 'panther_logs.aws_cloudtrail' or 'panther_logs.public.aws_cloudtrail'). "
+                f"Use list_databases() and list_database_tables() to find correct names."
+            )
+
+    return None
 
 
 def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
@@ -393,7 +525,8 @@ def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
         return select_keyword + processed_content
 
     # Pattern to match SELECT clause until FROM (including multiline)
-    select_clause_pattern = r"\b(SELECT\s+)(.*?)(?=\s+FROM\s|\s*$)"
+    # More precise pattern that handles multi-line SELECT statements better
+    select_clause_pattern = r"\b(SELECT\s+)((?:[^;](?!FROM\s))*?)(?=\s+FROM\s)"
     modified_sql = re.sub(
         select_clause_pattern,
         process_select_clause,
@@ -460,7 +593,51 @@ async def summarize_alert_events(
     # Format database reference based on datastore type
     signals_db = format_database_reference("panther_signals.public")
 
-    query = f"""
+    # Use datastore-appropriate functions
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        # Redshift version with PostgreSQL-style functions
+        query = f"""
+SELECT
+    DATE_TRUNC('DAY', cs.p_event_time) AS event_day,
+    DATE_TRUNC('MINUTE', cs.p_event_time - (EXTRACT(MINUTE FROM cs.p_event_time) % {time_window}) * INTERVAL '1 minute') AS time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses AS source_ips,
+    cs.p_any_emails AS emails,
+    cs.p_any_usernames AS usernames,
+    cs.p_any_trace_ids AS trace_ids,
+    COUNT(DISTINCT cs.p_alert_id) AS alert_count,
+    ARRAY_AGG(DISTINCT cs.p_alert_id) AS alert_ids,
+    ARRAY_AGG(DISTINCT cs.p_rule_id) AS rule_ids,
+    MIN(cs.p_event_time) AS first_event,
+    MAX(cs.p_event_time) AS last_event,
+    ARRAY_AGG(DISTINCT cs.p_alert_severity) AS severities
+FROM
+    {signals_db}.correlation_signals cs
+WHERE
+    cs.p_alert_id IN ({alert_ids_str})
+AND 
+    cs.p_event_time BETWEEN '{start_date}' AND '{end_date}'
+GROUP BY
+    event_day,
+    time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses,
+    cs.p_any_emails,
+    cs.p_any_usernames,
+    cs.p_any_trace_ids
+HAVING
+    COUNT(DISTINCT cs.p_alert_id) > 0
+ORDER BY
+    event_day DESC,
+    time_{time_window}_minute DESC,
+    alert_count DESC
+LIMIT 1000
+"""
+    else:
+        # Snowflake version with DATEADD function
+        query = f"""
 SELECT
     DATE_TRUNC('DAY', cs.p_event_time) AS event_day,
     DATE_TRUNC('MINUTE', DATEADD('MINUTE', {time_window} * FLOOR(EXTRACT(MINUTE FROM cs.p_event_time) / {time_window}), 
@@ -510,26 +687,53 @@ async def execute_data_lake_query(
     sql: Annotated[
         str,
         Field(
-            description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND. The query must be compatible with Snowflake SQL."
+            description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND. Must use fully qualified table references (database.table or database.schema.table format). Reserved words will be automatically quoted and database references will be converted for your datastore type (Snowflake or Redshift)."
         ),
     ],
     database_name: Annotated[
         Optional[str],
-        Field(description="The database to query.", default="panther_logs.public"),
+        Field(
+            description="The database to query. Will be automatically formatted for your datastore (e.g., 'panther_logs.public' for Snowflake, 'panther_logs' for Redshift).",
+            default="panther_logs.public",
+        ),
     ] = "panther_logs.public",
 ) -> Dict[str, Any]:
-    """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. For simple log sampling, use get_sample_log_events instead. The query must follow Snowflake SQL syntax (e.g., use field:nested_field instead of field.nested_field).
+    """Execute SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. For simple log sampling, use get_sample_log_events instead.
 
     WORKFLOW:
     1. First call get_table_schema to understand the schema
     2. Then execute_data_lake_query with your SQL
     3. Finally call get_data_lake_query_results with the returned query_id
 
+    SYNTAX GUIDANCE:
+    - Reserved words are automatically quoted when needed
+    - Database references are automatically converted for your datastore (.public handled automatically)
+    - For syntax help, use get_query_syntax_help()
+
+    IMPORTANT DATABASE SCHEMA NOTES:
+    - REQUIRED: Use fully qualified table references (database.table or database.schema.table format)
+    - Examples: 'panther_logs.aws_cloudtrail' or 'panther_logs.public.aws_cloudtrail'
+    - Database references are automatically converted (.public removed for Redshift, preserved for Snowflake)
+    - Use list_databases and list_database_tables to find the correct database and table names
+    - Table names differ from log type names (e.g., 'AWS.CloudTrail' log type → 'aws_cloudtrail' table)
+
     Returns a dictionary with query execution status and a query_id for retrieving results.
     """
     logger.info("Executing data lake query")
 
-    # Validate and wrap reserved words according to Snowflake constraints
+    # Validate that all table references are fully qualified
+    table_validation_error = _validate_fully_qualified_tables(sql)
+    if table_validation_error:
+        logger.error(table_validation_error)
+        return {
+            "success": False,
+            "message": table_validation_error,
+        }
+
+    # Convert database references for datastore compatibility (e.g., remove .public for Redshift)
+    sql = _convert_database_references_in_sql(sql)
+
+    # Validate and wrap reserved words according to datastore constraints
     sql, validation_error = _validate_and_wrap_reserved_words(sql)
     if validation_error:
         logger.error(validation_error)
@@ -759,7 +963,7 @@ async def list_database_tables(
     database: Annotated[
         str,
         Field(
-            description="The name of the database to list tables for",
+            description="The name of the database to list tables for. Use exact name from list_databases output.",
             example="panther_logs.public",
         ),
     ],
@@ -840,7 +1044,7 @@ async def get_table_schema(
     database_name: Annotated[
         str,
         Field(
-            description="The name of the database where the table is located",
+            description="The name of the database where the table is located. Use the exact name from list_databases (schema formatting is automatic).",
             example="panther_logs.public",
         ),
     ],
@@ -854,16 +1058,17 @@ async def get_table_schema(
 ) -> Dict[str, Any]:
     """Get column details for a specific datalake table.
 
-    IMPORTANT: This returns the table structure in Snowflake/Redshift. For writing
+    IMPORTANT: This returns the table structure in your datastore (Snowflake/Redshift). For writing
     optimal queries, ALSO call get_panther_log_type_schema() to understand:
     - Nested object structures (only shown as 'object' type here)
     - Which fields map to p_any_* indicator columns
     - Array element structures
 
     Example workflow:
-    1. get_panther_log_type_schema(["AWS.CloudTrail"]) - understand structure
-    2. get_table_schema("panther_logs.public", "aws_cloudtrail") - get column names/types
-    3. Write query using both: nested paths from log schema, column names from table schema
+    1. list_databases() - find available databases
+    2. list_database_tables("database_name") - find available tables
+    3. get_table_schema("database_name", "table_name") - get column details
+    4. Write query using database.table_name format (schema is handled automatically)
 
     Returns:
         Dict containing:
@@ -939,12 +1144,13 @@ async def get_sample_log_events(
         ),
     ],
 ) -> Dict[str, Any]:
-    """Get a sample of 10 log events for a specific log type from the panther_logs.public database.
+    """Get a sample of 10 log events for a specific log type from the panther_logs database.
 
     This function is the RECOMMENDED tool for quickly exploring sample log data with minimal effort.
 
     This function constructs a SQL query to fetch recent sample events and executes it against
     the data lake. The query automatically filters events from the last 7 days to ensure quick results.
+    Database schema formatting is handled automatically for your datastore type.
 
     NOTE: After calling this function, you MUST call get_data_lake_query_results with the returned
     query_id to retrieve the actual log events.
@@ -980,10 +1186,14 @@ async def get_sample_log_events(
     formatted_db = format_database_reference(database_name)
 
     try:
+        # Use datastore-appropriate date functions
+        current_timestamp = get_current_timestamp_function()
+        date_condition = get_dateadd_function("day", -7, current_timestamp)
+
         sql = f"""
         SELECT *
         FROM {formatted_db}.{table_name}
-        WHERE p_event_time >= DATEADD(day, -7, CURRENT_TIMESTAMP())
+        WHERE p_event_time >= {date_condition}
         ORDER BY p_event_time DESC
         LIMIT 10
         """

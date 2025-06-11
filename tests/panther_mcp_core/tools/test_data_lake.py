@@ -5,12 +5,17 @@ import pytest
 
 from mcp_panther.panther_mcp_core.tools.data_lake import (
     DatastoreType,
+    _convert_database_references_in_sql,
     _is_name_normalized,
     _normalize_name,
     _validate_and_wrap_reserved_words,
+    _validate_fully_qualified_tables,
     execute_data_lake_query,
     format_database_reference,
+    get_current_timestamp_function,
     get_datastore_type,
+    get_dateadd_function,
+    get_query_syntax_help,
     get_reserved_words_info,
     get_sample_log_events,
 )
@@ -96,7 +101,7 @@ async def test_execute_data_lake_query_custom_database(mock_graphql_client):
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
-    sql = "SELECT * FROM my_custom_table WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
+    sql = "SELECT * FROM custom_database.my_custom_table WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
     custom_db = "custom_database"
     result = await execute_data_lake_query(sql, database_name=custom_db)
 
@@ -344,8 +349,8 @@ LIMIT 10""",
             "expected_error": "cannot be used as column reference in scalar expressions",
         },
         {
-            "input": "SELECT current_date FROM table WHERE p_event_time >= '2024-01-01'",
-            "description": "CURRENT_DATE cannot be used as column name",
+            "input": "SELECT current_user FROM table WHERE p_event_time >= '2024-01-01'",
+            "description": "CURRENT_USER cannot be used as column name",
             "expected_error": "cannot be used as column name (reserved by ANSI)",
         },
     ]
@@ -478,7 +483,7 @@ def test_get_reserved_words_info_snowflake():
         assert "QUALIFY" in result["quotable_reserved_words"]  # Snowflake-specific
         assert "COLUMN" in result["quotable_reserved_words"]  # ANSI reserved
         assert "FALSE" in result["forbidden_scalar_expressions"]
-        assert "CURRENT_DATE" in result["forbidden_column_names"]
+        assert "CURRENT_USER" in result["forbidden_column_names"]
 
 
 def test_get_reserved_words_info_redshift():
@@ -515,6 +520,42 @@ def test_validate_and_wrap_reserved_words_redshift():
         assert '"qualify"' not in result  # Should not be quoted in Redshift
 
 
+def test_current_timestamp_function():
+    """Test datastore-specific timestamp functions."""
+    with patch.dict(os.environ, {"PANTHER_DATASTORE_TYPE": "snowflake"}):
+        assert get_current_timestamp_function() == "CURRENT_TIMESTAMP()"
+
+    with patch.dict(os.environ, {"PANTHER_DATASTORE_TYPE": "redshift"}):
+        assert get_current_timestamp_function() == "GETDATE()"
+
+
+def test_dateadd_function():
+    """Test datastore-specific date addition functions."""
+    with patch.dict(os.environ, {"PANTHER_DATASTORE_TYPE": "snowflake"}):
+        assert (
+            get_dateadd_function("day", -7, "CURRENT_TIMESTAMP()")
+            == "DATEADD(day, -7, CURRENT_TIMESTAMP())"
+        )
+        assert get_dateadd_function("hour", 1, "NOW()") == "DATEADD(hour, 1, NOW())"
+
+    with patch.dict(os.environ, {"PANTHER_DATASTORE_TYPE": "redshift"}):
+        assert (
+            get_dateadd_function("day", -7, "GETDATE()")
+            == "GETDATE() - INTERVAL '7 day'"
+        )
+        assert get_dateadd_function("hour", 1, "NOW()") == "NOW() + INTERVAL '1 hour'"
+
+
+def test_fixed_current_date_forbidden_words():
+    """Test that CURRENT_DATE is now allowed in WHERE clauses."""
+    # CURRENT_DATE should be allowed in WHERE clauses now
+    result, error = _validate_and_wrap_reserved_words(
+        "SELECT actionName FROM table WHERE p_event_time >= CURRENT_DATE - INTERVAL '30 days'"
+    )
+    assert error is None
+    assert "CURRENT_DATE" in result  # Should be preserved, not cause error
+
+
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
 async def test_execute_data_lake_query_redshift_database_formatting(
@@ -526,7 +567,7 @@ async def test_execute_data_lake_query_redshift_database_formatting(
             "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
         }
 
-        sql = "SELECT * FROM table WHERE p_event_time >= DATEADD(day, -1, CURRENT_TIMESTAMP())"
+        sql = "SELECT * FROM panther_logs.public.test_table WHERE p_event_time >= DATEADD(day, -1, CURRENT_TIMESTAMP())"
         result = await execute_data_lake_query(sql, database_name="panther_logs.public")
 
         assert result["success"] is True
@@ -576,3 +617,143 @@ async def test_execute_data_lake_query_snowflake_reserved_words(mock_graphql_cli
     assert '"regexp"' in modified_sql
     assert '"qualify"' in modified_sql
     assert '"minus"' in modified_sql
+
+
+def test_validate_fully_qualified_tables():
+    """Test validation of fully qualified table references."""
+    # Valid cases - should return None (no error)
+    valid_queries = [
+        "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+        "SELECT * FROM panther_signals.public.correlation_signals WHERE p_event_time >= '2024-01-01'",
+        "SELECT * FROM db1.table1 JOIN db2.table2 ON db1.table1.id = db2.table2.id WHERE p_event_time >= '2024-01-01'",
+    ]
+
+    for sql in valid_queries:
+        result = _validate_fully_qualified_tables(sql)
+        assert result is None, f"Valid query should not have error: {sql}"
+
+    # Invalid cases - should return error messages
+    invalid_queries = [
+        "SELECT * FROM aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+        "SELECT * FROM table1 JOIN panther_logs.table2 ON table1.id = table2.id WHERE p_event_time >= '2024-01-01'",
+        "SELECT * FROM panther_logs.table1 JOIN table2 ON table1.id = table2.id WHERE p_event_time >= '2024-01-01'",
+    ]
+
+    for sql in invalid_queries:
+        result = _validate_fully_qualified_tables(sql)
+        assert result is not None, f"Invalid query should have error: {sql}"
+        assert "not fully qualified" in result
+
+
+def test_convert_database_references_snowflake():
+    """Test database reference conversion for Snowflake (should preserve as-is)."""
+    with patch.dict(os.environ, {"PANTHER_DATASTORE_TYPE": "snowflake"}):
+        test_cases = [
+            {
+                "input": "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+                "expected": "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+            },
+            {
+                "input": "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+                "expected": "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+            },
+        ]
+
+        for case in test_cases:
+            result = _convert_database_references_in_sql(case["input"])
+            assert result == case["expected"]
+
+
+def test_convert_database_references_redshift():
+    """Test database reference conversion for Redshift (should remove .public)."""
+    with patch.dict(os.environ, {"PANTHER_DATASTORE_TYPE": "redshift"}):
+        test_cases = [
+            {
+                "input": "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+                "expected": "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+            },
+            {
+                "input": "SELECT * FROM panther_signals.public.correlation_signals WHERE p_event_time >= '2024-01-01'",
+                "expected": "SELECT * FROM panther_signals.correlation_signals WHERE p_event_time >= '2024-01-01'",
+            },
+            {
+                "input": "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+                "expected": "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_event_time >= '2024-01-01'",
+            },
+        ]
+
+        for case in test_cases:
+            result = _convert_database_references_in_sql(case["input"])
+            assert result == case["expected"]
+
+
+def test_get_query_syntax_help_snowflake():
+    """Test query syntax help for Snowflake."""
+    with patch.dict(os.environ, {"PANTHER_DATASTORE_TYPE": "snowflake"}):
+        result = get_query_syntax_help()
+
+        assert result["datastore_type"] == "snowflake"
+        assert (
+            "REQUIRED: Use fully qualified table references"
+            in result["database_references"]
+        )
+        assert "preserved for Snowflake" in result["database_references"]
+        assert "CURRENT_TIMESTAMP()" in result["date_functions"]
+        assert "DATEADD" in result["date_functions"]
+
+
+def test_get_query_syntax_help_redshift():
+    """Test query syntax help for Redshift."""
+    with patch.dict(os.environ, {"PANTHER_DATASTORE_TYPE": "redshift"}):
+        result = get_query_syntax_help()
+
+        assert result["datastore_type"] == "redshift"
+        assert (
+            "REQUIRED: Use fully qualified table references"
+            in result["database_references"]
+        )
+        assert (
+            "automatically converted to remove .public" in result["database_references"]
+        )
+        assert "GETDATE()" in result["date_functions"]
+        assert "INTERVAL" in result["date_functions"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_execute_data_lake_query_fully_qualified_validation(mock_graphql_client):
+    """Test that execute_data_lake_query validates fully qualified table references."""
+    # Query without fully qualified table reference should fail
+    sql = "SELECT * FROM aws_cloudtrail WHERE p_event_time >= DATEADD(day, -1, CURRENT_TIMESTAMP())"
+    result = await execute_data_lake_query(sql)
+
+    assert result["success"] is False
+    assert "not fully qualified" in result["message"]
+
+    # GraphQL client should not be called since validation failed
+    mock_graphql_client.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_execute_data_lake_query_database_reference_conversion(
+    mock_graphql_client,
+):
+    """Test that database references are converted in SQL queries."""
+    with patch.dict(os.environ, {"PANTHER_DATASTORE_TYPE": "redshift"}):
+        mock_graphql_client.execute.return_value = {
+            "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+        }
+
+        # Query with .public should be converted for Redshift
+        sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -1, CURRENT_TIMESTAMP())"
+        result = await execute_data_lake_query(sql)
+
+        assert result["success"] is True
+
+        # Verify the SQL was converted (removed .public)
+        call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+        modified_sql = call_args["input"]["sql"]
+        assert "panther_logs.aws_cloudtrail" in modified_sql
+        assert "panther_logs.public.aws_cloudtrail" not in modified_sql
