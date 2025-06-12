@@ -7,6 +7,10 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 2. **Interactively query security logs using natural language**
 3. **Triage, comment, and resolve one or many alerts**
 
+<a href="https://glama.ai/mcp/servers/@panther-labs/mcp-panther">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@panther-labs/mcp-panther/badge" alt="Panther Server MCP server" />
+</a>
+
 ## Available Tools
 
 <details>
