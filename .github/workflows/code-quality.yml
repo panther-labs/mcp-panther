@@ -19,10 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # For pull requests, use the PR head ref.
-          # For pushes, this will be empty and default to the pushed branch.
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || '' }}
-          # For pull requests from forks, we need to use the GITHUB_TOKEN.
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python ${{ matrix.python-version }}
