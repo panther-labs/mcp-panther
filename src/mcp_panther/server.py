@@ -81,8 +81,6 @@ register_all_tools(mcp)
 register_all_prompts(mcp)
 # Register all resources with MCP using the registry
 register_all_resources(mcp)
-
-
 def handle_signals():
     def signal_handler(sig, frame):
         logger.info(f"Received signal {sig}, shutting down...")
