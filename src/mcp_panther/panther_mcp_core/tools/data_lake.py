@@ -3,8 +3,10 @@ Tools for interacting with Panther's data lake.
 """
 
 import logging
+import os
 import re
-from typing import Annotated, Any, Dict, List, Optional
+from enum import Enum
+from typing import Annotated, Any, Dict, List
 
 import anyascii
 from pydantic import Field
@@ -12,15 +14,538 @@ from pydantic import Field
 from ..client import _create_panther_client, _get_today_date_range
 from ..permissions import Permission, all_perms
 from ..queries import (
+    CANCEL_DATA_LAKE_QUERY,
     EXECUTE_DATA_LAKE_QUERY,
     GET_COLUMNS_FOR_TABLE_QUERY,
     GET_DATA_LAKE_QUERY,
+    LIST_DATA_LAKE_QUERIES,
     LIST_DATABASES_QUERY,
     LIST_TABLES_QUERY,
 )
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
+
+
+class DatastoreType(str, Enum):
+    """Supported datastore types for Panther data lake."""
+
+    SNOWFLAKE = "snowflake"
+    REDSHIFT = "redshift"
+
+
+class QueryStatus(str, Enum):
+    """Valid data lake query status values."""
+
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+def get_datastore_type() -> DatastoreType:
+    """Get the configured datastore type from environment variable.
+
+    Returns:
+        DatastoreType: The configured datastore type, defaults to SNOWFLAKE
+    """
+    datastore_env = os.getenv("PANTHER_DATASTORE_TYPE", "snowflake").lower()
+
+    try:
+        return DatastoreType(datastore_env)
+    except ValueError:
+        logger.warning(
+            f"Invalid PANTHER_DATASTORE_TYPE '{datastore_env}', defaulting to snowflake. "
+            f"Valid values: {', '.join([dt.value for dt in DatastoreType])}"
+        )
+        return DatastoreType.SNOWFLAKE
+
+
+def format_database_reference(database_name: str) -> str:
+    """Format database reference based on datastore type.
+
+    Args:
+        database_name: Database name like 'panther_logs.public'
+
+    Returns:
+        Formatted database reference:
+        - Snowflake: 'panther_logs.public' (unchanged)
+        - Redshift: 'panther_logs' (removes .public)
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        # Remove .public suffix for Redshift
+        if database_name.endswith(".public"):
+            return database_name[:-7]  # Remove '.public'
+
+    # Snowflake or other datastores use the full reference
+    return database_name
+
+
+def get_current_timestamp_function() -> str:
+    """Get the appropriate current timestamp function for the datastore.
+
+    Returns:
+        String containing the timestamp function:
+        - Snowflake: 'CURRENT_TIMESTAMP()'
+        - Redshift: 'GETDATE()'
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        return "GETDATE()"
+    else:
+        return "CURRENT_TIMESTAMP()"
+
+
+def get_dateadd_function(interval: str, amount: int, date_expr: str) -> str:
+    """Get the appropriate date addition function for the datastore.
+
+    Args:
+        interval: Time interval ('day', 'hour', 'minute', etc.)
+        amount: Amount to add (can be negative for subtraction)
+        date_expr: Date expression to add to
+
+    Returns:
+        String containing the date add function:
+        - Snowflake: 'DATEADD(interval, amount, date_expr)'
+        - Redshift: 'date_expr + INTERVAL 'amount interval''
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        # Redshift uses PostgreSQL-style interval syntax
+        if amount >= 0:
+            return f"{date_expr} + INTERVAL '{amount} {interval}'"
+        else:
+            return f"{date_expr} - INTERVAL '{-amount} {interval}'"
+    else:
+        # Snowflake uses DATEADD function
+        return f"DATEADD({interval}, {amount}, {date_expr})"
+
+
+@mcp_tool()
+def get_query_syntax_help() -> dict[str, str]:
+    """Get datastore-specific query syntax guidance.
+
+    Returns:
+        Dictionary containing syntax examples and best practices for the current datastore:
+        - datastore_type: Current datastore type
+        - database_references: How to reference databases and tables
+        - date_functions: Examples of date/time functions
+        - reserved_words: How reserved words are handled
+        - best_practices: General tips for writing compatible queries
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        return {
+            "datastore_type": "redshift",
+            "database_references": "REQUIRED: Use fully qualified table references like 'panther_logs.public.aws_cloudtrail' or 'panther_logs.aws_cloudtrail'. References with .public are automatically converted to remove .public for Redshift compatibility.",
+            "date_functions": f"Current timestamp: {get_current_timestamp_function()}, Date arithmetic: date_column + INTERVAL '7 day'",
+            "reserved_words": "PostgreSQL-style reserved words are automatically quoted when used as column names. ANSI reserved words like 'column', 'order' are also handled.",
+            "best_practices": "Use standard SQL syntax. Nested fields: field.nested_field format. Always include p_event_time filter. Always use fully qualified table names.",
+        }
+    else:
+        return {
+            "datastore_type": "snowflake",
+            "database_references": "REQUIRED: Use fully qualified table references like 'panther_logs.public.aws_cloudtrail' or 'panther_logs.aws_cloudtrail'. Schema references like .public are preserved for Snowflake.",
+            "date_functions": f"Current timestamp: {get_current_timestamp_function()}, Date arithmetic: {get_dateadd_function('day', -7, 'CURRENT_TIMESTAMP()')}",
+            "reserved_words": "Snowflake reserved words like 'regexp', 'qualify' and ANSI words like 'column', 'order' are automatically quoted when used as column names.",
+            "best_practices": "Use standard SQL syntax. Nested fields: field:nested_field format. Always include p_event_time filter. Always use fully qualified table names.",
+        }
+
+
+# Snowflake reserved words categorized by their constraints
+# Based on official Snowflake documentation
+
+# Reserved by ANSI - can be quoted when used as column names
+ANSI_RESERVED_WORDS = {
+    "ALL",
+    "ALTER",
+    "AND",
+    "ANY",
+    "AS",
+    "BETWEEN",
+    "BY",
+    "CHECK",
+    "COLUMN",
+    "CONNECT",
+    "CREATE",
+    "CURRENT",
+    "DELETE",
+    "DISTINCT",
+    "DROP",
+    "ELSE",
+    "EXISTS",
+    "FOR",
+    "FROM",
+    "GRANT",
+    "GROUP",
+    "HAVING",
+    "IN",
+    "INSERT",
+    "INTERSECT",
+    "INTO",
+    "IS",
+    "LIKE",
+    "NOT",
+    "NULL",
+    "OF",
+    "ON",
+    "OR",
+    "ORDER",
+    "REVOKE",
+    "ROW",
+    "ROWS",
+    "SAMPLE",
+    "SELECT",
+    "SET",
+    "START",
+    "TABLE",
+    "TABLESAMPLE",
+    "THEN",
+    "TO",
+    "TRIGGER",
+    "UNION",
+    "UNIQUE",
+    "UPDATE",
+    "VALUES",
+    "WHENEVER",
+    "WHERE",
+    "WINDOW",
+    "WITH",
+}
+
+# Reserved by Snowflake (non-ANSI) - can be quoted when used as column names
+SNOWFLAKE_RESERVED_WORDS = {
+    "ILIKE",
+    "INCREMENT",
+    "MINUS",
+    "QUALIFY",
+    "REGEXP",
+    "RLIKE",
+    "SOME",
+}
+
+# Words that cause issues in SELECT statements and can be quoted
+# These include words that are officially "forbidden in SHOW commands" but also fail in SELECTs
+ADDITIONAL_PROBLEMATIC_WORDS = {
+    "ACCOUNT",
+    "CONNECTION",
+    "DATABASE",
+    "GSCLUSTER",
+    "ISSUE",
+    "ORGANIZATION",
+    "SCHEMA",
+    "VIEW",
+}
+
+# Cannot be used as column reference in scalar expressions - should error
+SCALAR_EXPRESSION_FORBIDDEN = {"CASE", "CAST", "FALSE", "TRUE", "TRY_CAST", "WHEN"}
+
+# Cannot be used as column name (reserved by ANSI) - should error as column name
+# Note: Only enforce this for column names in SELECT, not for functions in WHERE clauses
+COLUMN_NAME_FORBIDDEN = {
+    "CURRENT_USER",
+    "LOCALTIME",
+    "LOCALTIMESTAMP",
+}
+
+# Redshift reserved words (PostgreSQL-based subset)
+# Redshift uses PostgreSQL syntax, so fewer reserved words need quoting
+REDSHIFT_RESERVED_WORDS = {
+    "AES128",
+    "AES256",
+    "ALLOWOVERWRITE",
+    "ANALYSE",
+    "ANALYZE",
+    "ARRAY",
+    "CAST",
+    "COPY",
+    "CREDENTIALS",
+    "CURRENT_USER_ID",
+    "DELTA",
+    "DELTA32K",
+    "DISABLE",
+    "ENABLE",
+    "ENCRYPT",
+    "ENCRYPTION",
+    "EXPLICIT",
+    "FALSE",
+    "GLOBALDICT256",
+    "GLOBALDICT64K",
+    "IDENTITY",
+    "IGNORE",
+    "IMPLICIT",
+    "LUN",
+    "LUNS",
+    "LZO",
+    "MINUS",
+    "MODIFY",
+    "MOSTLY16",
+    "MOSTLY32",
+    "MOSTLY8",
+    "NEW",
+    "OFF",
+    "OLD",
+    "ONLY",
+    "OPEN",
+    "OVERLAPS",
+    "PARALLEL",
+    "PARTITION",
+    "PERCENT",
+    "PERMISSIONS",
+    "PRESERVE",
+    "RAW",
+    "READRATIO",
+    "RECOVER",
+    "RESPECT",
+    "RESTORE",
+    "REJECTLOG",
+    "RESORT",
+    "SYSDATE",
+    "SYSTEM",
+    "TEXT255",
+    "TEXT32K",
+    "TOP",
+    "TRUE",
+    "TRUNCATECOLUMNS",
+    "WALLET",
+}
+
+# All quotable reserved words (ANSI + Snowflake + Additional problematic words)
+QUOTABLE_RESERVED_WORDS = (
+    ANSI_RESERVED_WORDS | SNOWFLAKE_RESERVED_WORDS | ADDITIONAL_PROBLEMATIC_WORDS
+)
+
+# All quotable reserved words for Redshift
+REDSHIFT_QUOTABLE_RESERVED_WORDS = ANSI_RESERVED_WORDS | REDSHIFT_RESERVED_WORDS
+
+
+def get_reserved_words_info() -> dict[str, list[str]]:
+    """
+    Get categorized information about reserved words for the current datastore.
+
+    Returns:
+        Dictionary with categorized lists of reserved words:
+        - quotable_reserved_words: Words that can be quoted when used as column names
+        - forbidden_scalar_expressions: Words that cannot be used as column references in scalar expressions
+        - forbidden_column_names: Words that cannot be used as column names (reserved by ANSI)
+        - datastore_type: Current datastore type
+    """
+    datastore = get_datastore_type()
+    quotable_words = (
+        QUOTABLE_RESERVED_WORDS
+        if datastore == DatastoreType.SNOWFLAKE
+        else REDSHIFT_QUOTABLE_RESERVED_WORDS
+    )
+
+    return {
+        "datastore_type": datastore.value,
+        "quotable_reserved_words": sorted(quotable_words),
+        "forbidden_scalar_expressions": sorted(SCALAR_EXPRESSION_FORBIDDEN),
+        "forbidden_column_names": sorted(COLUMN_NAME_FORBIDDEN),
+    }
+
+
+def _convert_database_references_in_sql(sql: str) -> str:
+    """Convert database references in SQL based on datastore type.
+
+    For Redshift, converts 'database.public.table' to 'database.table'
+    For Snowflake, preserves references as-is
+
+    Args:
+        sql: The SQL query string to process
+
+    Returns:
+        SQL with converted database references
+    """
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        # Convert database.public.table to database.table for Redshift
+        # Use regex to find patterns like 'word.public.word'
+        import re
+
+        pattern = r"\b(\w+)\.public\.(\w+)\b"
+        converted_sql = re.sub(pattern, r"\1.\2", sql)
+        return converted_sql
+
+    # Snowflake preserves references as-is
+    return sql
+
+
+def _validate_fully_qualified_tables(sql: str) -> str | None:
+    """Validate that all table references in SQL are fully qualified.
+
+    Looks for FROM and JOIN clauses and ensures table references include database names.
+
+    Args:
+        sql: The SQL query string to validate
+
+    Returns:
+        Error message if validation fails, None if valid
+    """
+    import re
+
+    # Find FROM and JOIN clauses
+    # This regex looks for FROM/JOIN followed by a table reference
+    from_join_pattern = (
+        r"\b(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)"
+    )
+
+    matches = re.findall(from_join_pattern, sql, re.IGNORECASE)
+
+    for table_ref in matches:
+        # Check if table reference has at least one dot (database.table or database.schema.table)
+        if "." not in table_ref:
+            return (
+                f"Table reference '{table_ref}' is not fully qualified. "
+                f"Please use database.table format (e.g., 'panther_logs.aws_cloudtrail' or 'panther_logs.public.aws_cloudtrail'). "
+                f"Use list_databases() and list_database_tables() to find correct names."
+            )
+
+    return None
+
+
+def _validate_and_wrap_reserved_words(sql: str) -> tuple[str, str | None]:
+    """
+    Validate and wrap reserved words according to datastore-specific constraints.
+
+    This implementation:
+    - Wraps ANSI/datastore-specific reserved words with double quotes when used as column names
+    - Handles reserved words inside function calls (e.g., COUNT(DISTINCT account))
+    - Returns errors for forbidden words in specific contexts
+    - Provides lists of related reserved words in error messages to help avoid future mistakes
+    - Adapts behavior based on current datastore type (Snowflake vs Redshift)
+
+    Args:
+        sql: The SQL query string to process
+
+    Returns:
+        Tuple of (processed_sql, error_message). If error_message is not None,
+        the query contains forbidden usage and should be rejected. Error messages
+        include lists of related forbidden words to help avoid similar mistakes.
+    """
+    import re
+
+    # 1. Check for forbidden scalar expression words (but not function calls or SQL keywords)
+    for forbidden_word in SCALAR_EXPRESSION_FORBIDDEN:
+        # More precise check: exclude valid SQL contexts like CASE WHEN expressions
+        if forbidden_word in ["CASE", "WHEN"]:
+            # Skip CASE and WHEN when they're part of valid CASE expressions
+            # Pattern looks for these words as standalone column names, not in CASE...WHEN...THEN...ELSE...END
+            pattern = (
+                r"\bSELECT\b[^;]*\b"
+                + re.escape(forbidden_word)
+                + r"\b(?!\s*\()(?![^,]*\b(?:WHEN|THEN|ELSE|END)\b)"
+            )
+        else:
+            pattern = r"\bSELECT\b[^;]*\b" + re.escape(forbidden_word) + r"\b(?!\s*\()"
+
+        if re.search(pattern, sql, re.IGNORECASE):
+            forbidden_list = ", ".join(sorted(SCALAR_EXPRESSION_FORBIDDEN))
+            return (
+                sql,
+                f"Query contains forbidden keyword usage: '{forbidden_word}' cannot be used as column reference in scalar expressions. "
+                f"Forbidden scalar expression words: {forbidden_list}",
+            )
+
+    # 2. Check for forbidden column names (but not function calls)
+    for forbidden_word in COLUMN_NAME_FORBIDDEN:
+        # Simple check: if forbidden word appears after SELECT (as column), but not as function call
+        pattern = r"\bSELECT\b[^;]*\b" + re.escape(forbidden_word) + r"\b(?!\s*\()"
+        if re.search(pattern, sql, re.IGNORECASE):
+            forbidden_list = ", ".join(sorted(COLUMN_NAME_FORBIDDEN))
+            return (
+                sql,
+                f"Query contains forbidden keyword usage: '{forbidden_word}' cannot be used as column name (reserved by ANSI). "
+                f"Forbidden column names: {forbidden_list}",
+            )
+
+    # 3. Quote reserved words in specific column contexts (including inside functions)
+    # Get datastore-appropriate reserved words
+    datastore = get_datastore_type()
+    quotable_words = (
+        QUOTABLE_RESERVED_WORDS
+        if datastore == DatastoreType.SNOWFLAKE
+        else REDSHIFT_QUOTABLE_RESERVED_WORDS
+    )
+
+    # Only quote words that are actually problematic as column references
+    column_context_words = quotable_words - {
+        # Exclude common SQL keywords that shouldn't be quoted when used as keywords
+        "ALL",
+        "AND",
+        "AS",
+        "BY",
+        "DISTINCT",
+        "ELSE",
+        "EXISTS",
+        "FOR",
+        "FROM",
+        "GROUP",
+        "HAVING",
+        "IN",
+        "IS",
+        "LIKE",
+        "NOT",
+        "NULL",
+        "OF",
+        "ON",
+        "OR",
+        "ORDER",
+        "SELECT",
+        "SET",
+        "THEN",
+        "TO",
+        "UNION",
+        "UPDATE",
+        "WHERE",
+        "WITH",
+    }
+
+    def quote_reserved_word_match(match):
+        word = match.group(0)
+        return f'"{word}"'
+
+    # Build pattern for words that should be quoted in column contexts
+    column_words = "|".join(re.escape(word) for word in column_context_words)
+
+    # Pattern to match reserved words that should be quoted
+    # (?<!["`'])       - Not preceded by quote
+    # \b({words})\b    - Word boundary with reserved words
+    # (?!\s*\()        - Not followed by opening parenthesis (function calls)
+    reserved_word_pattern = rf"(?<![\"'`])\b({column_words})\b(?!\s*\()"
+
+    # Apply the pattern only to the SELECT clause
+    def process_select_clause(match):
+        select_keyword = match.group(1)  # "SELECT"
+        select_content = match.group(2)  # Everything after SELECT until FROM
+
+        # Quote reserved words in the SELECT content
+        processed_content = re.sub(
+            reserved_word_pattern,
+            quote_reserved_word_match,
+            select_content,
+            flags=re.IGNORECASE,
+        )
+
+        return select_keyword + processed_content
+
+    # Pattern to match SELECT clause until FROM (including multiline)
+    # More precise pattern that handles multi-line SELECT statements better
+    select_clause_pattern = r"\b(SELECT\s+)((?:[^;](?!FROM\s))*?)(?=\s+FROM\s)"
+    modified_sql = re.sub(
+        select_clause_pattern,
+        process_select_clause,
+        sql,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    return modified_sql, None
 
 
 @mcp_tool(
@@ -46,14 +571,14 @@ async def summarize_alert_events(
         ),
     ] = 30,
     start_date: Annotated[
-        Optional[str],
+        str | None,
         Field(
             description='The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to start of today UTC.',
             pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
         ),
     ] = None,
     end_date: Annotated[
-        Optional[str],
+        str | None,
         Field(
             description='The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to end of today UTC.',
             pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
@@ -76,11 +601,18 @@ async def summarize_alert_events(
     # Convert alert IDs list to SQL array
     alert_ids_str = ", ".join(f"'{aid}'" for aid in alert_ids)
 
-    query = f"""
+    # Format database reference based on datastore type
+    signals_db = format_database_reference("panther_signals.public")
+
+    # Use datastore-appropriate functions
+    datastore = get_datastore_type()
+
+    if datastore == DatastoreType.REDSHIFT:
+        # Redshift version with PostgreSQL-style functions
+        query = f"""
 SELECT
     DATE_TRUNC('DAY', cs.p_event_time) AS event_day,
-    DATE_TRUNC('MINUTE', DATEADD('MINUTE', {time_window} * FLOOR(EXTRACT(MINUTE FROM cs.p_event_time) / {time_window}), 
-        DATE_TRUNC('HOUR', cs.p_event_time))) AS time_{time_window}_minute,
+    DATE_TRUNC('MINUTE', cs.p_event_time - (EXTRACT(MINUTE FROM cs.p_event_time) % {time_window}) * INTERVAL '1 minute') AS time_{time_window}_minute,
     cs.p_log_type,
     cs.p_any_ip_addresses AS source_ips,
     cs.p_any_emails AS emails,
@@ -93,7 +625,7 @@ SELECT
     MAX(cs.p_event_time) AS last_event,
     ARRAY_AGG(DISTINCT cs.p_alert_severity) AS severities
 FROM
-    panther_signals.public.correlation_signals cs
+    {signals_db}.correlation_signals cs
 WHERE
     cs.p_alert_id IN ({alert_ids_str})
 AND 
@@ -114,7 +646,47 @@ ORDER BY
     alert_count DESC
 LIMIT 1000
 """
-    return await execute_data_lake_query(query, "panther_signals.public")
+    else:
+        # Snowflake version with DATEADD function
+        query = f"""
+SELECT
+    DATE_TRUNC('DAY', cs.p_event_time) AS event_day,
+    DATE_TRUNC('MINUTE', DATEADD('MINUTE', {time_window} * FLOOR(EXTRACT(MINUTE FROM cs.p_event_time) / {time_window}), 
+        DATE_TRUNC('HOUR', cs.p_event_time))) AS time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses AS source_ips,
+    cs.p_any_emails AS emails,
+    cs.p_any_usernames AS usernames,
+    cs.p_any_trace_ids AS trace_ids,
+    COUNT(DISTINCT cs.p_alert_id) AS alert_count,
+    ARRAY_AGG(DISTINCT cs.p_alert_id) AS alert_ids,
+    ARRAY_AGG(DISTINCT cs.p_rule_id) AS rule_ids,
+    MIN(cs.p_event_time) AS first_event,
+    MAX(cs.p_event_time) AS last_event,
+    ARRAY_AGG(DISTINCT cs.p_alert_severity) AS severities
+FROM
+    {signals_db}.correlation_signals cs
+WHERE
+    cs.p_alert_id IN ({alert_ids_str})
+AND 
+    cs.p_event_time BETWEEN '{start_date}' AND '{end_date}'
+GROUP BY
+    event_day,
+    time_{time_window}_minute,
+    cs.p_log_type,
+    cs.p_any_ip_addresses,
+    cs.p_any_emails,
+    cs.p_any_usernames,
+    cs.p_any_trace_ids
+HAVING
+    COUNT(DISTINCT cs.p_alert_id) > 0
+ORDER BY
+    event_day DESC,
+    time_{time_window}_minute DESC,
+    alert_count DESC
+LIMIT 1000
+"""
+    return await execute_data_lake_query(query, signals_db)
 
 
 @mcp_tool(
@@ -126,24 +698,54 @@ async def execute_data_lake_query(
     sql: Annotated[
         str,
         Field(
-            description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND. The query must be compatible with Snowflake SQL."
+            description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND. Must use fully qualified table references (database.table or database.schema.table format). Reserved words will be automatically quoted and database references will be converted for your datastore type (Snowflake or Redshift)."
         ),
     ],
-    database_name: Annotated[
-        Optional[str],
-        Field(description="The database to query.", default="panther_logs.public"),
-    ] = "panther_logs.public",
+    database_name: str = "panther_logs.public",
 ) -> Dict[str, Any]:
-    """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. For simple log sampling, use get_sample_log_events instead. The query must follow Snowflake SQL syntax (e.g., use field:nested_field instead of field.nested_field).
+    """Execute SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. For simple log sampling, use get_sample_log_events instead.
 
     WORKFLOW:
     1. First call get_table_schema to understand the schema
     2. Then execute_data_lake_query with your SQL
     3. Finally call get_data_lake_query_results with the returned query_id
 
+    SYNTAX GUIDANCE:
+    - Reserved words are automatically quoted when needed
+    - Database references are automatically converted for your datastore (.public handled automatically)
+    - For syntax help, use get_query_syntax_help()
+
+    IMPORTANT DATABASE SCHEMA NOTES:
+    - REQUIRED: Use fully qualified table references (database.table or database.schema.table format)
+    - Examples: 'panther_logs.aws_cloudtrail' or 'panther_logs.public.aws_cloudtrail'
+    - Database references are automatically converted (.public removed for Redshift, preserved for Snowflake)
+    - Use list_databases and list_database_tables to find the correct database and table names
+    - Table names differ from log type names (e.g., 'AWS.CloudTrail' log type → 'aws_cloudtrail' table)
+
     Returns a dictionary with query execution status and a query_id for retrieving results.
     """
     logger.info("Executing data lake query")
+
+    # Validate that all table references are fully qualified
+    table_validation_error = _validate_fully_qualified_tables(sql)
+    if table_validation_error:
+        logger.error(table_validation_error)
+        return {
+            "success": False,
+            "message": table_validation_error,
+        }
+
+    # Convert database references for datastore compatibility (e.g., remove .public for Redshift)
+    sql = _convert_database_references_in_sql(sql)
+
+    # Validate and wrap reserved words according to datastore constraints
+    sql, validation_error = _validate_and_wrap_reserved_words(sql)
+    if validation_error:
+        logger.error(validation_error)
+        return {
+            "success": False,
+            "message": validation_error,
+        }
 
     # Validate that the query includes a p_event_time filter after WHERE or AND
     sql_lower = sql.lower().replace("\n", " ")
@@ -163,8 +765,11 @@ async def execute_data_lake_query(
     try:
         client = await _create_panther_client()
 
+        # Format database name for current datastore
+        formatted_database_name = format_database_reference(database_name)
+
         # Prepare input variables
-        variables = {"input": {"sql": sql, "databaseName": database_name}}
+        variables = {"input": {"sql": sql, "databaseName": formatted_database_name}}
 
         logger.debug(f"Query variables: {variables}")
 
@@ -357,13 +962,14 @@ async def list_databases() -> Dict[str, Any]:
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_database_tables(
     database: Annotated[
         str,
         Field(
-            description="The name of the database to list tables for",
+            description="The name of the database to list tables for. Use exact name from list_databases output.",
             example="panther_logs.public",
         ),
     ],
@@ -438,13 +1044,14 @@ async def list_database_tables(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_table_schema(
     database_name: Annotated[
         str,
         Field(
-            description="The name of the database where the table is located",
+            description="The name of the database where the table is located. Use the exact name from list_databases (schema formatting is automatic).",
             example="panther_logs.public",
         ),
     ],
@@ -458,16 +1065,17 @@ async def get_table_schema(
 ) -> Dict[str, Any]:
     """Get column details for a specific datalake table.
 
-    IMPORTANT: This returns the table structure in Snowflake/Redshift. For writing
+    IMPORTANT: This returns the table structure in your datastore (Snowflake/Redshift). For writing
     optimal queries, ALSO call get_panther_log_type_schema() to understand:
     - Nested object structures (only shown as 'object' type here)
     - Which fields map to p_any_* indicator columns
     - Array element structures
 
     Example workflow:
-    1. get_panther_log_type_schema(["AWS.CloudTrail"]) - understand structure
-    2. get_table_schema("panther_logs.public", "aws_cloudtrail") - get column names/types
-    3. Write query using both: nested paths from log schema, column names from table schema
+    1. list_databases() - find available databases
+    2. list_database_tables("database_name") - find available tables
+    3. get_table_schema("database_name", "table_name") - get column details
+    4. Write query using database.table_name format (schema is handled automatically)
 
     Returns:
         Dict containing:
@@ -532,6 +1140,7 @@ async def get_table_schema(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_sample_log_events(
@@ -543,12 +1152,13 @@ async def get_sample_log_events(
         ),
     ],
 ) -> Dict[str, Any]:
-    """Get a sample of 10 log events for a specific log type from the panther_logs.public database.
+    """Get a sample of 10 log events for a specific log type from the panther_logs database.
 
     This function is the RECOMMENDED tool for quickly exploring sample log data with minimal effort.
 
     This function constructs a SQL query to fetch recent sample events and executes it against
     the data lake. The query automatically filters events from the last 7 days to ensure quick results.
+    Database schema formatting is handled automatically for your datastore type.
 
     NOTE: After calling this function, you MUST call get_data_lake_query_results with the returned
     query_id to retrieve the actual log events.
@@ -580,11 +1190,18 @@ async def get_sample_log_events(
     database_name = "panther_logs.public"
     table_name = _normalize_name(schema_name)
 
+    # Format database reference for current datastore
+    formatted_db = format_database_reference(database_name)
+
     try:
+        # Use datastore-appropriate date functions
+        current_timestamp = get_current_timestamp_function()
+        date_condition = get_dateadd_function("day", -7, current_timestamp)
+
         sql = f"""
         SELECT *
-        FROM {database_name}.{table_name}
-        WHERE p_event_time >= DATEADD(day, -7, CURRENT_TIMESTAMP())
+        FROM {formatted_db}.{table_name}
+        WHERE p_event_time >= {date_condition}
         ORDER BY p_event_time DESC
         LIMIT 10
         """
@@ -687,3 +1304,247 @@ def _normalize_name(name):
             result.append("_")
 
     return "".join(result)
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
+    }
+)
+async def list_data_lake_queries(
+    cursor: str | None = None,
+    page_size: Annotated[
+        int,
+        Field(
+            description="The number of results that each page will contain. Defaults to 25 with a maximum value of 999.",
+            ge=1,
+            le=999,
+        ),
+    ] = 25,
+    contains: Annotated[
+        str | None,
+        Field(description="Filter queries by their name and/or SQL statement"),
+    ] = None,
+    status: Annotated[
+        list[QueryStatus] | None,
+        Field(description="A list of query statuses to filter queries by"),
+    ] = None,
+    is_scheduled: Annotated[
+        bool | None,
+        Field(
+            description="Only return queries that are either scheduled or not (i.e. issued by a user). Leave blank to return both."
+        ),
+    ] = None,
+    started_at_after: Annotated[
+        str | None,
+        Field(
+            description="Only return queries that started after this date",
+            pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$",
+        ),
+    ] = None,
+    started_at_before: Annotated[
+        str | None,
+        Field(
+            description="Only return queries that started before this date",
+            pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$",
+        ),
+    ] = None,
+) -> Dict[str, Any]:
+    """List previously executed data lake queries with comprehensive filtering options.
+
+    This tool is essential for monitoring data lake query load and diagnosing performance issues.
+    Use it to find long-running queries, check query history, or identify queries that need cancellation.
+
+    Common use cases:
+    - Find running queries: status=['running']
+    - Monitor recent query activity: started_at_after='2024-01-01T00:00:00.000Z'
+    - Search for specific queries: contains='SELECT * FROM alerts'
+    - Check user vs scheduled queries: is_scheduled=false
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - queries: List of query objects with id, sql, status, timing info, and issuer details
+        - page_info: Pagination information (hasNextPage, endCursor, etc.)
+        - total_queries: Number of queries in current page
+        - message: Error message if unsuccessful
+    """
+    logger.info("Listing data lake queries")
+
+    try:
+        client = await _create_panther_client()
+
+        # Build input parameters
+        input_params = {
+            "pageSize": page_size,
+        }
+
+        if cursor:
+            input_params["cursor"] = cursor
+        if contains:
+            input_params["contains"] = contains
+        if status:
+            input_params["status"] = [s.value for s in status]
+        if is_scheduled is not None:
+            input_params["isScheduled"] = is_scheduled
+        if started_at_after:
+            input_params["startedAtAfter"] = started_at_after
+        if started_at_before:
+            input_params["startedAtBefore"] = started_at_before
+
+        variables = {"input": input_params} if input_params else None
+
+        # Execute the query
+        async with client as session:
+            result = await session.execute(
+                LIST_DATA_LAKE_QUERIES, variable_values=variables
+            )
+
+        # Parse results
+        query_data = result.get("dataLakeQueries", {})
+        edges = query_data.get("edges", [])
+        page_info = query_data.get("pageInfo", {})
+
+        # Extract queries from edges
+        queries = []
+        for edge in edges:
+            node = edge["node"]
+            # Format the issuer information
+            issued_by = node.get("issuedBy")
+            issuer_info = None
+            if issued_by:
+                if "email" in issued_by:  # User
+                    issuer_info = {
+                        "type": "user",
+                        "id": issued_by.get("id"),
+                        "email": issued_by.get("email"),
+                        "name": f"{issued_by.get('givenName', '')} {issued_by.get('familyName', '')}".strip(),
+                    }
+                else:  # API Token
+                    issuer_info = {
+                        "type": "api_token",
+                        "id": issued_by.get("id"),
+                        "name": issued_by.get("name"),
+                    }
+
+            queries.append(
+                {
+                    "id": node.get("id"),
+                    "sql": node.get("sql"),
+                    "name": node.get("name"),
+                    "status": node.get("status"),
+                    "message": node.get("message"),
+                    "started_at": node.get("startedAt"),
+                    "completed_at": node.get("completedAt"),
+                    "is_scheduled": node.get("isScheduled"),
+                    "issued_by": issuer_info,
+                }
+            )
+
+        logger.info(f"Successfully retrieved {len(queries)} data lake queries")
+
+        return {
+            "success": True,
+            "queries": queries,
+            "page_info": {
+                "has_next_page": page_info.get("hasNextPage", False),
+                "end_cursor": page_info.get("endCursor"),
+                "has_previous_page": page_info.get("hasPreviousPage", False),
+                "start_cursor": page_info.get("startCursor"),
+            },
+            "total_queries": len(queries),
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to list data lake queries: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to list data lake queries: {str(e)}",
+        }
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "destructiveHint": True,
+    }
+)
+async def cancel_data_lake_query(
+    query_id: Annotated[
+        str,
+        Field(description="The ID of the query to cancel"),
+    ],
+) -> Dict[str, Any]:
+    """Cancel a running data lake query to free up resources and prevent system overload.
+
+    This tool is critical for managing data lake performance and preventing resource exhaustion.
+    Use it to cancel long-running queries that are consuming excessive resources or are no longer needed.
+
+    IMPORTANT: Only running queries can be cancelled. Completed, failed, or already cancelled queries
+    cannot be cancelled again.
+
+    Common use cases:
+    - Cancel runaway queries consuming too many resources
+    - Stop queries that are taking longer than expected
+    - Clean up queries that are no longer needed
+    - Prevent system overload during peak usage
+
+    Best practices:
+    1. First use list_data_lake_queries(status=['running']) to find running queries
+    2. Review the SQL and timing information before cancelling
+    3. Cancel queries from oldest to newest if multiple queries need cancellation
+    4. Monitor system load after cancellation to ensure improvement
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the cancellation was successful
+        - query_id: ID of the cancelled query
+        - message: Success/error message
+    """
+    logger.info(f"Cancelling data lake query: {query_id}")
+
+    try:
+        client = await _create_panther_client()
+
+        variables = {"input": {"id": query_id}}
+
+        # Execute the cancellation
+        async with client as session:
+            result = await session.execute(
+                CANCEL_DATA_LAKE_QUERY, variable_values=variables
+            )
+
+        # Parse results
+        cancellation_data = result.get("cancelDataLakeQuery", {})
+        cancelled_id = cancellation_data.get("id")
+
+        if not cancelled_id:
+            raise ValueError("No query ID returned from cancellation")
+
+        logger.info(f"Successfully cancelled data lake query: {cancelled_id}")
+
+        return {
+            "success": True,
+            "query_id": cancelled_id,
+            "message": f"Successfully cancelled query {cancelled_id}",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to cancel data lake query: {str(e)}")
+
+        # Provide helpful error messages for common issues
+        error_message = str(e)
+        if "not found" in error_message.lower():
+            error_message = f"Query {query_id} not found. It may have already completed or been cancelled."
+        elif "cannot be cancelled" in error_message.lower():
+            error_message = f"Query {query_id} cannot be cancelled. Only running queries can be cancelled."
+        elif "permission" in error_message.lower():
+            error_message = f"Permission denied. You may not have permission to cancel query {query_id}."
+        else:
+            error_message = f"Failed to cancel query {query_id}: {error_message}"
+
+        return {
+            "success": False,
+            "message": error_message,
+        }
