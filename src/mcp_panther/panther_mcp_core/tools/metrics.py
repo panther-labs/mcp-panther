@@ -5,7 +5,7 @@ Tools for interacting with Panther metrics.
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Dict, Literal
+from typing import Annotated, Any, Dict
 
 from pydantic import Field
 
@@ -38,6 +38,24 @@ class AlertSeverity(str, Enum):
     INFO = "INFO"
 
 
+class AlertMetricInterval(int, Enum):
+    """Interval options for alert metrics in minutes."""
+    FIFTEEN_MINUTES = 15
+    THIRTY_MINUTES = 30
+    ONE_HOUR = 60
+    THREE_HOURS = 180
+    SIX_HOURS = 360
+    TWELVE_HOURS = 720
+    ONE_DAY = 1440
+
+
+class BytesProcessedInterval(int, Enum):
+    """Interval options for bytes processed metrics in minutes."""
+    ONE_HOUR = 60
+    TWELVE_HOURS = 720
+    ONE_DAY = 1440
+
+
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.METRICS_READ),
@@ -67,11 +85,11 @@ async def get_severity_alert_metrics(
         AlertSeverity.LOW,
     ],
     interval_in_minutes: Annotated[
-        Literal[15, 30, 60, 180, 360, 720, 1440],
+        AlertMetricInterval,
         Field(
             description="How data points are aggregated over time, with smaller intervals providing more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents."
         ),
-    ] = 1440,
+    ] = AlertMetricInterval.ONE_DAY,
 ) -> Dict[str, Any]:
     """Gets alert metrics grouped by severity for rule and policy alert types within a given time period. Use this tool to identify hot spots in your alerts, and use the list_alerts tool for specific details. Keep in mind that these metrics combine errors and alerts, so there may be inconsistencies from what list_alerts returns.
 
@@ -160,11 +178,11 @@ async def get_rule_alert_metrics(
         Field(description="The end date of the metrics period."),
     ] = None,
     interval_in_minutes: Annotated[
-        Literal[15, 30, 60, 180, 360, 720, 1440],
+        AlertMetricInterval,
         Field(
             description="Intervals for aggregating data points. Smaller intervals provide more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents."
         ),
-    ] = 15,
+    ] = AlertMetricInterval.FIFTEEN_MINUTES,
     rule_ids: Annotated[
         list[
             Annotated[
@@ -268,11 +286,11 @@ async def get_bytes_processed_per_log_type_and_source(
         Field(description="The end date of the metrics period."),
     ] = None,
     interval_in_minutes: Annotated[
-        Literal[60, 720, 1440],
+        BytesProcessedInterval,
         Field(
             description="How data points are aggregated over time, with smaller intervals providing more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents."
         ),
-    ] = 1440,
+    ] = BytesProcessedInterval.ONE_DAY,
 ) -> Dict[str, Any]:
     """Retrieves data ingestion metrics showing total bytes processed per log type and source, helping analyze data volume patterns.
 
