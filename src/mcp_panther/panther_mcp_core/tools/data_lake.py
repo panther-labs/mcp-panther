@@ -33,7 +33,7 @@ async def summarize_alert_events(
         List[str],
         Field(
             description="List of alert IDs to analyze",
-            example='["alert-123", "alert-456", "alert-789"]',
+            json_schema_extra={"example": '["alert-123", "alert-456", "alert-789"]'},
         ),
     ],
     time_window: Annotated[
@@ -202,7 +202,7 @@ async def get_data_lake_query_results(
         str,
         Field(
             description="The ID of the query to get results for",
-            example="1234567890",
+            json_schema_extra={"example": "1234567890"},
         ),
     ],
 ) -> Dict[str, Any]:
@@ -364,7 +364,7 @@ async def list_database_tables(
         str,
         Field(
             description="The name of the database to list tables for",
-            example="panther_logs.public",
+            json_schema_extra={"example": "panther_logs.public"},
         ),
     ],
 ) -> Dict[str, Any]:
@@ -445,14 +445,14 @@ async def get_table_schema(
         str,
         Field(
             description="The name of the database where the table is located",
-            example="panther_logs.public",
+            json_schema_extra={"example": "panther_logs.public"},
         ),
     ],
     table_name: Annotated[
         str,
         Field(
             description="The name of the table to get columns for",
-            example="Panther.Audit",
+            json_schema_extra={"example": "Panther.Audit"},
         ),
     ],
 ) -> Dict[str, Any]:
@@ -539,7 +539,7 @@ async def get_sample_log_events(
         str,
         Field(
             description="The schema name to query for sample log events",
-            example="Panther.Audit",
+            json_schema_extra={"example": "Panther.Audit"},
         ),
     ],
 ) -> Dict[str, Any]:
