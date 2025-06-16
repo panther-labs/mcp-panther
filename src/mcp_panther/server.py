@@ -127,6 +127,12 @@ def main(transport: str, port: int, host: str, log_file: str | None):
     if log_file:
         configure_logging(log_file, force=True)
 
+    major = sys.version_info.major
+    minor = sys.version_info.minor
+    micro = sys.version_info.micro
+
+    logger.info(f"Python {major}.{minor}.{micro}")
+
     if transport == "sse":
         # Create the Starlette app
         app = Starlette(
