@@ -3,6 +3,7 @@ import logging
 import os
 import signal
 import sys
+from importlib.metadata import version
 
 import click
 import uvicorn
@@ -94,6 +95,7 @@ def handle_signals():
 
 
 @click.command()
+@click.version_option(version("mcp-panther"), "--version", "-v")
 @click.option(
     "--transport",
     type=click.Choice(["stdio", "sse"]),
