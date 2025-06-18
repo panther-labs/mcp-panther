@@ -8,6 +8,8 @@ import logging
 from functools import wraps
 from typing import Callable, Optional, Set
 
+from ..utils import USE_LEGACY_MCP
+
 logger = logging.getLogger("mcp-panther")
 
 # Registry to store all prompt functions
@@ -86,11 +88,17 @@ def register_all_prompts(mcp_instance) -> None:
         metadata = getattr(prompt, "_mcp_prompt_metadata", {})
 
         # Create prompt decorator with metadata
-        prompt_decorator = mcp_instance.prompt(
-            name=metadata.get("name"),
-            description=metadata.get("description"),
-            tags=metadata.get("tags"),
-        )
+        if USE_LEGACY_MCP:
+            prompt_decorator = mcp_instance.prompt(
+                name=metadata.get("name"),
+                description=metadata.get("description"),
+            )
+        else:
+            prompt_decorator = mcp_instance.prompt(
+                name=metadata.get("name"),
+                description=metadata.get("description"),
+                tags=metadata.get("tags"),
+            )
 
         # Register the prompt
         prompt_decorator(prompt)

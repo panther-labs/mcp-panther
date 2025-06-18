@@ -89,12 +89,18 @@ def register_all_tools(mcp_instance) -> None:
         # Get tool metadata if it exists
         metadata = getattr(tool, "_mcp_tool_metadata", {})
 
+        annotations = metadata.get("annotations", {})
         # Create tool decorator with metadata
         tool_decorator = mcp_instance.tool(
             name=metadata.get("name"),
             description=metadata.get("description"),
-            annotations=metadata.get("annotations"),
+            annotations=annotations,
         )
+
+        if annotations and annotations.get("permissions"):
+            if not tool.__doc__:
+                tool.__doc__ = ""
+            tool.__doc__ += f"\n\n Permissions:{annotations.get('permissions')}"
 
         # Register the tool
         tool_decorator(tool)

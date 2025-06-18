@@ -218,8 +218,10 @@ If you run into any issues, [try the troubleshooting steps here](https://modelco
 Use with [Goose](https://block.github.io/goose/), Block's open-source AI agent:
 ```bash
 # Start Goose with the MCP server
-goose session --with-extension "uvx mcp-panther"
+goose session --with-extension "uvx mcp-panther --compat-mode"
 ```
+
+The `--compat-mode` flag enables compatibility mode for broader MCP client support, especially for clients using older MCP versions that may not support all the latest features.
 
 ## Troubleshooting
 

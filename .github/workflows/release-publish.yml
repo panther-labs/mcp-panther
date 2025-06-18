@@ -11,6 +11,10 @@ on:
         description: 'Create as draft release'
         type: boolean
         default: true
+      tag_as_latest:
+        description: 'Tag Docker image as latest'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -143,15 +147,27 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Prepare Docker tags
+      id: docker_tags
+      run: |
+        TAGS="ghcr.io/${{ github.repository }}:${{ needs.prepare_release.outputs.version }}"
+        
+        if [ "${{ github.event.inputs.tag_as_latest }}" == "true" ]; then
+          TAGS="$TAGS,ghcr.io/${{ github.repository }}:latest"
+          echo "Including latest tag"
+        else
+          echo "Skipping latest tag"
+        fi
+        
+        echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
         platforms: linux/amd64,linux/arm64
-        tags: |
-          ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:${{ needs.prepare_release.outputs.version }}
+        tags: ${{ steps.docker_tags.outputs.tags }}
         labels: |
           org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           org.opencontainers.image.description=MCP Panther

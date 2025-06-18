@@ -10,6 +10,8 @@ import logging
 from functools import wraps
 from typing import Callable, Dict, Optional, Set
 
+from ..utils import USE_LEGACY_MCP
+
 logger = logging.getLogger("mcp-panther")
 
 # Registry to store all decorated resources
@@ -78,13 +80,21 @@ def register_all_resources(mcp_instance) -> None:
         metadata = getattr(resource_func, "_mcp_resource_metadata", {})
 
         # Create resource decorator with metadata
-        resource_decorator = mcp_instance.resource(
-            uri=metadata["uri"],
-            name=metadata.get("name"),
-            description=metadata.get("description"),
-            mime_type=metadata.get("mime_type"),
-            tags=metadata.get("tags"),
-        )
+        if USE_LEGACY_MCP:
+            resource_decorator = mcp_instance.resource(
+                uri,
+                name=metadata.get("name"),
+                description=metadata.get("description"),
+                mime_type=metadata.get("mime_type"),
+            )
+        else:
+            resource_decorator = mcp_instance.resource(
+                uri=metadata["uri"],
+                name=metadata.get("name"),
+                description=metadata.get("description"),
+                mime_type=metadata.get("mime_type"),
+                tags=metadata.get("tags"),
+            )
 
         # Register the resource
         resource_decorator(resource_func)
