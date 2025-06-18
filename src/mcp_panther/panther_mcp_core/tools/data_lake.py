@@ -4,13 +4,14 @@ Tools for interacting with Panther's data lake.
 
 import logging
 import re
+from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Dict, List
 
 import anyascii
 from pydantic import Field
 
-from ..client import _create_panther_client, _get_today_date_range
+from ..client import _create_panther_client, get_today_date_range, graphql_date_format
 from ..permissions import Permission, all_perms
 from ..queries import (
     CANCEL_DATA_LAKE_QUERY,
@@ -58,18 +59,12 @@ async def summarize_alert_events(
         ),
     ] = 30,
     start_date: Annotated[
-        str | None,
-        Field(
-            description='The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to start of today UTC.',
-            pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
-        ),
+        datetime | None,
+        Field(description="The start date of the analysis period. Defaults to start of today UTC."),
     ] = None,
     end_date: Annotated[
-        str | None,
-        Field(
-            description='The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to end of today UTC.',
-            pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
-        ),
+        datetime | None,
+        Field(description="The end date of the analysis period. Defaults to end of today UTC."),
     ] = None,
 ) -> Dict[str, Any]:
     """Analyze patterns and relationships across multiple alerts by aggregating their event data into time-based groups. For each time window (configurable from 1-60 minutes), the tool collects unique entities (IPs, emails, usernames, trace IDs) and alert metadata (IDs, rules, severities) to help identify related activities. Results are ordered chronologically with the most recent first, helping analysts identify temporal patterns, common entities, and potential incident scope.
@@ -81,12 +76,16 @@ async def summarize_alert_events(
 
     # Get default date range if not provided
     if start_date is None or end_date is None:
-        default_start, default_end = _get_today_date_range()
+        default_start, default_end = get_today_date_range()
         start_date = start_date or default_start
         end_date = end_date or default_end
 
     # Convert alert IDs list to SQL array
     alert_ids_str = ", ".join(f"'{aid}'" for aid in alert_ids)
+    
+    # Convert datetime objects to GraphQL format for SQL query
+    start_date_str = graphql_date_format(start_date)
+    end_date_str = graphql_date_format(end_date)
 
     query = f"""
 SELECT
@@ -109,7 +108,7 @@ FROM
 WHERE
     cs.p_alert_id IN ({alert_ids_str})
 AND 
-    cs.p_event_time BETWEEN '{start_date}' AND '{end_date}'
+    cs.p_event_time BETWEEN '{start_date_str}' AND '{end_date_str}'
 GROUP BY
     event_day,
     time_{time_window}_minute,
@@ -732,18 +731,12 @@ async def list_data_lake_queries(
         ),
     ] = None,
     started_at_after: Annotated[
-        str | None,
-        Field(
-            description="Only return queries that started after this date",
-            pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$",
-        ),
+        datetime | None,
+        Field(description="Only return queries that started after this date"),
     ] = None,
     started_at_before: Annotated[
-        str | None,
-        Field(
-            description="Only return queries that started before this date",
-            pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$",
-        ),
+        datetime | None,
+        Field(description="Only return queries that started before this date"),
     ] = None,
 ) -> Dict[str, Any]:
     """List previously executed data lake queries with comprehensive filtering options.
@@ -784,9 +777,9 @@ async def list_data_lake_queries(
         if is_scheduled is not None:
             input_params["isScheduled"] = is_scheduled
         if started_at_after:
-            input_params["startedAtAfter"] = started_at_after
+            input_params["startedAtAfter"] = graphql_date_format(started_at_after)
         if started_at_before:
-            input_params["startedAtBefore"] = started_at_before
+            input_params["startedAtBefore"] = graphql_date_format(started_at_before)
 
         variables = {"input": input_params} if input_params else None
 
