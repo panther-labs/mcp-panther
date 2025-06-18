@@ -1,6 +1,6 @@
 [project]
 name = "mcp-panther"
-version = "1.0.0"
+version = "1.1.0a4"
 description = "Panther Labs MCP Server"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -28,7 +28,6 @@ dependencies = [
     "anyascii>=0.3.2",
     "gql>=3.5.2",
     "mcp[cli]>=1.6.0",
-    "pip-system-certs>=0.1.0",
     "click>=8.1.0",
     "uvicorn>=0.24.0",
     "starlette>=0.35.0",

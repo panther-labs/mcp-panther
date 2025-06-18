@@ -3,10 +3,10 @@ import logging
 import os
 import signal
 import sys
+from importlib.metadata import version
 
 import click
 import uvicorn
-from fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.routing import Mount
 
@@ -60,10 +60,12 @@ try:
     from panther_mcp_core.prompts.registry import register_all_prompts
     from panther_mcp_core.resources.registry import register_all_resources
     from panther_mcp_core.tools.registry import register_all_tools
+    from panther_mcp_core.utils import COMPATIBILITY_MODE_FLAG, USE_LEGACY_MCP
 except ImportError:
     from .panther_mcp_core.prompts.registry import register_all_prompts
     from .panther_mcp_core.resources.registry import register_all_resources
     from .panther_mcp_core.tools.registry import register_all_tools
+    from .panther_mcp_core.utils import COMPATIBILITY_MODE_FLAG, USE_LEGACY_MCP
 
 # Server dependencies
 deps = [
@@ -71,6 +73,11 @@ deps = [
     "aiohttp",
     "anyascii",
 ]
+
+if USE_LEGACY_MCP:
+    from mcp.server.fastmcp import FastMCP
+else:
+    from fastmcp import FastMCP
 
 # Create the MCP server
 mcp = FastMCP(MCP_SERVER_NAME, dependencies=deps)
@@ -94,11 +101,18 @@ def handle_signals():
 
 
 @click.command()
+@click.version_option(version("mcp-panther"), "--version", "-v")
 @click.option(
     "--transport",
     type=click.Choice(["stdio", "sse"]),
     default=os.environ.get("MCP_TRANSPORT", default="stdio"),
     help="Transport type (stdio or sse)",
+)
+@click.option(
+    COMPATIBILITY_MODE_FLAG,
+    is_flag=True,
+    default=USE_LEGACY_MCP,
+    help="Enable compatibility mode for broader MCP client support",
 )
 @click.option(
     "--port",
@@ -116,7 +130,7 @@ def handle_signals():
     default=os.environ.get("MCP_LOG_FILE"),
     help="Write logs to this file instead of stderr",
 )
-def main(transport: str, port: int, host: str, log_file: str | None):
+def main(transport: str, compat_mode: bool, port: int, host: str, log_file: str | None):
     """Run the Panther MCP server with the specified transport"""
     # Set up signal handling
     handle_signals()
@@ -124,6 +138,15 @@ def main(transport: str, port: int, host: str, log_file: str | None):
     # Reconfigure logging if a log file is provided
     if log_file:
         configure_logging(log_file, force=True)
+
+    if USE_LEGACY_MCP:
+        logger.info("using compatability mode")
+
+    major = sys.version_info.major
+    minor = sys.version_info.minor
+    micro = sys.version_info.micro
+
+    logger.info(f"Python {major}.{minor}.{micro}")
 
     if transport == "sse":
         # Create the Starlette app
