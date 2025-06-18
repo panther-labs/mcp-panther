@@ -4,7 +4,8 @@ Tools for interacting with Panther's data lake.
 
 import logging
 import re
-from typing import Annotated, Any, Dict, List, Optional
+from enum import Enum
+from typing import Annotated, Any, Dict, List
 
 import anyascii
 from pydantic import Field
@@ -12,15 +13,26 @@ from pydantic import Field
 from ..client import _create_panther_client, _get_today_date_range
 from ..permissions import Permission, all_perms
 from ..queries import (
+    CANCEL_DATA_LAKE_QUERY,
     EXECUTE_DATA_LAKE_QUERY,
     GET_COLUMNS_FOR_TABLE_QUERY,
     GET_DATA_LAKE_QUERY,
+    LIST_DATA_LAKE_QUERIES,
     LIST_DATABASES_QUERY,
     LIST_TABLES_QUERY,
 )
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
+
+
+class QueryStatus(str, Enum):
+    """Valid data lake query status values."""
+
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 @mcp_tool(
@@ -46,14 +58,14 @@ async def summarize_alert_events(
         ),
     ] = 30,
     start_date: Annotated[
-        Optional[str],
+        str | None,
         Field(
             description='The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to start of today UTC.',
             pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
         ),
     ] = None,
     end_date: Annotated[
-        Optional[str],
+        str | None,
         Field(
             description='The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z"). Defaults to end of today UTC.',
             pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$",
@@ -129,10 +141,7 @@ async def execute_data_lake_query(
             description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND. The query must be compatible with Snowflake SQL."
         ),
     ],
-    database_name: Annotated[
-        Optional[str],
-        Field(description="The database to query.", default="panther_logs.public"),
-    ] = "panther_logs.public",
+    database_name: str = "panther_logs.public",
 ) -> Dict[str, Any]:
     """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. For simple log sampling, use get_sample_log_events instead. The query must follow Snowflake SQL syntax (e.g., use field:nested_field instead of field.nested_field).
 
@@ -357,6 +366,7 @@ async def list_databases() -> Dict[str, Any]:
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_database_tables(
@@ -438,6 +448,7 @@ async def list_database_tables(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_table_schema(
@@ -532,6 +543,7 @@ async def get_table_schema(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_sample_log_events(
@@ -687,3 +699,247 @@ def _normalize_name(name):
             result.append("_")
 
     return "".join(result)
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
+    }
+)
+async def list_data_lake_queries(
+    cursor: str | None = None,
+    page_size: Annotated[
+        int,
+        Field(
+            description="The number of results that each page will contain. Defaults to 25 with a maximum value of 999.",
+            ge=1,
+            le=999,
+        ),
+    ] = 25,
+    contains: Annotated[
+        str | None,
+        Field(description="Filter queries by their name and/or SQL statement"),
+    ] = None,
+    status: Annotated[
+        list[QueryStatus] | None,
+        Field(description="A list of query statuses to filter queries by"),
+    ] = None,
+    is_scheduled: Annotated[
+        bool | None,
+        Field(
+            description="Only return queries that are either scheduled or not (i.e. issued by a user). Leave blank to return both."
+        ),
+    ] = None,
+    started_at_after: Annotated[
+        str | None,
+        Field(
+            description="Only return queries that started after this date",
+            pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$",
+        ),
+    ] = None,
+    started_at_before: Annotated[
+        str | None,
+        Field(
+            description="Only return queries that started before this date",
+            pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$",
+        ),
+    ] = None,
+) -> Dict[str, Any]:
+    """List previously executed data lake queries with comprehensive filtering options.
+
+    This tool is essential for monitoring data lake query load and diagnosing performance issues.
+    Use it to find long-running queries, check query history, or identify queries that need cancellation.
+
+    Common use cases:
+    - Find running queries: status=['running']
+    - Monitor recent query activity: started_at_after='2024-01-01T00:00:00.000Z'
+    - Search for specific queries: contains='SELECT * FROM alerts'
+    - Check user vs scheduled queries: is_scheduled=false
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - queries: List of query objects with id, sql, status, timing info, and issuer details
+        - page_info: Pagination information (hasNextPage, endCursor, etc.)
+        - total_queries: Number of queries in current page
+        - message: Error message if unsuccessful
+    """
+    logger.info("Listing data lake queries")
+
+    try:
+        client = await _create_panther_client()
+
+        # Build input parameters
+        input_params = {
+            "pageSize": page_size,
+        }
+
+        if cursor:
+            input_params["cursor"] = cursor
+        if contains:
+            input_params["contains"] = contains
+        if status:
+            input_params["status"] = [s.value for s in status]
+        if is_scheduled is not None:
+            input_params["isScheduled"] = is_scheduled
+        if started_at_after:
+            input_params["startedAtAfter"] = started_at_after
+        if started_at_before:
+            input_params["startedAtBefore"] = started_at_before
+
+        variables = {"input": input_params} if input_params else None
+
+        # Execute the query
+        async with client as session:
+            result = await session.execute(
+                LIST_DATA_LAKE_QUERIES, variable_values=variables
+            )
+
+        # Parse results
+        query_data = result.get("dataLakeQueries", {})
+        edges = query_data.get("edges", [])
+        page_info = query_data.get("pageInfo", {})
+
+        # Extract queries from edges
+        queries = []
+        for edge in edges:
+            node = edge["node"]
+            # Format the issuer information
+            issued_by = node.get("issuedBy")
+            issuer_info = None
+            if issued_by:
+                if "email" in issued_by:  # User
+                    issuer_info = {
+                        "type": "user",
+                        "id": issued_by.get("id"),
+                        "email": issued_by.get("email"),
+                        "name": f"{issued_by.get('givenName', '')} {issued_by.get('familyName', '')}".strip(),
+                    }
+                else:  # API Token
+                    issuer_info = {
+                        "type": "api_token",
+                        "id": issued_by.get("id"),
+                        "name": issued_by.get("name"),
+                    }
+
+            queries.append(
+                {
+                    "id": node.get("id"),
+                    "sql": node.get("sql"),
+                    "name": node.get("name"),
+                    "status": node.get("status"),
+                    "message": node.get("message"),
+                    "started_at": node.get("startedAt"),
+                    "completed_at": node.get("completedAt"),
+                    "is_scheduled": node.get("isScheduled"),
+                    "issued_by": issuer_info,
+                }
+            )
+
+        logger.info(f"Successfully retrieved {len(queries)} data lake queries")
+
+        return {
+            "success": True,
+            "queries": queries,
+            "page_info": {
+                "has_next_page": page_info.get("hasNextPage", False),
+                "end_cursor": page_info.get("endCursor"),
+                "has_previous_page": page_info.get("hasPreviousPage", False),
+                "start_cursor": page_info.get("startCursor"),
+            },
+            "total_queries": len(queries),
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to list data lake queries: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to list data lake queries: {str(e)}",
+        }
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "destructiveHint": True,
+    }
+)
+async def cancel_data_lake_query(
+    query_id: Annotated[
+        str,
+        Field(description="The ID of the query to cancel"),
+    ],
+) -> Dict[str, Any]:
+    """Cancel a running data lake query to free up resources and prevent system overload.
+
+    This tool is critical for managing data lake performance and preventing resource exhaustion.
+    Use it to cancel long-running queries that are consuming excessive resources or are no longer needed.
+
+    IMPORTANT: Only running queries can be cancelled. Completed, failed, or already cancelled queries
+    cannot be cancelled again.
+
+    Common use cases:
+    - Cancel runaway queries consuming too many resources
+    - Stop queries that are taking longer than expected
+    - Clean up queries that are no longer needed
+    - Prevent system overload during peak usage
+
+    Best practices:
+    1. First use list_data_lake_queries(status=['running']) to find running queries
+    2. Review the SQL and timing information before cancelling
+    3. Cancel queries from oldest to newest if multiple queries need cancellation
+    4. Monitor system load after cancellation to ensure improvement
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the cancellation was successful
+        - query_id: ID of the cancelled query
+        - message: Success/error message
+    """
+    logger.info(f"Cancelling data lake query: {query_id}")
+
+    try:
+        client = await _create_panther_client()
+
+        variables = {"input": {"id": query_id}}
+
+        # Execute the cancellation
+        async with client as session:
+            result = await session.execute(
+                CANCEL_DATA_LAKE_QUERY, variable_values=variables
+            )
+
+        # Parse results
+        cancellation_data = result.get("cancelDataLakeQuery", {})
+        cancelled_id = cancellation_data.get("id")
+
+        if not cancelled_id:
+            raise ValueError("No query ID returned from cancellation")
+
+        logger.info(f"Successfully cancelled data lake query: {cancelled_id}")
+
+        return {
+            "success": True,
+            "query_id": cancelled_id,
+            "message": f"Successfully cancelled query {cancelled_id}",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to cancel data lake query: {str(e)}")
+
+        # Provide helpful error messages for common issues
+        error_message = str(e)
+        if "not found" in error_message.lower():
+            error_message = f"Query {query_id} not found. It may have already completed or been cancelled."
+        elif "cannot be cancelled" in error_message.lower():
+            error_message = f"Query {query_id} cannot be cancelled. Only running queries can be cancelled."
+        elif "permission" in error_message.lower():
+            error_message = f"Permission denied. You may not have permission to cancel query {query_id}."
+        else:
+            error_message = f"Failed to cancel query {query_id}: {error_message}"
+
+        return {
+            "success": False,
+            "message": error_message,
+        }

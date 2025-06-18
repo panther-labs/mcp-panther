@@ -367,3 +367,49 @@ query GetSchemaDetails($name: String!) {
     }
 }
 """)
+
+# Data Lake Query Management
+LIST_DATA_LAKE_QUERIES = gql("""
+query ListDataLakeQueries($input: DataLakeQueriesInput) {
+    dataLakeQueries(input: $input) {
+        edges {
+            node {
+                id
+                sql
+                name
+                status
+                message
+                startedAt
+                completedAt
+                isScheduled
+                issuedBy {
+                    ... on User {
+                        id
+                        email
+                        givenName
+                        familyName
+                    }
+                    ... on APIToken {
+                        id
+                        name
+                    }
+                }
+            }
+        }
+        pageInfo {
+            hasNextPage
+            endCursor
+            hasPreviousPage
+            startCursor
+        }
+    }
+}
+""")
+
+CANCEL_DATA_LAKE_QUERY = gql("""
+mutation CancelDataLakeQuery($input: CancelDataLakeQueryInput!) {
+    cancelDataLakeQuery(input: $input) {
+        id
+    }
+}
+""")
