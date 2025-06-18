@@ -221,6 +221,8 @@ Use with [Goose](https://block.github.io/goose/), Block's open-source AI agent:
 goose session --with-extension "uvx mcp-panther --compat-mode"
 ```
 
+The `--compat-mode` flag enables compatibility mode for broader MCP client support, especially for clients using older MCP versions that may not support all the latest features.
+
 ## Troubleshooting
 
 Check the server logs for detailed error messages: `tail -n 20 -F ~/Library/Logs/Claude/mcp*.log`. Common issues and solutions are listed below.
