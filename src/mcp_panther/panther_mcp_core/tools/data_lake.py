@@ -60,11 +60,15 @@ async def summarize_alert_events(
     ] = 30,
     start_date: Annotated[
         datetime | None,
-        Field(description="The start date of the analysis period. Defaults to start of today UTC."),
+        Field(
+            description="The start date of the analysis period. Defaults to start of today UTC."
+        ),
     ] = None,
     end_date: Annotated[
         datetime | None,
-        Field(description="The end date of the analysis period. Defaults to end of today UTC."),
+        Field(
+            description="The end date of the analysis period. Defaults to end of today UTC."
+        ),
     ] = None,
 ) -> Dict[str, Any]:
     """Analyze patterns and relationships across multiple alerts by aggregating their event data into time-based groups. For each time window (configurable from 1-60 minutes), the tool collects unique entities (IPs, emails, usernames, trace IDs) and alert metadata (IDs, rules, severities) to help identify related activities. Results are ordered chronologically with the most recent first, helping analysts identify temporal patterns, common entities, and potential incident scope.
@@ -82,7 +86,7 @@ async def summarize_alert_events(
 
     # Convert alert IDs list to SQL array
     alert_ids_str = ", ".join(f"'{aid}'" for aid in alert_ids)
-    
+
     # Convert datetime objects to GraphQL format for SQL query
     start_date_str = graphql_date_format(start_date)
     end_date_str = graphql_date_format(end_date)
