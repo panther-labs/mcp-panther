@@ -6,7 +6,7 @@ All prompt modules are imported here to ensure they are available.
 """
 
 # Define all modules that should be available when importing this package
-__all__ = ["alert_triage"]
+__all__ = ["alert_triage", "reporting"]
 
 # Import all prompt modules to ensure their decorators are processed
-from . import alert_triage
+from . import alert_triage, reporting
