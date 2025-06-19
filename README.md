@@ -35,6 +35,8 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 |-----------|-------------|---------------|
 | `execute_data_lake_query` | Execute SQL queries against Panther's data lake | "Query AWS CloudTrail logs for failed login attempts in the last day" |
 | `get_data_lake_query_results` | Get results from a previously executed data lake query | "Get results for query ID abc123" |
+| `list_data_lake_queries` | List previously executed data lake queries with comprehensive filtering options | "Show me all running queries from the last hour" |
+| `cancel_data_lake_query` | Cancel a running data lake query to free up resources and prevent system overload | "Cancel query abc123 that's taking too long" |
 | `get_sample_log_events` | Get a sample of 10 recent events for a specific log type | "Show me sample events from AWS_CLOUDTRAIL logs" |
 | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
 | `list_databases` | List all available data lake databases in Panther | "List all available databases" |
