@@ -5,35 +5,21 @@ Prompt templates for guiding users through Panther alert triage workflows.
 from .registry import mcp_prompt
 
 
-@mcp_prompt
-def get_log_sources_report() -> str:
-    return """You are an expert in security data pipelines and ETL. Your goal is to ensure that all Panther log sources are healthy, and if they are unhealthy, to understand the root cause and how to fix it. Follow these steps:
-
-1. List log sources
-2. If any log sources are unhealthy, search for a related SYSTEM ERROR alert, you might need to look a few weeks back if the source has been unhealthy for some time.
-3. If the reason for being unhealthy is a classification error, query the panther_monitor.public. database, classification_failures table with a filter on p_source_id matching the offending source. Read the payload, try to guess the log type, and then compare it to the log source's attached schemas to pinpoint why it isn't classifying.
-4. If no sources are unhealthy, print a summary of your findings. If several are unhealthy, triage one at a time, providing a summary for each one."""
-
-
-@mcp_prompt
-def list_detection_rule_errors(start_date: str, end_date: str) -> str:
-    """Get all detection rule errors between the specified dates.
-
-    Args:
-        start_date: The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
-        end_date: The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
-    """
+@mcp_prompt(
+    name="Get Detection Rule Errors",
+    description="Find detection rule errors between the specified dates (YYYY-MM-DD HH:MM:SSZ format) and perform root cause analysis on them.",
+    tags={"triage", "operations"},
+)
+def get_detection_rule_errors(start_date: str, end_date: str) -> str:
     return f"""You are an expert Python software developer specialized in cybersecurity and Panther. Your goal is to perform root cause analysis on detection errors and guide the human on how to resolve them with suggestions. This will guarantee a stable rule processor for security log analysis. Search for errors created between {start_date} and {end_date}. Use a concise, professional, informative tone."""
 
 
-@mcp_prompt
+@mcp_prompt(
+    name="List and Prioritize Alerts",
+    description="Find commonalities between alerts in the specified time period (YYYY-MM-DD HH:MM:SSZ format) and perform detailed actor-based analysis and prioritization.",
+    tags={"triage"},
+)
 def list_and_prioritize_alerts(start_date: str, end_date: str) -> str:
-    """Get temporal alert data between specified dates and perform detailed actor-based analysis and prioritization.
-
-    Args:
-        start_date: The start date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
-        end_date: The end date in format "YYYY-MM-DD HH:MM:SSZ" (e.g. "2025-04-22 22:37:41Z")
-    """
     return f"""Analyze alert signals and group them based on entity names. The goal is to identify patterns of related activity across alerts and triage them together.
 
 1. Get all alert IDs between {start_date} and {end_date}.
