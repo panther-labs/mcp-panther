@@ -10,6 +10,7 @@ __all__ = [
     "alerts",
     "rules",
     "data_lake",
+    "data_models",
     "sources",
     "metrics",
     "users",
@@ -22,6 +23,7 @@ __all__ = [
 from . import (
     alerts,
     data_lake,
+    data_models,
     helpers,
     metrics,
     permissions,
