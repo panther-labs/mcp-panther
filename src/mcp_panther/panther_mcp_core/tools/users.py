@@ -71,7 +71,7 @@ async def get_user_by_id(
 ) -> Dict[str, Any]:
     """Get detailed information about a Panther user by ID
 
-    Returns complete user information including roles and permissions.
+    Returns complete user information including email, names, role, authentication status, and timestamps.
     """
     logger.info(f"Fetching user details for user ID: {user_id}")
 

@@ -56,24 +56,27 @@ async def test_list_roles_success(mock_rest_client):
     first_role = result["roles"][0]
     assert first_role["id"] == MOCK_ROLE["id"]
     assert first_role["name"] == MOCK_ROLE["name"]
-    assert first_role["description"] == MOCK_ROLE["description"]
     assert first_role["permissions"] == MOCK_ROLE["permissions"]
-    assert first_role["managed"] is True
+    assert first_role["createdAt"] == MOCK_ROLE["createdAt"]
+    # Note: API returns updatedAt, not lastModified for roles
 
 
 @pytest.mark.asyncio
 @patch_rest_client(ROLES_MODULE_PATH)
-async def test_list_roles_with_pagination(mock_rest_client):
-    """Test listing roles with pagination."""
+async def test_list_roles_with_filters(mock_rest_client):
+    """Test listing roles with various filters."""
     mock_rest_client.get.return_value = (MOCK_ROLES_RESPONSE, 200)
 
-    await list_roles(cursor="some-cursor", limit=50)
+    await list_roles(
+        name_contains="Admin", role_ids=["Admin", "Analyst"], sort_dir="desc"
+    )
 
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
     assert args[0] == "/roles"
-    assert kwargs["params"]["cursor"] == "some-cursor"
-    assert kwargs["params"]["limit"] == 50
+    assert kwargs["params"]["name-contains"] == "Admin"
+    assert kwargs["params"]["ids"] == "Admin,Analyst"
+    assert kwargs["params"]["sort-dir"] == "desc"
 
 
 @pytest.mark.asyncio
@@ -150,32 +153,27 @@ async def test_list_roles_empty_results(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ROLES_MODULE_PATH)
-async def test_list_roles_with_null_cursor(mock_rest_client):
-    """Test listing roles with null cursor."""
+async def test_list_roles_with_name_exact_match(mock_rest_client):
+    """Test listing roles with exact name match."""
     mock_rest_client.get.return_value = (MOCK_ROLES_RESPONSE, 200)
 
-    await list_roles(cursor="null")
+    await list_roles(name="Admin")
 
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
     assert args[0] == "/roles"
-    # Should not include cursor in params when it's "null"
-    assert "cursor" not in kwargs["params"]
+    assert kwargs["params"]["name"] == "Admin"
 
 
 @pytest.mark.asyncio
 @patch_rest_client(ROLES_MODULE_PATH)
-async def test_list_roles_limit_validation(mock_rest_client):
-    """Test listing roles with various limit values."""
+async def test_list_roles_default_sort_direction(mock_rest_client):
+    """Test listing roles with default sort direction."""
     mock_rest_client.get.return_value = (MOCK_ROLES_RESPONSE, 200)
 
-    # Test with minimum limit
-    await list_roles(limit=1)
-    args, kwargs = mock_rest_client.get.call_args
-    assert kwargs["params"]["limit"] == 1
+    await list_roles()
 
-    # Test with maximum limit (should be handled by Annotated constraints)
-    mock_rest_client.reset_mock()
-    await list_roles(limit=1000)
+    mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
-    assert kwargs["params"]["limit"] == 1000
+    assert args[0] == "/roles"
+    assert kwargs["params"]["sort-dir"] == "asc"

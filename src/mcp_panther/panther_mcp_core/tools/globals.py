@@ -22,16 +22,32 @@ logger = logging.getLogger("mcp-panther")
 async def list_globals(
     cursor: Annotated[
         str | None,
-        Field(description="Optional cursor for pagination from a previous query"),
+        Field(description="The pagination token to retrieve the next set of results"),
     ] = None,
     limit: Annotated[
         int,
         Field(
-            description="Optional maximum number of results to return",
+            description="The maximum number of results to return",
             ge=1,
             le=1000,
         ),
     ] = 100,
+    name_contains: Annotated[
+        str | None,
+        Field(
+            description="A case-insensitive substring to search for in the global's name"
+        ),
+    ] = None,
+    created_by: Annotated[
+        str | None,
+        Field(description="Filters for globals created by a specific user or actor ID"),
+    ] = None,
+    last_modified_by: Annotated[
+        str | None,
+        Field(
+            description="Filters for globals last modified by a specific user or actor ID"
+        ),
+    ] = None,
 ) -> Dict[str, Any]:
     """List all global helpers from your Panther instance. Global helpers are shared Python functions that can be used across multiple rules, policies, and other detections.
 
@@ -40,11 +56,17 @@ async def list_globals(
     logger.info(f"Fetching {limit} global helpers from Panther")
 
     try:
-        # Prepare query parameters
+        # Prepare query parameters based on API spec
         params = {"limit": limit}
         if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
             params["cursor"] = cursor
             logger.info(f"Using cursor for pagination: {cursor}")
+        if name_contains:
+            params["name-contains"] = name_contains
+        if created_by:
+            params["created-by"] = created_by
+        if last_modified_by:
+            params["last-modified-by"] = last_modified_by
 
         async with get_rest_client() as client:
             result, _ = await client.get("/globals", params=params)
@@ -58,9 +80,7 @@ async def list_globals(
             {
                 "id": global_helper["id"],
                 "description": global_helper.get("description"),
-                "displayName": global_helper.get("displayName"),
-                "enabled": global_helper.get("enabled"),
-                "managed": global_helper.get("managed"),
+                "tags": global_helper.get("tags"),
                 "createdAt": global_helper.get("createdAt"),
                 "lastModified": global_helper.get("lastModified"),
             }

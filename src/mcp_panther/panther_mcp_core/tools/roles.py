@@ -20,31 +20,45 @@ logger = logging.getLogger("mcp-panther")
     }
 )
 async def list_roles(
-    cursor: Annotated[
+    name_contains: Annotated[
         str | None,
-        Field(description="Optional cursor for pagination from a previous query"),
+        Field(description="A string to search for within the role name"),
     ] = None,
-    limit: Annotated[
-        int,
+    name: Annotated[
+        str | None,
         Field(
-            description="Optional maximum number of results to return",
-            ge=1,
-            le=1000,
+            description="An exact match for a role's name. If provided, other parameters are ignored"
         ),
-    ] = 100,
+    ] = None,
+    role_ids: Annotated[
+        list[str] | None,
+        Field(description="A list of role IDs to return"),
+    ] = None,
+    sort_dir: Annotated[
+        str | None,
+        Field(
+            description="The sort direction for the results", examples=["asc", "desc"]
+        ),
+    ] = "asc",
 ) -> Dict[str, Any]:
     """List all roles from your Panther instance.
 
-    Returns paginated list of roles with metadata including permissions and settings.
+    Returns list of roles with metadata including permissions and settings.
     """
-    logger.info(f"Fetching {limit} roles from Panther")
+    logger.info("Fetching roles from Panther")
 
     try:
-        # Prepare query parameters
-        params = {"limit": limit}
-        if cursor and cursor.lower() != "null":  # Only add cursor if it's not null
-            params["cursor"] = cursor
-            logger.info(f"Using cursor for pagination: {cursor}")
+        # Prepare query parameters based on API spec
+        params = {}
+        if name_contains:
+            params["name-contains"] = name_contains
+        if name:
+            params["name"] = name
+        if role_ids:
+            # Convert list to comma-delimited string as per API spec
+            params["ids"] = ",".join(role_ids)
+        if sort_dir:
+            params["sort-dir"] = sort_dir
 
         async with get_rest_client() as client:
             result, _ = await client.get("/roles", params=params)
@@ -58,11 +72,11 @@ async def list_roles(
             {
                 "id": role["id"],
                 "name": role.get("name"),
-                "description": role.get("description"),
                 "permissions": role.get("permissions"),
-                "managed": role.get("managed"),
+                "logTypeAccess": role.get("logTypeAccess"),
+                "logTypeAccessKind": role.get("logTypeAccessKind"),
                 "createdAt": role.get("createdAt"),
-                "lastModified": role.get("lastModified"),
+                "updatedAt": role.get("updatedAt"),
             }
             for role in roles
         ]

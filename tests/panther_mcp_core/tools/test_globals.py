@@ -10,9 +10,7 @@ MOCK_GLOBAL = {
     "id": "MyGlobalHelper",
     "body": 'def is_suspicious_ip(ip_address):\n    """Check if an IP address is suspicious based on reputation data."""\n    suspicious_ranges = ["192.168.1.0/24", "10.0.0.0/8"]\n    return any(ip_address.startswith(range_prefix.split("/")[0]) for range_prefix in suspicious_ranges)',
     "description": "Helper function to check if an IP address is suspicious",
-    "displayName": "Suspicious IP Checker",
-    "enabled": True,
-    "managed": False,
+    "tags": ["security", "ip-validation"],
     "createdAt": "2024-11-14T17:09:49.841715953Z",
     "lastModified": "2024-11-14T17:09:49.841716265Z",
 }
@@ -49,10 +47,10 @@ async def test_list_globals_success(mock_rest_client):
 
     first_global = result["globals"][0]
     assert first_global["id"] == MOCK_GLOBAL["id"]
-    assert first_global["displayName"] == MOCK_GLOBAL["displayName"]
     assert first_global["description"] == MOCK_GLOBAL["description"]
-    assert first_global["enabled"] is True
-    assert first_global["managed"] is False
+    assert first_global["tags"] == MOCK_GLOBAL.get("tags")
+    assert first_global["createdAt"] == MOCK_GLOBAL["createdAt"]
+    assert first_global["lastModified"] == MOCK_GLOBAL["lastModified"]
 
 
 @pytest.mark.asyncio
@@ -68,6 +66,24 @@ async def test_list_globals_with_pagination(mock_rest_client):
     assert args[0] == "/globals"
     assert kwargs["params"]["cursor"] == "some-cursor"
     assert kwargs["params"]["limit"] == 50
+
+
+@pytest.mark.asyncio
+@patch_rest_client(GLOBALS_MODULE_PATH)
+async def test_list_globals_with_filters(mock_rest_client):
+    """Test listing global helpers with various filters."""
+    mock_rest_client.get.return_value = (MOCK_GLOBALS_RESPONSE, 200)
+
+    await list_globals(
+        name_contains="Helper", created_by="user-123", last_modified_by="user-456"
+    )
+
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == "/globals"
+    assert kwargs["params"]["name-contains"] == "Helper"
+    assert kwargs["params"]["created-by"] == "user-123"
+    assert kwargs["params"]["last-modified-by"] == "user-456"
 
 
 @pytest.mark.asyncio
@@ -92,10 +108,9 @@ async def test_get_global_by_id_success(mock_rest_client):
 
     assert result["success"] is True
     assert result["global"]["id"] == MOCK_GLOBAL["id"]
-    assert result["global"]["displayName"] == MOCK_GLOBAL["displayName"]
     assert result["global"]["description"] == MOCK_GLOBAL["description"]
     assert result["global"]["body"] == MOCK_GLOBAL["body"]
-    assert result["global"]["enabled"] is True
+    assert result["global"]["tags"] == MOCK_GLOBAL["tags"]
 
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
