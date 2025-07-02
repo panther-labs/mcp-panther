@@ -33,7 +33,7 @@ async def list_data_models(
         ),
     ] = 100,
 ) -> Dict[str, Any]:
-    """List all data models from your Panther instance.
+    """List all data models from your Panther instance. Data models are used only in Panther's Python rules to map log type schema fields to a unified data model. They may also contain custom mappings for fields that are not part of the log type schema.
 
     Returns paginated list of data models with metadata including mappings and log types.
     """
