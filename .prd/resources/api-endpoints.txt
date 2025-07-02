@@ -1,0 +1,89 @@
+## Alert Comment Endpoints
+* **GET** `/alert-comments`
+* **POST** `/alert-comments`
+* **GET** `/alert-comments/{id}`
+* **POST** `/alert-comments/{id}`
+
+## Alert Endpoints
+* **GET** `/alerts`
+* **PATCH** `/alerts`
+* **GET** `/alerts/{id}`
+* **PATCH** `/alerts/{id}`
+* **GET** `/alerts/{id}/events`
+
+## API Token Endpoints
+* **GET** `/api-tokens`
+* **POST** `/api-tokens`
+* **DELETE** `/api-tokens/{id}`
+* **GET** `/api-tokens/{id}`
+* **POST** `/api-tokens/{id}`
+* **POST** `/api-tokens/{id}/rotate`
+
+## Data Model Endpoints
+* **GET** `/data-models`
+* **POST** `/data-models`
+* **DELETE** `/data-models/{id}`
+* **GET** `/data-models/{id}`
+* **PUT** `/data-models/{id}`
+
+## Global Endpoints
+* **GET** `/globals`
+* **POST** `/globals`
+* **DELETE** `/globals/{id}`
+* **GET** `/globals/{id}`
+* **PUT** `/globals/{id}`
+
+## HTTP Source Endpoints
+* **POST** `/log-sources/http`
+* **DELETE** `/log-sources/http/{id}`
+* **GET** `/log-sources/http/{id}`
+* **PUT** `/log-sources/http/{id}`
+
+## Policy Endpoints
+* **GET** `/policies`
+* **POST** `/policies`
+* **DELETE** `/policies/{id}`
+* **GET** `/policies/{id}`
+* **PUT** `/policies/{id}`
+
+## Query Endpoints
+* **GET** `/queries`
+* **POST** `/queries`
+* **DELETE** `/queries/{id}`
+* **GET** `/queries/{id}`
+* **POST** `/queries/{id}`
+
+## Role Endpoints
+* **GET** `/roles`
+* **POST** `/roles`
+* **DELETE** `/roles/{id}`
+* **GET** `/roles/{id}`
+* **POST** `/roles/{id}`
+
+## Rule Endpoints
+* **GET** `/rules`
+* **POST** `/rules`
+* **DELETE** `/rules/{id}`
+* **GET** `/rules/{id}`
+* **PUT** `/rules/{id}`
+
+## Scheduled Rule Endpoints
+* **GET** `/scheduled-rules`
+* **POST** `/scheduled-rules`
+* **DELETE** `/scheduled-rules/{id}`
+* **GET** `/scheduled-rules/{id}`
+* **PUT** `/scheduled-rules/{id}`
+
+## Simple Rule Endpoints
+* **GET** `/simple-rules`
+* **POST** `/simple-rules`
+* **DELETE** `/simple-rules/{id}`
+* **GET** `/simple-rules/{id}`
+* **PUT** `/simple-rules/{id}`
+
+## User Endpoints
+* **GET** `/users`
+* **POST** `/users`
+* **DELETE** `/users/{id}`
+* **GET** `/users/{id}`
+* **POST** `/users/{id}`

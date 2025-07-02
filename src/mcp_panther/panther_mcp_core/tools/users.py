@@ -3,9 +3,11 @@ Tools for interacting with Panther users.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Annotated, Any, Dict
 
-from ..client import _execute_query
+from pydantic import Field
+
+from ..client import _execute_query, get_rest_client
 from ..permissions import Permission, all_perms
 from ..queries import LIST_USERS_QUERY
 from .registry import mcp_tool
@@ -50,4 +52,48 @@ async def list_panther_users() -> Dict[str, Any]:
         return {
             "success": False,
             "message": f"Failed to fetch users: {str(e)}",
+        }
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.USER_READ),
+    }
+)
+async def get_user_by_id(
+    user_id: Annotated[
+        str,
+        Field(
+            description="The ID of the user to fetch",
+            examples=["user-123"],
+        ),
+    ],
+) -> Dict[str, Any]:
+    """Get detailed information about a Panther user by ID
+
+    Returns complete user information including roles and permissions.
+    """
+    logger.info(f"Fetching user details for user ID: {user_id}")
+
+    try:
+        async with get_rest_client() as client:
+            # Allow 404 as a valid response to handle not found case
+            result, status = await client.get(
+                f"/users/{user_id}", expected_codes=[200, 404]
+            )
+
+            if status == 404:
+                logger.warning(f"No user found with ID: {user_id}")
+                return {
+                    "success": False,
+                    "message": f"No user found with ID: {user_id}",
+                }
+
+        logger.info(f"Successfully retrieved user details for user ID: {user_id}")
+        return {"success": True, "user": result}
+    except Exception as e:
+        logger.error(f"Failed to get user details: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to get user details: {str(e)}",
         }
