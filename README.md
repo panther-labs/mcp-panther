@@ -63,6 +63,10 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `list_scheduled_rules` | List all scheduled rules with optional pagination | "List all scheduled rules in Panther" |
 | `list_simple_rules` | List all simple rules with optional pagination | "Show me all simple rules in Panther" |
 | `put_rule` | Update an existing rule or create a new one | "Update rule abc123 with new severity HIGH" |
+| `list_data_models` | List data models that control UDM mappings in rules | "Show me all data models for log parsing" |
+| `get_data_model_by_id` | Get detailed information about a specific data model | "Get the complete details for the 'AWS_CloudTrail' data model" |
+| `list_globals` | List global helper functions with filtering options | "Show me global helpers containing 'aws' in the name" |
+| `get_global_by_id` | Get detailed information and code for a specific global helper | "Get the complete code for global helper 'AWSUtilities'" |
 
 </details>
 
@@ -97,10 +101,6 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `get_permissions` | Get the current user's permissions | "What permissions do I have?" |
 | `list_roles` | List all roles with filtering options (name search, role IDs, sort direction) | "Show me all roles containing 'Admin' in the name" |
 | `get_role_by_id` | Get detailed information about a specific role including permissions | "Get complete details for the 'Admin' role" |
-| `list_data_models` | List data models that control UDM mappings in rules | "Show me all data models for log parsing" |
-| `get_data_model_by_id` | Get detailed information about a specific data model | "Get the complete details for the 'AWS_CloudTrail' data model" |
-| `list_globals` | List global helper functions with filtering options | "Show me global helpers containing 'aws' in the name" |
-| `get_global_by_id` | Get detailed information and code for a specific global helper | "Get the complete code for global helper 'AWSUtilities'" |
 
 </details>
 
