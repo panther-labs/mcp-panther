@@ -51,7 +51,6 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `create_rule` | Create a new Panther rule | "Create a new rule to detect more than 7 failed logins within a day across any user in the AWS Console" |
 | `disable_rule` | Disable a rule by setting enabled to false | "Disable rule abc123" |
 | `get_global_helper_by_id` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
 | `get_policy_by_id` | Get detailed information about a specific policy | "Get details for policy ID AWS.S3.Bucket.PublicReadACP" |
@@ -72,9 +71,8 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `create_or_update_schema` | Create or update a schema | "Create a new schema for custom log type" |
-| `get_schema_details` | Get detailed information for specific schemas | "Get full details for AWS.CloudTrail schema" |
-| `list_schemas` | List available schemas with optional filters | "Show me all AWS-related schemas" |
+| `list_log_type_schemas` | List available log type schemas with optional filters | "Show me all AWS-related schemas" |
+| `get_panther_log_type_schema` | Get detailed information for specific log type schemas | "Get full details for AWS.CloudTrail schema" |
 
 </details>
 
@@ -85,16 +83,24 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 |-----------|-------------|---------------|
 | `get_rule_alert_metrics` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
 | `get_severity_alert_metrics` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
+| `get_bytes_processed_per_log_type_and_source` | Get data ingestion metrics by log type and source | "Show me data ingestion volume by log type" |
 
 </details>
 
 <details>
-<summary><strong>Users</strong></summary>
+<summary><strong>Users & Access Management</strong></summary>
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `list_panther_users` | List all Panther user accounts | "Show me all active Panther users" |
+| `get_user_by_id` | Get detailed information about a specific user | "Get details for user ID 'john.doe@company.com'" |
 | `get_permissions` | Get the current user's permissions | "What permissions do I have?" |
+| `list_roles` | List all roles with filtering options (name search, role IDs, sort direction) | "Show me all roles containing 'Admin' in the name" |
+| `get_role_by_id` | Get detailed information about a specific role including permissions | "Get complete details for the 'Admin' role" |
+| `list_data_models` | List data models that control UDM mappings in rules | "Show me all data models for log parsing" |
+| `get_data_model_by_id` | Get detailed information about a specific data model | "Get the complete details for the 'AWS_CloudTrail' data model" |
+| `list_globals` | List global helper functions with filtering options | "Show me global helpers containing 'aws' in the name" |
+| `get_global_by_id` | Get detailed information and code for a specific global helper | "Get the complete code for global helper 'AWSUtilities'" |
 
 </details>
 
