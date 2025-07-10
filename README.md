@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/panther-labs-mcp-panther-badge.png)](https://mseep.ai/app/panther-labs-mcp-panther)
+
 # Panther MCP Server
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
