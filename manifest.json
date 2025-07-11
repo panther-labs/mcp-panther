@@ -1,0 +1,83 @@
+{
+  "dxt_version": "0.1",
+  "name": "mcp-panther",
+  "version": "1.1.0",
+  "description": "Connect LLMs to Panther's security platform for interactive rule writing, log querying, and alert management through natural language.",
+  "display_name": "Panther MCP Server",
+  "author": {
+    "name": "Panther Labs Inc",
+    "url": "https://www.panther.com"
+  },
+  "homepage": "https://www.panther.com",
+  "documentation": "https://docs.panther.com/panther-developer-workflows/mcp-server",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/panther-labs/mcp-panther"
+  },
+  "icon": "favicon.png",
+  "server": {
+    "type": "python",
+    "entry_point": "src/mcp_panther/server.py",
+    "runtime": {
+      "python": ">=3.10.0"
+    },
+    "dependencies": {
+      "bundled": true,
+      "bundle_path": "lib/",
+      "env_file": "mcp_config.env"
+    },
+    "mcp_config": {
+      "command": "python3",
+      "args": ["-m", "mcp_panther.server"],
+      "env": {
+        "PYTHONPATH": "lib:src"
+      }
+    }
+  },
+  "user_config": {
+    "PANTHER_INSTANCE_URL": {
+      "type": "string",
+      "title": "Panther Instance URL",
+      "description": "Your Panther instance URL (e.g., https://your-instance.panther.com)",
+      "required": true,
+      "sensitive": false
+    },
+    "PANTHER_API_TOKEN": {
+      "type": "string",
+      "title": "Panther API Token",
+      "description": "API token for accessing your Panther instance",
+      "required": true,
+      "sensitive": true
+    },
+    "log_file": {
+      "type": "string",
+      "title": "Log File Path",
+      "description": "Optional path to write server logs",
+      "required": false,
+      "sensitive": false
+    }
+  },
+  "keywords": [
+    "security",
+    "siem",
+    "logging",
+    "panther",
+    "detection",
+    "alerts",
+    "cybersecurity"
+  ],
+  "license": "Apache-2.0",
+  "compatibility": {
+    "platforms": ["darwin", "linux", "win32"],
+    "runtimes": {
+      "python": ">=3.10.0"
+    }
+  },
+  "bundling": {
+    "method": "dependencies",
+    "script": "scripts/bundle-deps.sh",
+    "target": "lib/",
+    "reproducible": true,
+    "lock_file": "uv.lock"
+  }
+}

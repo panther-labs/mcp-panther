@@ -37,7 +37,6 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `get_data_lake_query_results` | Get results from a previously executed data lake query | "Get results for query ID abc123" |
 | `list_data_lake_queries` | List previously executed data lake queries with comprehensive filtering options | "Show me all running queries from the last hour" |
 | `cancel_data_lake_query` | Cancel a running data lake query to free up resources and prevent system overload | "Cancel query abc123 that's taking too long" |
-| `get_sample_log_events` | Get a sample of 10 recent events for a specific log type | "Show me sample events from AWS_CLOUDTRAIL logs" |
 | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
 | `list_databases` | List all available data lake databases in Panther | "List all available databases" |
 | `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
@@ -113,6 +112,77 @@ Panther highly recommends the following MCP best practices:
 - **Host the MCP server in a locked-down sandbox (e.g., Docker) with read-only mounts.** This confines any compromise to a minimal blast radius.
 - **Monitor credential access to Panther and monitor for anomalies.** Write a Panther rule!
 - **Scan MCP servers with `mcp-scan`.** Utilize the `mcp-scan` tool by [invariantlabs](https://github.com/invariantlabs-ai/mcp-scan) for common vulnerabilities.
+
+## MCP Python Extensions Bundling
+
+This project is compliant with MCP Python Extensions and supports bundled dependencies for distribution. The bundling approach eliminates the need for users to install dependencies separately.
+
+### Bundle Dependencies
+
+To bundle all required dependencies into the `lib/` directory:
+
+```bash
+./scripts/bundle-deps.sh
+```
+
+This script:
+- Exports dependencies from the `uv.lock` file
+- Installs only runtime dependencies (excludes development dependencies)
+- Creates a self-contained `lib/` directory with all dependencies
+- Verifies the bundle by testing imports
+
+### Test Bundled Setup
+
+To verify the bundled setup works correctly:
+
+```bash
+./scripts/test-bundled-setup.sh
+```
+
+This script:
+- Sources the `mcp_config.env` environment configuration
+- Tests that all dependencies can be imported from the bundled `lib/` directory
+- Verifies that the project modules can be imported correctly
+
+### Environment Configuration
+
+The `mcp_config.env` file sets up the environment for bundled dependencies:
+
+```bash
+# Add the bundled dependencies to PYTHONPATH
+export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}${PWD}/lib:${PWD}/src"
+
+# Optional: Set Python to use optimized bytecode
+export PYTHONOPTIMIZE=1
+
+# Optional: Disable Python buffering for better logging
+export PYTHONUNBUFFERED=1
+```
+
+### Manifest Configuration
+
+The `manifest.json` file specifies the bundled dependencies approach:
+
+```json
+{
+  "server": {
+    "type": "python",
+    "entry_point": "src/mcp_panther/server.py",
+    "dependencies": {
+      "bundled": true,
+      "bundle_path": "lib/",
+      "env_file": "mcp_config.env"
+    }
+  },
+  "bundling": {
+    "method": "dependencies",
+    "script": "scripts/bundle-deps.sh",
+    "target": "lib/",
+    "reproducible": true,
+    "lock_file": "uv.lock"
+  }
+}
+```
 
 ## Panther Configuration
 
