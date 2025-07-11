@@ -27,7 +27,7 @@
       "env_file": "mcp_config.env"
     },
     "mcp_config": {
-      "command": "python",
+      "command": "python3",
       "args": ["${__dirname}/src/mcp_panther/server.py"],
       "env": {
         "PYTHONPATH": "${__dirname}/lib:${__dirname}/src",
@@ -52,6 +52,152 @@
       "sensitive": true
     }
   },
+  "tools": [
+    {
+      "name": "add_alert_comment",
+      "description": "Add a comment to a Panther alert"
+    },
+    {
+      "name": "get_alert_by_id",
+      "description": "Get detailed information about a specific alert"
+    },
+    {
+      "name": "get_alert_events",
+      "description": "Get a small sampling of events for a given alert"
+    },
+    {
+      "name": "list_alerts",
+      "description": "List alerts with comprehensive filtering options (date range, severity, status, etc.)"
+    },
+    {
+      "name": "update_alert_assignee_by_id",
+      "description": "Update the assignee of one or more alerts"
+    },
+    {
+      "name": "update_alert_status",
+      "description": "Update the status of one or more alerts"
+    },
+    {
+      "name": "list_alert_comments",
+      "description": "List all comments for a specific alert"
+    },
+    {
+      "name": "execute_data_lake_query",
+      "description": "Execute SQL queries against Panther's data lake"
+    },
+    {
+      "name": "get_data_lake_query_results",
+      "description": "Get results from a previously executed data lake query"
+    },
+    {
+      "name": "list_data_lake_queries",
+      "description": "List previously executed data lake queries with comprehensive filtering options"
+    },
+    {
+      "name": "cancel_data_lake_query",
+      "description": "Cancel a running data lake query to free up resources and prevent system overload"
+    },
+    {
+      "name": "get_table_schema",
+      "description": "Get schema information for a specific table"
+    },
+    {
+      "name": "list_databases",
+      "description": "List all available data lake databases in Panther"
+    },
+    {
+      "name": "list_log_sources",
+      "description": "List log sources with optional filters (health status, log types, integration type)"
+    },
+    {
+      "name": "list_database_tables",
+      "description": "List all available tables for a specific database in Panther's data lake"
+    },
+    {
+      "name": "summarize_alert_events",
+      "description": "Analyze patterns and relationships across multiple alerts by aggregating their event data"
+    },
+    {
+      "name": "list_detections",
+      "description": "List detections from Panther with support for different detection types"
+    },
+    {
+      "name": "get_detection_by_id",
+      "description": "Get detailed information about a specific detection including the detection body and tests"
+    },
+    {
+      "name": "disable_rule",
+      "description": "Disable a rule by setting enabled to false"
+    },
+    {
+      "name": "put_rule",
+      "description": "Update an existing rule or create a new one"
+    },
+    {
+      "name": "get_global_helper_by_id",
+      "description": "Get detailed information about a specific global helper"
+    },
+    {
+      "name": "list_global_helpers",
+      "description": "List all Panther global helpers with optional pagination"
+    },
+    {
+      "name": "list_data_models",
+      "description": "List data models that control UDM mappings in rules"
+    },
+    {
+      "name": "get_data_model_by_id",
+      "description": "Get detailed information about a specific data model"
+    },
+    {
+      "name": "list_globals",
+      "description": "List global helper functions with filtering options"
+    },
+    {
+      "name": "get_global_by_id",
+      "description": "Get detailed information and code for a specific global helper"
+    },
+    {
+      "name": "list_log_type_schemas",
+      "description": "List available log type schemas with optional filters"
+    },
+    {
+      "name": "get_panther_log_type_schema",
+      "description": "Get detailed information for specific log type schemas"
+    },
+    {
+      "name": "get_rule_alert_metrics",
+      "description": "Get metrics about alerts grouped by rule"
+    },
+    {
+      "name": "get_severity_alert_metrics",
+      "description": "Get metrics about alerts grouped by severity"
+    },
+    {
+      "name": "get_bytes_processed_per_log_type_and_source",
+      "description": "Get data ingestion metrics by log type and source"
+    },
+    {
+      "name": "list_panther_users",
+      "description": "List all Panther user accounts"
+    },
+    {
+      "name": "get_user_by_id",
+      "description": "Get detailed information about a specific user"
+    },
+    {
+      "name": "get_permissions",
+      "description": "Get the current user's permissions"
+    },
+    {
+      "name": "list_roles",
+      "description": "List all roles with filtering options (name search, role IDs, sort direction)"
+    },
+    {
+      "name": "get_role_by_id",
+      "description": "Get detailed information about a specific role including permissions"
+    }
+  ],
   "keywords": [
     "security",
     "siem",
