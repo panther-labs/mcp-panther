@@ -130,7 +130,10 @@ async def test_get_detection_by_id_rule_not_found(mock_rest_client):
     result = await get_detection_by_id("nonexistent-rule", ["rules"])
 
     assert result["success"] is False
-    assert "No rule found with ID" in result["message"]
+    assert (
+        "No detection found with ID nonexistent-rule in any of the specified types"
+        in result["message"]
+    )
 
 
 @pytest.mark.asyncio
@@ -297,10 +300,15 @@ async def test_get_detection_by_id_scheduled_rule_not_found(mock_rest_client):
     """Test handling of non-existent scheduled rule."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_detection_by_id("nonexistent.scheduled.rule", ["scheduled_rules"])
+    result = await get_detection_by_id(
+        "nonexistent.scheduled.rule", ["scheduled_rules"]
+    )
 
     assert result["success"] is False
-    assert "No scheduled_rule found with ID" in result["message"]
+    assert (
+        "No detection found with ID nonexistent.scheduled.rule in any of the specified types"
+        in result["message"]
+    )
 
 
 @pytest.mark.asyncio
@@ -410,7 +418,10 @@ async def test_get_detection_by_id_simple_rule_not_found(mock_rest_client):
     result = await get_detection_by_id("nonexistent.simple.rule", ["simple_rules"])
 
     assert result["success"] is False
-    assert "No simple_rule found with ID" in result["message"]
+    assert (
+        "No detection found with ID nonexistent.simple.rule in any of the specified types"
+        in result["message"]
+    )
 
 
 @pytest.mark.asyncio
@@ -517,7 +528,7 @@ async def test_list_detections_policies_error(mock_rest_client):
     result = await list_detections(["policies"])
 
     assert result["success"] is False
-    assert "Failed to list policies" in result["message"]
+    assert "Failed to list detection types ['policies']" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -549,7 +560,10 @@ async def test_get_detection_by_id_policy_not_found(mock_rest_client):
     result = await get_detection_by_id("nonexistent-policy", ["policies"])
 
     assert result["success"] is False
-    assert "No policie found with ID" in result["message"]
+    assert (
+        "No detection found with ID nonexistent-policy in any of the specified types"
+        in result["message"]
+    )
 
 
 @pytest.mark.asyncio
@@ -561,7 +575,7 @@ async def test_get_detection_by_id_policy_error(mock_rest_client):
     result = await get_detection_by_id(MOCK_POLICY["id"], ["policies"])
 
     assert result["success"] is False
-    assert "Failed to get policies details" in result["message"]
+    assert "Failed to get detection details for types ['policies']" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -570,8 +584,11 @@ async def test_list_detections_invalid_detection_type():
     result = await list_detections(["invalid_type"])
 
     assert result["success"] is False
-    assert "Invalid detection_type 'invalid_type'" in result["message"]
-    assert "Valid values are: rules, scheduled_rules, simple_rules, policies" in result["message"]
+    assert "Invalid detection_types ['invalid_type']" in result["message"]
+    assert (
+        "Valid values are: rules, scheduled_rules, simple_rules, policies"
+        in result["message"]
+    )
 
 
 @pytest.mark.asyncio
@@ -580,23 +597,106 @@ async def test_get_detection_by_id_invalid_detection_type():
     result = await get_detection_by_id("some-id", ["invalid_type"])
 
     assert result["success"] is False
-    assert "Invalid detection_type 'invalid_type'" in result["message"]
-    assert "Valid values are: rules, scheduled_rules, simple_rules, policies" in result["message"]
+    assert "Invalid detection_types ['invalid_type']" in result["message"]
+    assert (
+        "Valid values are: rules, scheduled_rules, simple_rules, policies"
+        in result["message"]
+    )
 
 
 @pytest.mark.asyncio
-async def test_list_detections_multiple_types():
-    """Test validation when multiple detection types are provided."""
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_multiple_types(mock_rest_client):
+    """Test listing multiple detection types."""
+
+    # Mock responses for both rules and policies
+    def side_effect(endpoint, **kwargs):
+        if endpoint == "/rules":
+            return (MOCK_RULES_RESPONSE, 200)
+        elif endpoint == "/policies":
+            return (MOCK_POLICIES_RESPONSE, 200)
+        else:
+            return ({"results": []}, 200)
+
+    mock_rest_client.get.side_effect = side_effect
+
     result = await list_detections(["rules", "policies"])
 
-    assert result["success"] is False
-    assert "Currently only single detection type queries are supported" in result["message"]
+    assert result["success"] is True
+    assert "rules" in result
+    assert "policies" in result
+    assert len(result["rules"]) == 2  # From MOCK_RULES_RESPONSE
+    assert len(result["policies"]) == 2  # From MOCK_POLICIES_RESPONSE
+    assert result["total_all_detections"] == 4
+    assert result["detection_types_queried"] == ["rules", "policies"]
+
+    # Should have called both endpoints
+    assert mock_rest_client.get.call_count == 2
 
 
 @pytest.mark.asyncio
-async def test_get_detection_by_id_multiple_types():
-    """Test validation when multiple detection types are provided."""
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_detection_by_id_multiple_types_found_in_one(mock_rest_client):
+    """Test getting detection by ID when found in one of multiple types."""
+
+    def side_effect(endpoint, **kwargs):
+        if "/rules/" in endpoint:
+            return (MOCK_RULE, 200)
+        else:
+            return ({}, 404)
+
+    mock_rest_client.get.side_effect = side_effect
+
+    result = await get_detection_by_id("some-id", ["rules", "policies"])
+
+    assert result["success"] is True
+    assert "rule" in result
+    assert "found_in_types" in result
+    assert "not_found_in_types" in result
+    assert result["found_in_types"] == ["rules"]
+    assert result["not_found_in_types"] == ["policies"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_detection_by_id_multiple_types_not_found(mock_rest_client):
+    """Test getting detection by ID when not found in any of multiple types."""
+    mock_rest_client.get.return_value = ({}, 404)
+
     result = await get_detection_by_id("some-id", ["rules", "policies"])
 
     assert result["success"] is False
-    assert "Currently only single detection type queries are supported" in result["message"]
+    assert (
+        "No detection found with ID some-id in any of the specified types"
+        in result["message"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_list_detections_empty_types():
+    """Test validation when no detection types are provided."""
+    result = await list_detections([])
+
+    assert result["success"] is False
+    assert "At least one detection type must be specified" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_get_detection_by_id_empty_types():
+    """Test validation when no detection types are provided."""
+    result = await get_detection_by_id("some-id", [])
+
+    assert result["success"] is False
+    assert "At least one detection type must be specified" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_list_detections_with_cursor_multiple_types():
+    """Test that cursor pagination is not supported with multiple types."""
+    result = await list_detections(["rules", "policies"], cursor="some-cursor")
+
+    assert result["success"] is False
+    assert (
+        "Cursor pagination is not supported when querying multiple detection types"
+        in result["message"]
+    )

@@ -6,3 +6,4 @@
 - Always update the __init__.py when adding new files in prompts, resources, or tools
 - Always update the @README.md when adding or updating tools, changing supported installations, and any user-facing information that's important
 - For developer-oriented instructions, always update @src/README.md
+- Always switch to feature branches
