@@ -1,17 +1,26 @@
 #!/bin/bash
-# Bundle dependencies for dxt extension
+# Bundle dependencies for dxt extension using complete virtual environment
 
 set -e
 
-echo "Bundling dependencies for dxt extension..."
+echo "Creating complete virtual environment for DXT extension..."
 
-# Use lib directory approach for better DXT compatibility
-# This avoids issues with Python executable symlinks and paths
-echo "Creating lib/ directory for dependency bundling..."
-rm -rf lib/
-mkdir -p lib/
+# Create server directory if it doesn't exist
+mkdir -p server
 
-# Export and install dependencies
+# Remove existing venv and create fresh one
+echo "Creating fresh virtual environment in server/venv/..."
+rm -rf server/venv/
+python3 -m venv --copies server/venv/
+
+# Activate the virtual environment
+source server/venv/bin/activate
+
+# Upgrade pip
+echo "Upgrading pip..."
+pip install --upgrade pip
+
+# Export dependencies from uv lock file
 echo "Exporting dependencies from lock file..."
 uv export --format requirements-txt --no-dev --output-file requirements-bundle.txt
 
@@ -19,33 +28,26 @@ uv export --format requirements-txt --no-dev --output-file requirements-bundle.t
 sed -i.bak '/^-e \./d' requirements-bundle.txt
 rm -f requirements-bundle.txt.bak
 
-echo "Installing dependencies to lib/ directory..."
-uv pip install --target lib/ --requirement requirements-bundle.txt
+# Install all dependencies into the virtual environment
+echo "Installing dependencies into virtual environment..."
+pip install --requirement requirements-bundle.txt
 
 # Clean up temporary requirements file
 rm -f requirements-bundle.txt
 
-# Alternative Method 2: Install only runtime dependencies directly from pyproject.toml
-# echo "Installing runtime dependencies from pyproject.toml..."
-# uv pip install --target lib/ --no-deps $(python -c "
-# import tomllib
-# with open('pyproject.toml', 'rb') as f:
-#     data = tomllib.load(f)
-#     deps = data.get('project', {}).get('dependencies', [])
-#     print(' '.join(deps))
-# ")
+# Set proper permissions for Python executables in the virtual environment
+echo "Setting executable permissions..."
+chmod +x server/venv/bin/python*
+chmod +x server/venv/bin/pip*
 
-# Alternative Method 3: Install project and dependencies (includes your source code)
-# echo "Installing project and dependencies..."
-# uv pip install --target lib/ .
-
-echo "Dependencies bundled successfully in lib/"
+echo "Virtual environment created successfully in server/venv/"
 echo "Total size:"
-du -sh lib/
+du -sh server/venv/
 
-# Create a simple test to verify the bundling worked
-echo "Testing bundled dependencies..."
-PYTHONPATH="lib:src" python3 -c "
+# Test the virtual environment
+echo "Testing virtual environment..."
+source server/venv/bin/activate
+python3 -c "
 try:
     import aiohttp
     import gql
@@ -56,11 +58,11 @@ try:
     import fastmcp
     import pydantic
     from pydantic_core import __version__ as pydantic_core_version
-    print('✓ All dependencies imported successfully')
+    print('✓ All dependencies imported successfully in venv')
     print(f'✓ Pydantic core version: {pydantic_core_version}')
 except ImportError as e:
     print(f'✗ Import error: {e}')
     exit(1)
 "
 
-echo "✓ Bundling complete and verified!"
+echo "✓ Virtual environment setup complete and verified!"

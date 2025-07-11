@@ -3,6 +3,17 @@ import logging
 import os
 import signal
 import sys
+from pathlib import Path
+
+# Setup Python path for DXT bundled dependencies
+script_dir = Path(__file__).parent.parent.parent
+lib_dir = script_dir / "lib"
+src_dir = script_dir / "src"
+
+if lib_dir.exists() and str(lib_dir) not in sys.path:
+    sys.path.insert(0, str(lib_dir))
+if src_dir.exists() and str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
 
 import click
 import uvicorn

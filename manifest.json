@@ -17,20 +17,18 @@
   "icon": "favicon.png",
   "server": {
     "type": "python",
-    "entry_point": "src/mcp_panther/server.py",
+    "entry_point": "server/mcp_panther/server.py",
     "runtime": {
       "python": ">=3.10.0"
     },
     "dependencies": {
       "bundled": true,
-      "bundle_path": "lib/",
-      "env_file": "mcp_config.env"
+      "bundle_path": "server/venv/"
     },
     "mcp_config": {
-      "command": "python3",
-      "args": ["${__dirname}/src/mcp_panther/server.py"],
+      "command": "${__dirname}/server/venv/bin/python",
+      "args": ["${__dirname}/server/mcp_panther/server.py"],
       "env": {
-        "PYTHONPATH": "${__dirname}/lib:${__dirname}/src",
         "PANTHER_INSTANCE_URL": "${user_config.PANTHER_INSTANCE_URL}",
         "PANTHER_API_TOKEN": "${user_config.PANTHER_API_TOKEN}"
       }
@@ -217,7 +215,7 @@
   "bundling": {
     "method": "dependencies",
     "script": "scripts/bundle-deps.sh",
-    "target": "lib/",
+    "target": "server/venv/",
     "reproducible": true,
     "lock_file": "uv.lock"
   }
