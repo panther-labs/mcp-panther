@@ -35,3 +35,6 @@ integration-test:
 # Bundle dependencies for dxt extension
 bundle-deps:
 	./scripts/bundle-deps.sh
+
+dxt: bundle-deps
+	dxt pack

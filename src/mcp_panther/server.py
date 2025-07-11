@@ -3,7 +3,6 @@ import logging
 import os
 import signal
 import sys
-from importlib.metadata import version
 
 import click
 import uvicorn
@@ -101,7 +100,6 @@ def handle_signals():
 
 
 @click.command()
-@click.version_option(version("mcp-panther"), "--version", "-v")
 @click.option(
     "--transport",
     type=click.Choice(["stdio", "sse"]),
@@ -177,4 +175,7 @@ def main(transport: str, compat_mode: bool, port: int, host: str, log_file: str 
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        os._exit(0)  # Force immediate exit

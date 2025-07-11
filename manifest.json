@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "mcp-panther",
   "version": "1.1.0",
-  "description": "Connect LLMs to Panther's security platform for interactive rule writing, log querying, and alert management through natural language.",
+  "description": "Integrate Claude with Panther's security platform for interactive rule writing, log querying, and alert management through natural language.",
   "display_name": "Panther MCP Server",
   "author": {
     "name": "Panther Labs Inc",
