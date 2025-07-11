@@ -174,3 +174,7 @@ def main(transport: str, compat_mode: bool, port: int, host: str, log_file: str 
         logger.info("Starting Panther MCP Server with stdio transport")
         # Let FastMCP handle all the asyncio details internally
         mcp.run()
+
+
+if __name__ == "__main__":
+    main()
