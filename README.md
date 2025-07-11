@@ -51,17 +51,12 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
+| `list_detections` | List detections from Panther with support for different detection types. Accepts a list with one detection type: ["rules"], ["scheduled_rules"], ["simple_rules"], or ["policies"] | "Show me all enabled rules" / "List all policies for AWS resources" |
+| `get_detection_by_id` | Get detailed information about a specific detection including the detection body and tests. Accepts a list with one detection type: ["rules"], ["scheduled_rules"], ["simple_rules"], or ["policies"] | "Get details for rule ID abc123" / "Get details for policy ID AWS.S3.Bucket.PublicReadACP" |
 | `disable_rule` | Disable a rule by setting enabled to false | "Disable rule abc123" |
+| `put_rule` | Update an existing rule or create a new one | "Update rule abc123 with new severity HIGH" |
 | `get_global_helper_by_id` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
-| `get_policy_by_id` | Get detailed information about a specific policy | "Get details for policy ID AWS.S3.Bucket.PublicReadACP" |
-| `get_rule_by_id` | Get detailed information about a specific rule | "Get details for rule ID abc123" |
-| `get_scheduled_rule_by_id` | Get detailed information about a specific scheduled rule | "Get details for scheduled rule abc123" |
-| `get_simple_rule_by_id` | Get detailed information about a specific simple rule | "Get details for simple rule abc123" |
 | `list_global_helpers` | List all Panther global helpers with optional pagination | "Show me all global helpers for CrowdStrike events" |
-| `list_policies` | List all Panther policies with optional pagination | "Show me all policies for AWS resources" |
-| `list_rules` | List all Panther rules with optional pagination | "Show me all enabled rules" |
-| `list_scheduled_rules` | List all scheduled rules with optional pagination | "List all scheduled rules in Panther" |
-| `list_simple_rules` | List all simple rules with optional pagination | "Show me all simple rules in Panther" |
 | `list_data_models` | List data models that control UDM mappings in rules | "Show me all data models for log parsing" |
 | `get_data_model_by_id` | Get detailed information about a specific data model | "Get the complete details for the 'AWS_CloudTrail' data model" |
 | `list_globals` | List global helper functions with filtering options | "Show me global helpers containing 'aws' in the name" |
