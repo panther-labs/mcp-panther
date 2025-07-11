@@ -30,7 +30,7 @@
       "command": "python3",
       "args": ["-m", "mcp_panther.server"],
       "env": {
-        "PYTHONPATH": "lib:src"
+        "PYTHONPATH": "${DXT_EXTENSION_PATH}/lib:${DXT_EXTENSION_PATH}/src"
       }
     }
   },
