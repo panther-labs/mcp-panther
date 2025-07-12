@@ -227,13 +227,11 @@ async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
     """Get detailed information about a specific Panther alert by ID"""
     logger.info(f"Fetching alert details for ID: {alert_id}")
     try:
-        client = await _create_panther_client()
-
         # Prepare input variables
         variables = {"id": alert_id}
 
         # Execute the query asynchronously
-        async with client as session:
+        async with await _create_panther_client() as session:
             result = await session.execute(
                 GET_ALERT_BY_ID_QUERY, variable_values=variables
             )
