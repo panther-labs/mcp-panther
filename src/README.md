@@ -45,8 +45,6 @@ Or add the following to your MCP client configuration:
         "--with",
         "fastmcp",
         "--with",
-        "anyascii",
-        "--with",
         "aiohttp",
         "--with",
         "gql[aiohttp]",

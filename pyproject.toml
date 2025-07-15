@@ -25,7 +25,6 @@ classifiers = [
 keywords = ["security", "ai", "mcp", "mcp-server", "panther"]
 dependencies = [
     "aiohttp>=3.11.14",
-    "anyascii>=0.3.2",
     "gql>=3.5.2",
     "mcp[cli]>=1.6.0",
     "click>=8.1.0",

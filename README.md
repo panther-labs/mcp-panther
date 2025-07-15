@@ -37,7 +37,6 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `get_data_lake_query_results` | Get results from a previously executed data lake query | "Get results for query ID abc123" |
 | `list_data_lake_queries` | List previously executed data lake queries with comprehensive filtering options | "Show me all running queries from the last hour" |
 | `cancel_data_lake_query` | Cancel a running data lake query to free up resources and prevent system overload | "Cancel query abc123 that's taking too long" |
-| `get_sample_log_events` | Get a sample of 10 recent events for a specific log type | "Show me sample events from AWS_CLOUDTRAIL logs" |
 | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
 | `list_databases` | List all available data lake databases in Panther | "List all available databases" |
 | `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
@@ -62,7 +61,6 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `list_rules` | List all Panther rules with optional pagination | "Show me all enabled rules" |
 | `list_scheduled_rules` | List all scheduled rules with optional pagination | "List all scheduled rules in Panther" |
 | `list_simple_rules` | List all simple rules with optional pagination | "Show me all simple rules in Panther" |
-| `put_rule` | Update an existing rule or create a new one | "Update rule abc123 with new severity HIGH" |
 | `list_data_models` | List data models that control UDM mappings in rules | "Show me all data models for log parsing" |
 | `get_data_model_by_id` | Get detailed information about a specific data model | "Get the complete details for the 'AWS_CloudTrail' data model" |
 | `list_globals` | List global helper functions with filtering options | "Show me global helpers containing 'aws' in the name" |
@@ -104,17 +102,9 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 </details>
 
-## Security Best Practices
-
-Panther highly recommends the following MCP best practices:
-
-- **Run only trusted, officially signed MCP servers.** Verify digital signatures or checksums before running, audit the tool code, and avoid community tools from unofficial publishers.
-- **Apply strict least-privilege to Panther API tokens.** Scope tokens to the minimal permissions required and bind them to an IP allow-list or CIDR range so they're useless if exfiltrated. Rotate credentials on a preferred interval (e.g., every 30d).
-- **Host the MCP server in a locked-down sandbox (e.g., Docker) with read-only mounts.** This confines any compromise to a minimal blast radius.
-- **Monitor credential access to Panther and monitor for anomalies.** Write a Panther rule!
-- **Scan MCP servers with `mcp-scan`.** Utilize the `mcp-scan` tool by [invariantlabs](https://github.com/invariantlabs-ai/mcp-scan) for common vulnerabilities.
-
 ## Panther Configuration
+
+**Follow these steps to configure your API credentials and environment.**
 
 1. Create an API token in Panther:
    - Navigate to Settings (gear icon) → API Tokens
@@ -127,16 +117,16 @@ Panther highly recommends the following MCP best practices:
 
      </details>
 
-2. Store the generated token securely (e.g., in 1Password)
+2. Store the generated token securely (e.g., 1Password)
 
-3. Grab the Panther instance URL from your browser (e.g., `https://YOUR-PANTHER-INSTANCE.domain`)
+3. Copy the Panther instance URL from your browser (e.g., `https://YOUR-PANTHER-INSTANCE.domain`)
     - Note: This must include `https://`
 
-## MCP Installation
+## MCP Server Installation
 
 **Choose one of the following installation methods:**
 
-### Docker Setup (Recommended)
+### Docker (Recommended)
 The easiest way to get started is using our pre-built Docker image:
 
 ```json
@@ -161,7 +151,7 @@ The easiest way to get started is using our pre-built Docker image:
 }
 ```
 
-### UVX Setup
+### UVX
 For Python users, you can run directly from PyPI using uvx:
 
 1. [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
@@ -182,7 +172,7 @@ For Python users, you can run directly from PyPI using uvx:
 }
 ```
 
-## Client Setup
+## MCP Client Setup
 
 ### Cursor
 [Follow the instructions here](https://docs.cursor.com/context/model-context-protocol#configuring-mcp-servers) to configure your project or global MCP configuration. **It's VERY IMPORTANT that you do not check this file into version control.**
@@ -230,6 +220,15 @@ goose session --with-extension "uvx mcp-panther --compat-mode"
 ```
 
 The `--compat-mode` flag enables compatibility mode for broader MCP client support, especially for clients using older MCP versions that may not support all the latest features.
+
+## Security Best Practices
+
+We highly recommends the following MCP security best practices:
+
+- **Apply strict least-privilege to Panther API tokens.** Scope tokens to the minimal permissions required and bind them to an IP allow-list or CIDR range so they're useless if exfiltrated. Rotate credentials on a preferred interval (e.g., every 30d).
+- **Host the MCP server in a locked-down sandbox (e.g., Docker) with read-only mounts.** This confines any compromise to a minimal blast radius.
+- **Monitor credential access to Panther and monitor for anomalies.** Write a Panther rule!
+- **Run only trusted, officially signed MCP servers.** Verify digital signatures or checksums before running, audit the tool code, and avoid community tools from unofficial publishers.
 
 ## Troubleshooting
 

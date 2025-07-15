@@ -71,7 +71,6 @@ except ImportError:
 deps = [
     "gql[aiohttp]",
     "aiohttp",
-    "anyascii",
 ]
 
 if USE_LEGACY_MCP:

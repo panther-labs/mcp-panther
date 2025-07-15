@@ -8,7 +8,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Dict, List
 
-import anyascii
 from pydantic import Field
 
 from ..client import _create_panther_client, get_today_date_range, graphql_date_format
@@ -146,7 +145,7 @@ async def execute_data_lake_query(
     ],
     database_name: str = "panther_logs.public",
 ) -> Dict[str, Any]:
-    """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. For simple log sampling, use get_sample_log_events instead. The query must follow Snowflake SQL syntax (e.g., use field:nested_field instead of field.nested_field).
+    """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. The query must follow Snowflake SQL syntax (e.g., use field:nested_field instead of field.nested_field).
 
     WORKFLOW:
     1. First call get_table_schema to understand the schema
@@ -541,167 +540,6 @@ async def get_table_schema(
             "success": False,
             "message": f"Failed to get columns for table: {str(e)}",
         }
-
-
-@mcp_tool(
-    annotations={
-        "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
-        "readOnlyHint": True,
-    }
-)
-async def get_sample_log_events(
-    schema_name: Annotated[
-        str,
-        Field(
-            description="The schema name to query for sample log events",
-            examples=["Panther.Audit"],
-        ),
-    ],
-) -> Dict[str, Any]:
-    """Get a sample of 10 log events for a specific log type from the panther_logs.public database.
-
-    This function is the RECOMMENDED tool for quickly exploring sample log data with minimal effort.
-
-    This function constructs a SQL query to fetch recent sample events and executes it against
-    the data lake. The query automatically filters events from the last 7 days to ensure quick results.
-
-    NOTE: After calling this function, you MUST call get_data_lake_query_results with the returned
-    query_id to retrieve the actual log events.
-
-    Example usage:
-        # Step 1: Get query_id for sample events
-        result = get_sample_log_events(schema_name="Panther.Audit")
-
-        # Step 2: Retrieve the actual results using the query_id
-        events = get_data_lake_query_results(query_id=result["query_id"])
-
-        # Step 3: Display results in a markdown table format
-
-    Returns:
-        Dict containing:
-        - success: Boolean indicating if the query was successful
-        - query_id: ID of the executed query for retrieving results with get_data_lake_query_results
-        - message: Error message if unsuccessful
-
-    Post-processing:
-        After retrieving results, it's recommended to:
-        1. Display data in a table format (using artifacts for UI display)
-        2. Provide sample JSON for a single record to show complete structure
-        3. Highlight key fields and patterns across records
-    """
-
-    logger.info(f"Fetching sample log events for schema: {schema_name}")
-
-    database_name = "panther_logs.public"
-    table_name = _normalize_name(schema_name)
-
-    try:
-        sql = f"""
-        SELECT *
-        FROM {database_name}.{table_name}
-        WHERE p_event_time >= DATEADD(day, -7, CURRENT_TIMESTAMP())
-        ORDER BY p_event_time DESC
-        LIMIT 10
-        """
-
-        result = await execute_data_lake_query(sql=sql, database_name=database_name)
-
-        return result
-    except Exception as e:
-        logger.error(f"Failed to fetch sample log events: {str(e)}")
-        return {
-            "success": False,
-            "message": f"Failed to fetch sample log events: {str(e)}",
-        }
-
-
-transliterate_chars = {
-    "@": "at_sign",
-    ",": "comma",
-    "`": "backtick",
-    "'": "apostrophe",
-    "$": "dollar_sign",
-    "*": "asterisk",
-    "&": "ampersand",
-    "!": "exclamation",
-    "%": "percent",
-    "+": "plus",
-    "/": "slash",
-    "\\": "backslash",
-    "#": "hash",
-    "~": "tilde",
-    "=": "eq",
-}
-
-number_to_word = {
-    "0": "zero",
-    "1": "one",
-    "2": "two",
-    "3": "three",
-    "4": "four",
-    "5": "five",
-    "6": "six",
-    "7": "seven",
-    "8": "eight",
-    "9": "nine",
-}
-
-
-def _is_name_normalized(name):
-    """Check if a table name is already normalized"""
-    if not re.match(r"^[a-zA-Z_-][a-zA-Z0-9_-]*$", name):
-        return False
-
-    return True
-
-
-def _normalize_name(name):
-    """Normalize a table name"""
-    if _is_name_normalized(name):
-        return name
-
-    result = []
-    characters = list(name)
-    last = len(characters) - 1
-
-    for i, c in enumerate(characters):
-        if "a" <= c <= "z" or "A" <= c <= "Z":
-            # Allow uppercase and lowercase letters
-            result.append(c)
-        elif "0" <= c <= "9":
-            if i == 0:
-                # Convert numbers at the start of the string to words
-                result.append(number_to_word[c])
-                result.append("_")
-            else:
-                # Allow numbers beyond the first character
-                result.append(c)
-        elif c == "_" or c == "-":
-            # Allow underscores and hyphens
-            result.append(c)
-        else:
-            # Check if we have a specific transliteration for this character
-            if c in transliterate_chars:
-                if i > 0:
-                    result.append("_")
-
-                result.append(transliterate_chars[c])
-
-                if i < last:
-                    result.append("_")
-                continue
-
-            # Try to handle non-ASCII letters
-            if ord(c) > 127:
-                transliterated = anyascii.anyascii(c)
-                if transliterated and transliterated != "'" and transliterated != " ":
-                    result.append(transliterated)
-                    continue
-
-            # Fallback to underscore
-            result.append("_")
-
-    return "".join(result)
 
 
 @mcp_tool(

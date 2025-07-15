@@ -82,15 +82,6 @@ wheels = [
 ]
 
 [[package]]
-name = "anyascii"
-version = "0.3.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9f/52/93b9ea99063f7cf37fb67f5e3f49480686cbe7f228c48b9d713326223b6e/anyascii-0.3.2.tar.gz", hash = "sha256:9d5d32ef844fe225b8bc7cba7f950534fae4da27a9bf3a6bea2cb0ea46ce4730", size = 214052 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4f/7b/a9a747e0632271d855da379532b05a62c58e979813814a57fa3b3afeb3a4/anyascii-0.3.2-py3-none-any.whl", hash = "sha256:3b3beef6fc43d9036d3b0529050b0c48bfad8bc960e9e562d7223cfb94fe45d4", size = 289923 },
-]
-
-[[package]]
 name = "anyio"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -414,7 +405,6 @@ version = "1.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
-    { name = "anyascii" },
     { name = "click" },
     { name = "fastmcp" },
     { name = "gql" },
@@ -435,7 +425,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.14" },
-    { name = "anyascii", specifier = ">=0.3.2" },
     { name = "click", specifier = ">=8.1.0" },
     { name = "fastmcp", specifier = ">=2.3.3" },
     { name = "gql", specifier = ">=3.5.2" },
