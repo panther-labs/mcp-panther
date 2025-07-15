@@ -3,74 +3,14 @@ from unittest.mock import patch
 
 from mcp_panther.panther_mcp_core.tools.data_lake import (
     QueryStatus,
-    _is_name_normalized,
-    _normalize_name,
     _cancel_data_lake_query,
     execute_data_lake_query,
-    get_sample_log_events,
 )
 from tests.utils.helpers import patch_graphql_client
 
 DATA_LAKE_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.data_lake"
 
 MOCK_QUERY_ID = "query-123456789"
-
-
-@pytest.mark.asyncio
-@patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_get_sample_log_events_success(mock_graphql_client):
-    """Test successful retrieval of sample log events."""
-    mock_graphql_client.execute.return_value = {
-        "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
-    }
-    with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_res:
-        mock_res.return_value = {
-            "success": True,
-            "status": "succeeded",
-            "results": [],
-            "column_info": {},
-            "stats": {},
-            "has_next_page": False,
-            "end_cursor": None,
-            "message": "Query executed successfully",
-        }
-
-        result = await get_sample_log_events(log_type="AWS.CloudTrail")
-
-    assert result["success"] is True
-    assert result["status"] == "succeeded"
-
-    mock_graphql_client.execute.assert_called_once()
-    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
-    assert "panther_logs.public" in call_args["input"]["databaseName"]
-    assert "AWS_CloudTrail" in call_args["input"]["sql"]
-    assert "p_event_time" in call_args["input"]["sql"]
-    assert "LIMIT 10" in call_args["input"]["sql"]
-
-
-@pytest.mark.asyncio
-@patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_get_sample_log_events_error(mock_graphql_client):
-    """Test handling of errors when getting sample log events."""
-    mock_graphql_client.execute.side_effect = Exception("Test error")
-
-    result = await get_sample_log_events(log_type="AWS.CloudTrail")
-
-    assert result["success"] is False
-    assert "Failed to execute data lake query" in result["message"]
-    assert "Test error" in result["message"]
-
-
-@pytest.mark.asyncio
-@patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_get_sample_log_events_no_query_id(mock_graphql_client):
-    """Test handling when no query ID is returned."""
-    mock_graphql_client.execute.return_value = {}
-
-    result = await get_sample_log_events(log_type="AWS.CloudTrail")
-
-    assert result["success"] is False
-    assert "No query ID returned" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -232,62 +172,6 @@ async def test_execute_data_lake_query_invalid_event_time_usage(mock_graphql_cli
             in result["message"]
         )
         mock_graphql_client.execute.assert_not_called()
-
-
-def test_normalize_name():
-    test_cases = [
-        {"input": "@foo", "expected": "at_sign_foo"},
-        {"input": "CrAzY-tAbLe", "expected": "CrAzY-tAbLe"},
-        {"input": "U2", "expected": "U2"},
-        {"input": "2LEGIT-2QUIT", "expected": "two_LEGIT-2QUIT"},
-        {"input": "foo,bar", "expected": "foo_comma_bar"},
-        {"input": "`foo`", "expected": "backtick_foo_backtick"},
-        {"input": "'foo'", "expected": "apostrophe_foo_apostrophe"},
-        {"input": "foo.bar", "expected": "foo_bar"},
-        {"input": "AWS.CloudTrail", "expected": "AWS_CloudTrail"},
-        {"input": ".foo", "expected": "_foo"},
-        {"input": "foo-bar", "expected": "foo-bar"},
-        {"input": "$foo", "expected": "dollar_sign_foo"},
-        {"input": "Μύκονοοοος", "expected": "Mykonoooos"},
-        {"input": "fooʼn", "expected": "foo_n"},
-        {"input": "foo\\bar", "expected": "foo_backslash_bar"},
-        {"input": "<foo>bar", "expected": "_foo_bar"},
-    ]
-
-    for tc in test_cases:
-        col_name = _normalize_name(tc["input"])
-        assert col_name == tc["expected"], (
-            f"Input: {tc['input']}, Expected: {tc['expected']}, Got: {col_name}"
-        )
-
-
-def test_is_normalized():
-    test_cases = [
-        {"input": "@foo", "expected": False},
-        {"input": "CrAzY-tAbLe", "expected": True},
-        {"input": "U2", "expected": True},
-        {"input": "2LEGIT-2QUIT", "expected": False},
-        {"input": "foo,bar", "expected": False},
-        {"input": "`foo`", "expected": False},
-        {"input": "'foo'", "expected": False},
-        {"input": "foo.bar", "expected": False},
-        {"input": ".foo", "expected": False},
-        {"input": "foo-bar", "expected": True},
-        {"input": "foo_bar", "expected": True},
-        {"input": "$foo", "expected": False},
-        {"input": "Μύκονοοοος", "expected": False},
-        {"input": "fooʼn", "expected": False},
-        {"input": "foo\\bar", "expected": False},
-        {"input": "<foo>bar", "expected": False},
-    ]
-
-    for tc in test_cases:
-        result = _is_name_normalized(tc["input"])
-        assert result == tc["expected"], (
-            f"Input: {tc['input']}, Expected:  {tc['expected']}, Got: {result}"
-        )
-
-
 
 
 @pytest.mark.asyncio
