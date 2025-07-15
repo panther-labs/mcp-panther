@@ -167,7 +167,7 @@ async def execute_data_lake_query(
     timeout: Annotated[
         int,
         Field(
-            description="Timeout before the SQL query is cancelled. If the query fails due to timeout, the caller should consider a longer timeout."
+            description="Timeout in seconds before the SQL query is cancelled. If the query fails due to timeout, the caller should consider a longer timeout."
         ),
     ] = 30,
 ) -> Dict[str, Any]:
