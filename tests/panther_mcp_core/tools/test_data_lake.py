@@ -5,6 +5,11 @@ from mcp_panther.panther_mcp_core.tools.data_lake import (
     QueryStatus,
     _cancel_data_lake_query,
     execute_data_lake_query,
+<<<<<<< HEAD
+=======
+    list_data_lake_queries,
+    wrap_reserved_words,
+>>>>>>> fc27393 (Add SQL reserved word processing to data lake queries)
 )
 from tests.utils.helpers import patch_graphql_client
 
@@ -192,3 +197,146 @@ async def test_cancel_data_lake_query_success(mock_graphql_client):
     assert call_args["input"]["id"] == "query123"
 
 
+<<<<<<< HEAD
+=======
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_cancel_data_lake_query_not_found(mock_graphql_client):
+    """Test cancellation of a non-existent query."""
+    mock_graphql_client.execute.side_effect = Exception("Query not found")
+
+    result = await cancel_data_lake_query("nonexistent")
+
+    assert result["success"] is False
+    assert "not found" in result["message"]
+    assert "already completed or been cancelled" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_cancel_data_lake_query_cannot_cancel(mock_graphql_client):
+    """Test cancellation of a query that cannot be cancelled."""
+    mock_graphql_client.execute.side_effect = Exception("Query cannot be cancelled")
+
+    result = await cancel_data_lake_query("completed_query")
+
+    assert result["success"] is False
+    assert "cannot be cancelled" in result["message"]
+    assert "Only running queries" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_cancel_data_lake_query_permission_error(mock_graphql_client):
+    """Test cancellation with permission error."""
+    mock_graphql_client.execute.side_effect = Exception("Permission denied")
+
+    result = await cancel_data_lake_query("query123")
+
+    assert result["success"] is False
+    assert "Permission denied" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_cancel_data_lake_query_no_id_returned(mock_graphql_client):
+    """Test cancellation when no ID is returned."""
+    mock_response = {"cancelDataLakeQuery": {}}
+    mock_graphql_client.execute.return_value = mock_response
+
+    result = await cancel_data_lake_query("query123")
+
+    assert result["success"] is False
+    assert "No query ID returned" in result["message"]
+
+
+# Reserved Words Tests
+
+
+def test_wrap_reserved_words_basic():
+    """Test basic reserved word wrapping."""
+    test_cases = [
+        {
+            "input": "SELECT eventName as 'select', awsRegion as 'from' FROM aws_cloudtrail",
+            "expected_contains": ['"select"', '"from"'],
+        },
+        {
+            "input": "SELECT 'table', 'column', 'index' FROM aws_cloudtrail",
+            "expected_contains": ['"table"', '"column"', '"index"'],
+        },
+        {
+            "input": "SELECT eventName FROM aws_cloudtrail WHERE 'where' > 100",
+            "expected_contains": ['"where"'],
+        },
+    ]
+
+    for case in test_cases:
+        result = wrap_reserved_words(case["input"])
+        for expected in case["expected_contains"]:
+            assert expected in result, f"Expected '{expected}' in result: {result}"
+
+
+def test_wrap_reserved_words_preserves_non_reserved():
+    """Test that non-reserved words are not modified."""
+    sql = "SELECT eventName FROM aws_cloudtrail WHERE eventTime > '2024-01-01'"
+    result = wrap_reserved_words(sql)
+
+    # Should not quote non-reserved words
+    assert '"2024-01-01"' not in result
+    assert "'2024-01-01'" in result
+
+
+def test_wrap_reserved_words_complex_query():
+    """Test reserved words in complex queries."""
+    sql = """
+    SELECT eventName as 'select', awsRegion as 'from'
+    FROM aws_cloudtrail 
+    WHERE p_event_time >= CURRENT_TIMESTAMP() - INTERVAL '1 DAY'
+    ORDER BY 'select', 'from'
+    """
+
+    result = wrap_reserved_words(sql)
+    assert '"select"' in result
+    assert '"from"' in result
+    # Keywords used as SQL commands should not be quoted
+    assert "SELECT" in result
+    assert "FROM" in result
+    assert "WHERE" in result
+
+
+def test_wrap_reserved_words_handles_errors():
+    """Test that function handles malformed SQL gracefully."""
+    malformed_sql = "SELECT FROM WHERE ((("
+    result = wrap_reserved_words(malformed_sql)
+    # Should return original SQL if parsing fails
+    assert result == malformed_sql
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_execute_data_lake_query_with_reserved_words_processing(
+    mock_graphql_client,
+):
+    """Test that execute_data_lake_query processes reserved words."""
+    mock_graphql_client.execute.return_value = {
+        "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+    }
+
+    # SQL with single-quoted reserved words that should be converted to double-quoted
+    sql = "SELECT eventName as 'select', awsRegion as 'from' FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
+    result = await execute_data_lake_query(sql)
+
+    assert result["success"] is True
+    assert result["query_id"] == MOCK_QUERY_ID
+
+    # Verify the SQL was processed for reserved words
+    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    processed_sql = call_args["input"]["sql"]
+
+    # Should have converted single-quoted reserved words to double-quoted
+    assert '"select"' in processed_sql
+    assert '"from"' in processed_sql
+    # Should not contain single-quoted reserved words
+    assert "'select'" not in processed_sql
+    assert "'from'" not in processed_sql
+>>>>>>> fc27393 (Add SQL reserved word processing to data lake queries)

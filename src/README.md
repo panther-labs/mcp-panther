@@ -21,6 +21,16 @@ This guide provides instructions for developers working on the MCP Panther proje
 
 The MCP Panther project is a server implementation for the Model Control Protocol (MCP) that provides integration with Panther Labs services.
 
+### Dependencies
+
+The project includes several key dependencies:
+
+- **FastMCP**: Core MCP server framework
+- **GQL**: GraphQL client for Panther API communication
+- **SQLParse**: SQL parsing library for reserved word processing in data lake queries
+- **Pydantic**: Data validation and serialization
+- **Uvicorn/Starlette**: ASGI server components
+
 ## Testing Changes
 
 ### Manual Testing
@@ -44,6 +54,8 @@ Or add the following to your MCP client configuration:
         "run",
         "--with",
         "fastmcp",
+        "--with",
+        "sqlparse",
         "--with",
         "aiohttp",
         "--with",
