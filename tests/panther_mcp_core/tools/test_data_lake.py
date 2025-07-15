@@ -4,6 +4,7 @@ from mcp_panther.panther_mcp_core.tools.data_lake import (
     QueryStatus,
     _is_name_normalized,
     _normalize_name,
+    _validate_and_wrap_reserved_words,
     cancel_data_lake_query,
     execute_data_lake_query,
     get_sample_log_events,
@@ -211,9 +212,9 @@ def test_normalize_name():
 
     for tc in test_cases:
         col_name = _normalize_name(tc["input"])
-        assert col_name == tc["expected"], (
-            f"Input: {tc['input']}, Expected: {tc['expected']}, Got: {col_name}"
-        )
+        assert (
+            col_name == tc["expected"]
+        ), f"Input: {tc['input']}, Expected: {tc['expected']}, Got: {col_name}"
 
 
 def test_is_normalized():
@@ -238,9 +239,9 @@ def test_is_normalized():
 
     for tc in test_cases:
         result = _is_name_normalized(tc["input"])
-        assert result == tc["expected"], (
-            f"Input: {tc['input']}, Expected:  {tc['expected']}, Got: {result}"
-        )
+        assert (
+            result == tc["expected"]
+        ), f"Input: {tc['input']}, Expected:  {tc['expected']}, Got: {result}"
 
 
 @pytest.mark.asyncio
@@ -414,3 +415,284 @@ async def test_cancel_data_lake_query_no_id_returned(mock_graphql_client):
 
     assert result["success"] is False
     assert "No query ID returned" in result["message"]
+
+
+# Reserved Words Validation Tests
+
+
+def test_validate_and_wrap_reserved_words_forbidden_scalar_expressions():
+    """Test that forbidden scalar expression words are properly blocked."""
+    forbidden_queries = [
+        "SELECT eventName as 'true' FROM aws_cloudtrail",
+        "SELECT eventName as 'false' FROM aws_cloudtrail",
+        "SELECT eventName as 'case' FROM aws_cloudtrail",
+        "SELECT eventName as 'cast' FROM aws_cloudtrail",
+        "SELECT eventName as 'try_cast' FROM aws_cloudtrail",
+        "SELECT eventName as 'when' FROM aws_cloudtrail",
+        # Mixed case
+        "SELECT eventName as 'True' FROM aws_cloudtrail",
+        "SELECT eventName as 'FALSE' FROM aws_cloudtrail",
+        "SELECT eventName as 'Case' FROM aws_cloudtrail",
+        # In double quotes
+        'SELECT eventName as "TRUE" FROM aws_cloudtrail',
+        'SELECT eventName as "cast" FROM aws_cloudtrail',
+    ]
+
+    for sql in forbidden_queries:
+        with pytest.raises(ValueError) as exc_info:
+            _validate_and_wrap_reserved_words(sql)
+        assert "Query contains forbidden keyword usage" in str(exc_info.value)
+        assert "cannot be used as column reference" in str(exc_info.value)
+
+
+def test_validate_and_wrap_reserved_words_forbidden_column_names():
+    """Test that forbidden column names are properly blocked."""
+    forbidden_queries = [
+        "SELECT 'current_user' FROM aws_cloudtrail",
+        "SELECT 'LOCALTIME' FROM aws_cloudtrail",
+        "SELECT 'localtimestamp' FROM aws_cloudtrail",
+        # Mixed case
+        "SELECT 'Current_User' FROM aws_cloudtrail",
+        "SELECT 'LocalTime' FROM aws_cloudtrail",
+    ]
+
+    for sql in forbidden_queries:
+        with pytest.raises(ValueError) as exc_info:
+            _validate_and_wrap_reserved_words(sql)
+        assert "Query contains forbidden keyword usage" in str(exc_info.value)
+        assert "cannot be used as column name" in str(exc_info.value)
+
+
+def test_validate_and_wrap_reserved_words_basic_reserved_words():
+    """Test that basic reserved words are properly quoted."""
+    test_cases = [
+        {
+            "input": "SELECT eventName as 'select', awsRegion as 'from' FROM aws_cloudtrail",
+            "expected_contains": ['"select"', '"from"'],
+        },
+        {
+            "input": "SELECT eventName as 'where', sourceIP as 'order' FROM aws_cloudtrail",
+            "expected_contains": ['"where"', '"order"'],
+        },
+        {
+            "input": "SELECT 'table', 'column', 'index' FROM aws_cloudtrail",
+            "expected_contains": ['"table"', '"column"', '"index"'],
+        },
+        {
+            "input": "SELECT eventName as 'update', 'insert', 'delete' FROM aws_cloudtrail",
+            "expected_contains": ['"update"', '"insert"', '"delete"'],
+        },
+        {
+            "input": "SELECT 'alter', 'drop', 'create' FROM aws_cloudtrail",
+            "expected_contains": ['"alter"', '"drop"', '"create"'],
+        },
+        {
+            "input": "SELECT 'join', 'left', 'right', 'union' FROM aws_cloudtrail",
+            "expected_contains": ['"join"', '"left"', '"right"', '"union"'],
+        },
+    ]
+
+    for case in test_cases:
+        result = _validate_and_wrap_reserved_words(case["input"])
+        for expected in case["expected_contains"]:
+            assert expected in result, f"Expected '{expected}' in result: {result}"
+
+
+def test_validate_and_wrap_reserved_words_mixed_case():
+    """Test that reserved words are handled regardless of case."""
+    test_cases = [
+        {
+            "input": "SELECT eventName as 'Select', 'From', 'WHERE' FROM aws_cloudtrail",
+            "expected_contains": ['"Select"', '"From"', '"WHERE"'],
+        },
+        {
+            "input": "SELECT 'Table', 'Column', 'INDEX' FROM aws_cloudtrail",
+            "expected_contains": ['"Table"', '"Column"', '"INDEX"'],
+        },
+    ]
+
+    for case in test_cases:
+        result = _validate_and_wrap_reserved_words(case["input"])
+        for expected in case["expected_contains"]:
+            assert expected in result, f"Expected '{expected}' in result: {result}"
+
+
+def test_validate_and_wrap_reserved_words_preserves_functions():
+    """Test that SQL functions are preserved without quoting."""
+    test_cases = [
+        {
+            "input": "SELECT CURRENT_TIMESTAMP(), COUNT(*), MAX(eventTime) FROM aws_cloudtrail",
+            "expected_preserved": ["CURRENT_TIMESTAMP()", "COUNT(*)", "MAX(eventTime)"],
+        },
+        {
+            "input": "SELECT DATEADD('day', -1, CURRENT_TIMESTAMP()) as yesterday FROM aws_cloudtrail",
+            "expected_preserved": ["DATEADD('day', -1, CURRENT_TIMESTAMP())"],
+        },
+        {
+            "input": "SELECT DISTINCT eventName, TRY_CAST(sourceIP as STRING) FROM aws_cloudtrail",
+            "expected_preserved": ["DISTINCT", "TRY_CAST(sourceIP as STRING)"],
+        },
+    ]
+
+    for case in test_cases:
+        result = _validate_and_wrap_reserved_words(case["input"])
+        for expected in case["expected_preserved"]:
+            assert (
+                expected in result
+            ), f"Expected function '{expected}' to be preserved in: {result}"
+
+
+def test_validate_and_wrap_reserved_words_complex_queries():
+    """Test reserved words handling in complex queries."""
+    test_cases = [
+        {
+            "input": """
+                SELECT eventName as 'select', awsRegion as 'from' 
+                FROM aws_cloudtrail 
+                WHERE p_event_time >= CURRENT_TIMESTAMP() - INTERVAL '1 DAY' 
+                ORDER BY 'select', 'from'
+            """,
+            "expected_contains": ['"select"', '"from"'],
+            "expected_preserved": ["CURRENT_TIMESTAMP()", "ORDER BY", "WHERE"],
+        },
+        {
+            "input": """
+                WITH 'with' AS (
+                    SELECT eventName as 'case', COUNT(*) as 'count' 
+                    FROM aws_cloudtrail 
+                    GROUP BY 'case'
+                ) 
+                SELECT 'case', 'count' FROM 'with' ORDER BY 'count'
+            """,
+            "expected_contains": ['"with"', '"case"', '"count"'],
+            "expected_preserved": ["WITH", "AS", "GROUP BY", "ORDER BY"],
+        },
+    ]
+
+    for case in test_cases:
+        result = _validate_and_wrap_reserved_words(case["input"])
+
+        for expected in case["expected_contains"]:
+            assert expected in result, f"Expected '{expected}' in result: {result}"
+
+        for preserved in case["expected_preserved"]:
+            assert (
+                preserved in result
+            ), f"Expected '{preserved}' to be preserved in: {result}"
+
+
+def test_validate_and_wrap_reserved_words_subqueries():
+    """Test reserved words handling in subqueries."""
+    sql = """
+        SELECT 'alter' FROM (
+            SELECT eventSource as 'alter', COUNT(*) as 'drop' 
+            FROM aws_cloudtrail 
+            GROUP BY 'alter' 
+            ORDER BY 'drop' DESC
+        ) ORDER BY 'alter'
+    """
+
+    result = _validate_and_wrap_reserved_words(sql)
+
+    expected_quoted = ['"alter"', '"drop"']
+    for expected in expected_quoted:
+        assert expected in result, f"Expected '{expected}' in subquery result: {result}"
+
+
+def test_validate_and_wrap_reserved_words_join_operations():
+    """Test reserved words handling in JOIN operations."""
+    sql = """
+        SELECT t1.'join', t2.'left' 
+        FROM aws_cloudtrail t1 
+        JOIN other_table t2 ON t1.id = t2.id 
+        WHERE t1.'right' = 'value'
+    """
+
+    result = _validate_and_wrap_reserved_words(sql)
+
+    expected_quoted = ['"join"', '"left"', '"right"']
+    for expected in expected_quoted:
+        assert expected in result, f"Expected '{expected}' in JOIN result: {result}"
+
+    # Ensure JOIN keyword itself is not quoted
+    assert "JOIN" in result and '"JOIN"' not in result
+
+
+def test_validate_and_wrap_reserved_words_edge_cases():
+    """Test edge cases in reserved words handling."""
+    test_cases = [
+        {
+            "input": "SELECT 'select' || 'from' as combined FROM aws_cloudtrail",
+            "expected_contains": ['"select"', '"from"'],
+        },
+        {
+            "input": "SELECT eventName FROM aws_cloudtrail WHERE 'where' > 100",
+            "expected_contains": ['"where"'],
+        },
+        {
+            "input": "SELECT CASE WHEN 'condition' THEN 1 ELSE 0 END FROM aws_cloudtrail",
+            "expected_contains": ['"condition"'],
+            "expected_preserved": ["CASE", "WHEN", "THEN", "ELSE", "END"],
+        },
+    ]
+
+    for case in test_cases:
+        result = _validate_and_wrap_reserved_words(case["input"])
+
+        for expected in case["expected_contains"]:
+            assert expected in result, f"Expected '{expected}' in result: {result}"
+
+        if "expected_preserved" in case:
+            for preserved in case["expected_preserved"]:
+                assert (
+                    preserved in result
+                ), f"Expected '{preserved}' to be preserved in: {result}"
+
+
+def test_validate_and_wrap_reserved_words_no_changes_needed():
+    """Test that queries without reserved word issues pass through unchanged."""
+    clean_queries = [
+        "SELECT eventName, sourceIP FROM aws_cloudtrail WHERE p_event_time > '2024-01-01'",
+        "SELECT COUNT(*) FROM aws_cloudtrail GROUP BY eventSource",
+        "SELECT DISTINCT eventName FROM aws_cloudtrail ORDER BY eventName",
+        "SELECT * FROM aws_cloudtrail LIMIT 100",
+    ]
+
+    for sql in clean_queries:
+        result = _validate_and_wrap_reserved_words(sql)
+        # Should not contain any quoted words for these clean queries
+        assert (
+            '"' not in result or sql == result
+        ), f"Clean query was modified: {sql} -> {result}"
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_execute_data_lake_query_with_reserved_words_validation(
+    mock_graphql_client,
+):
+    """Test that execute_data_lake_query properly validates reserved words."""
+    mock_graphql_client.execute.return_value = {
+        "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+    }
+
+    # Test that forbidden words are blocked
+    forbidden_sql = "SELECT eventName as 'true' FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= CURRENT_TIMESTAMP() - INTERVAL '1 DAY'"
+    result = await execute_data_lake_query(forbidden_sql)
+
+    assert result["success"] is False
+    assert "Query contains forbidden keyword usage" in result["message"]
+    mock_graphql_client.execute.assert_not_called()
+
+    # Test that valid reserved words are properly handled
+    valid_sql = "SELECT eventName as 'select', awsRegion as 'from' FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= CURRENT_TIMESTAMP() - INTERVAL '1 DAY'"
+    result = await execute_data_lake_query(valid_sql)
+
+    assert result["success"] is True
+    assert result["query_id"] == MOCK_QUERY_ID
+
+    # Verify the SQL was modified to quote reserved words
+    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    modified_sql = call_args["input"]["sql"]
+    assert '"select"' in modified_sql
+    assert '"from"' in modified_sql
