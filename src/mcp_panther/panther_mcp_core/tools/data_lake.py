@@ -2,8 +2,10 @@
 Tools for interacting with Panther's data lake.
 """
 
+import asyncio
 import logging
 import re
+import time
 from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Dict, List
@@ -17,13 +19,15 @@ from ..queries import (
     EXECUTE_DATA_LAKE_QUERY,
     GET_COLUMNS_FOR_TABLE_QUERY,
     GET_DATA_LAKE_QUERY,
-    LIST_DATA_LAKE_QUERIES,
     LIST_DATABASES_QUERY,
     LIST_TABLES_QUERY,
 )
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
+
+INITIAL_QUERY_SLEEP_SECONDS = 1
+MAX_QUERY_SLEEP_SECONDS = 5
 
 
 class QueryStatus(str, Enum):
@@ -70,9 +74,24 @@ async def summarize_alert_events(
         ),
     ] = None,
 ) -> Dict[str, Any]:
-    """Analyze patterns and relationships across multiple alerts by aggregating their event data into time-based groups. For each time window (configurable from 1-60 minutes), the tool collects unique entities (IPs, emails, usernames, trace IDs) and alert metadata (IDs, rules, severities) to help identify related activities. Results are ordered chronologically with the most recent first, helping analysts identify temporal patterns, common entities, and potential incident scope.
+    """Analyze patterns and relationships across multiple alerts by aggregating their event data into time-based groups.
 
-    Returns a dictionary containing query execution details and a query_id for retrieving results.
+    For each time window (configurable from 1-60 minutes), the tool collects unique entities (IPs, emails, usernames,
+    trace IDs) and alert metadata (IDs, rules, severities) to help identify related activities.
+
+    Results are ordered chronologically with the most recent first, helping analysts identify temporal patterns,
+    common entities, and potential incident scope.
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - status: Status of the query (e.g., "succeeded", "failed", "cancelled")
+        - message: Error message if unsuccessful
+        - results: List of query result rows
+        - column_info: Dict containing column names and types
+        - stats: Dict containing stats about the query
+        - has_next_page: Boolean indicating if there are more results available
+        - end_cursor: Cursor for fetching the next page of results, or null if no more pages
     """
     if time_window not in [1, 5, 15, 30, 60]:
         raise ValueError("Time window must be 1, 5, 15, 30, or 60")
@@ -144,26 +163,59 @@ async def execute_data_lake_query(
         ),
     ],
     database_name: str = "panther_logs.public",
+    timeout: Annotated[
+        int,
+        Field(
+            description="Timeout in seconds before the SQL query is cancelled. If the query fails due to timeout, the caller should consider a longer timeout."
+        ),
+    ] = 30,
 ) -> Dict[str, Any]:
-    """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation. This tool requires a p_event_time filter condition and should only be called five times per user request. The query must follow Snowflake SQL syntax (e.g., use field:nested_field instead of field.nested_field).
+    """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation.
 
-    WORKFLOW:
-    1. First call get_table_schema to understand the schema
-    2. Then execute_data_lake_query with your SQL
-    3. Finally call get_data_lake_query_results with the returned query_id
+    All queries MUST conform to Snowflake's SQL syntax.
 
-    Returns a dictionary with query execution status and a query_id for retrieving results.
+    If the table has a `p_event_time` column, it must use a WHERE clause to filter upon it.
+
+    Guidance:
+
+    For efficiency, when checking for values in an array, use the snowflake function `ARRAY_CONTAINS( <value_expr> , <array> )`.
+
+    When using `ARRAY_CONTAINS`, make sure to cast the value_expr to a variant, for example: `ARRAY_CONTAINS('example@example.com'::VARIANT, p_any_emails)`.
+
+    When interacting with `object` type columns use dot notation to traverse a path in a JSON object:
+    `<column>:<level1_element>.<level2_element>.<level3_element>`. Optionally enclose element names in double quotes: `<column>:"<level1_element>"."<level2_element>"."<level3_element>"`.
+
+    If an `object`/JSON element name does not conform to Snowflake SQL identifier rules, for example if it contains spaces, then
+    you must enclose the element name in double quotes.
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - status: Status of the query (e.g., "succeeded", "failed", "cancelled")
+        - message: Error message if unsuccessful
+        - results: List of query result rows
+        - column_info: Dict containing column names and types
+        - stats: Dict containing stats about the query
+        - has_next_page: Boolean indicating if there are more results available
+        - end_cursor: Cursor for fetching the next page of results, or null if no more pages
     """
     logger.info("Executing data lake query")
 
+    start_time = time.time()
+
     # Validate that the query includes a p_event_time filter after WHERE or AND
     sql_lower = sql.lower().replace("\n", " ")
-    if not re.search(
-        r"\b(where|and)\s+.*?(?:[\w.]+\.)?p_event_time\s*(>=|<=|=|>|<|between)",
+    if (
+        not re.search(
+            r"\b(where|and)\s+.*?(?:[\w.]+\.)?p_event_time\s*(>=|<=|=|>|<|between)",
+            sql_lower,
+        )
+    ) and re.search(
+        r"\Wpanther_(views|signals|rule_matches|rule_errors|monitor|logs|cloudsecurity)\.",
         sql_lower,
     ):
         error_msg = (
-            "Query must include p_event_time as a filter condition after WHERE or AND"
+            "Query must include `p_event_time` as a filter condition after WHERE or AND"
         )
         logger.error(error_msg)
         return {
@@ -172,15 +224,13 @@ async def execute_data_lake_query(
         }
 
     try:
-        client = await _create_panther_client()
-
         # Prepare input variables
         variables = {"input": {"sql": sql, "databaseName": database_name}}
 
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
-        async with client as session:
+        async with await _create_panther_client() as session:
             result = await session.execute(
                 EXECUTE_DATA_LAKE_QUERY, variable_values=variables
             )
@@ -193,8 +243,26 @@ async def execute_data_lake_query(
 
         logger.info(f"Successfully executed query with ID: {query_id}")
 
-        # Format the response
-        return {"success": True, "query_id": query_id}
+        sleep_time = INITIAL_QUERY_SLEEP_SECONDS
+        while True:
+            await asyncio.sleep(sleep_time)
+
+            result = await _get_data_lake_query_results(query_id=query_id)
+
+            if result.get("status") == "running":
+                if (time.time() - start_time) >= timeout:
+                    await _cancel_data_lake_query(query_id=query_id)
+                    return {
+                        "success": False,
+                        "status": "cancelled",
+                        "message": "Query time exceeded timeout, and has been cancelled. A longer timout may be required."
+                        "Retrying may be faster due to caching, or you may need to reduce the duration of data being queried.",
+                    }
+            else:
+                return result
+
+            if sleep_time <= MAX_QUERY_SLEEP_SECONDS:
+                sleep_time += 1
     except Exception as e:
         logger.error(f"Failed to execute data lake query: {str(e)}")
         return {
@@ -203,12 +271,7 @@ async def execute_data_lake_query(
         }
 
 
-@mcp_tool(
-    annotations={
-        "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
-    }
-)
-async def get_data_lake_query_results(
+async def _get_data_lake_query_results(
     query_id: Annotated[
         str,
         Field(
@@ -233,15 +296,13 @@ async def get_data_lake_query_results(
     logger.info(f"Fetching data lake queryresults for query ID: {query_id}")
 
     try:
-        client = await _create_panther_client()
-
         # Prepare input variables
         variables = {"id": query_id, "root": False}
 
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
-        async with client as session:
+        async with await _create_panther_client() as session:
             result = await session.execute(
                 GET_DATA_LAKE_QUERY, variable_values=variables
             )
@@ -333,10 +394,8 @@ async def list_databases() -> Dict[str, Any]:
     logger.info("Fetching datalake databases")
 
     try:
-        client = await _create_panther_client()
-
         # Execute the query asynchronously
-        async with client as session:
+        async with await _create_panther_client() as session:
             result = await session.execute(LIST_DATABASES_QUERY)
 
         # Get query data
@@ -400,7 +459,6 @@ async def list_database_tables(
     page_size = 100
 
     try:
-        client = await _create_panther_client()
         logger.info(f"Fetching tables for database: {database}")
         cursor = None
 
@@ -415,7 +473,7 @@ async def list_database_tables(
             logger.debug(f"Query variables: {variables}")
 
             # Execute the query asynchronously
-            async with client as session:
+            async with await _create_panther_client() as session:
                 result = await session.execute(
                     LIST_TABLES_QUERY, variable_values=variables
                 )
@@ -469,9 +527,9 @@ async def get_table_schema(
         ),
     ],
 ) -> Dict[str, Any]:
-    """Get column details for a specific datalake table.
+    """Get column details for a specific data lake table.
 
-    IMPORTANT: This returns the table structure in Snowflake/Redshift. For writing
+    IMPORTANT: This returns the table structure in Snowflake. For writing
     optimal queries, ALSO call get_panther_log_type_schema() to understand:
     - Nested object structures (only shown as 'object' type here)
     - Which fields map to p_any_* indicator columns
@@ -499,15 +557,13 @@ async def get_table_schema(
     logger.info(f"Fetching column information for table: {table_full_path}")
 
     try:
-        client = await _create_panther_client()
-
         # Prepare input variables
         variables = {"databaseName": database_name, "tableName": table_name}
 
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
-        async with client as session:
+        async with await _create_panther_client() as session:
             result = await session.execute(
                 GET_COLUMNS_FOR_TABLE_QUERY, variable_values=variables
             )
@@ -542,165 +598,7 @@ async def get_table_schema(
         }
 
 
-@mcp_tool(
-    annotations={
-        "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
-        "readOnlyHint": True,
-    }
-)
-async def list_data_lake_queries(
-    cursor: str | None = None,
-    page_size: Annotated[
-        int,
-        Field(
-            description="The number of results that each page will contain. Defaults to 25 with a maximum value of 999.",
-            ge=1,
-            le=999,
-        ),
-    ] = 25,
-    contains: Annotated[
-        str | None,
-        Field(description="Filter queries by their name and/or SQL statement"),
-    ] = None,
-    status: Annotated[
-        list[QueryStatus] | None,
-        Field(description="A list of query statuses to filter queries by"),
-    ] = None,
-    is_scheduled: Annotated[
-        bool | None,
-        Field(
-            description="Only return queries that are either scheduled or not (i.e. issued by a user). Leave blank to return both."
-        ),
-    ] = None,
-    started_at_after: Annotated[
-        datetime | None,
-        Field(description="Only return queries that started after this date"),
-    ] = None,
-    started_at_before: Annotated[
-        datetime | None,
-        Field(description="Only return queries that started before this date"),
-    ] = None,
-) -> Dict[str, Any]:
-    """List previously executed data lake queries with comprehensive filtering options.
-
-    This tool is essential for monitoring data lake query load and diagnosing performance issues.
-    Use it to find long-running queries, check query history, or identify queries that need cancellation.
-
-    Common use cases:
-    - Find running queries: status=['running']
-    - Monitor recent query activity: started_at_after='2024-01-01T00:00:00.000Z'
-    - Search for specific queries: contains='SELECT * FROM alerts'
-    - Check user vs scheduled queries: is_scheduled=false
-
-    Returns:
-        Dict containing:
-        - success: Boolean indicating if the query was successful
-        - queries: List of query objects with id, sql, status, timing info, and issuer details
-        - page_info: Pagination information (hasNextPage, endCursor, etc.)
-        - total_queries: Number of queries in current page
-        - message: Error message if unsuccessful
-    """
-    logger.info("Listing data lake queries")
-
-    try:
-        client = await _create_panther_client()
-
-        # Build input parameters
-        input_params = {
-            "pageSize": page_size,
-        }
-
-        if cursor:
-            input_params["cursor"] = cursor
-        if contains:
-            input_params["contains"] = contains
-        if status:
-            input_params["status"] = [s.value for s in status]
-        if is_scheduled is not None:
-            input_params["isScheduled"] = is_scheduled
-        if started_at_after:
-            input_params["startedAtAfter"] = graphql_date_format(started_at_after)
-        if started_at_before:
-            input_params["startedAtBefore"] = graphql_date_format(started_at_before)
-
-        variables = {"input": input_params} if input_params else None
-
-        # Execute the query
-        async with client as session:
-            result = await session.execute(
-                LIST_DATA_LAKE_QUERIES, variable_values=variables
-            )
-
-        # Parse results
-        query_data = result.get("dataLakeQueries", {})
-        edges = query_data.get("edges", [])
-        page_info = query_data.get("pageInfo", {})
-
-        # Extract queries from edges
-        queries = []
-        for edge in edges:
-            node = edge["node"]
-            # Format the issuer information
-            issued_by = node.get("issuedBy")
-            issuer_info = None
-            if issued_by:
-                if "email" in issued_by:  # User
-                    issuer_info = {
-                        "type": "user",
-                        "id": issued_by.get("id"),
-                        "email": issued_by.get("email"),
-                        "name": f"{issued_by.get('givenName', '')} {issued_by.get('familyName', '')}".strip(),
-                    }
-                else:  # API Token
-                    issuer_info = {
-                        "type": "api_token",
-                        "id": issued_by.get("id"),
-                        "name": issued_by.get("name"),
-                    }
-
-            queries.append(
-                {
-                    "id": node.get("id"),
-                    "sql": node.get("sql"),
-                    "name": node.get("name"),
-                    "status": node.get("status"),
-                    "message": node.get("message"),
-                    "started_at": node.get("startedAt"),
-                    "completed_at": node.get("completedAt"),
-                    "is_scheduled": node.get("isScheduled"),
-                    "issued_by": issuer_info,
-                }
-            )
-
-        logger.info(f"Successfully retrieved {len(queries)} data lake queries")
-
-        return {
-            "success": True,
-            "queries": queries,
-            "page_info": {
-                "has_next_page": page_info.get("hasNextPage", False),
-                "end_cursor": page_info.get("endCursor"),
-                "has_previous_page": page_info.get("hasPreviousPage", False),
-                "start_cursor": page_info.get("startCursor"),
-            },
-            "total_queries": len(queries),
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to list data lake queries: {str(e)}")
-        return {
-            "success": False,
-            "message": f"Failed to list data lake queries: {str(e)}",
-        }
-
-
-@mcp_tool(
-    annotations={
-        "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
-        "destructiveHint": True,
-    }
-)
-async def cancel_data_lake_query(
+async def _cancel_data_lake_query(
     query_id: Annotated[
         str,
         Field(description="The ID of the query to cancel"),
