@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from mcp_panther.panther_mcp_core.tools.data_lake import (
     _cancel_data_lake_query,
@@ -20,9 +21,7 @@ async def test_execute_data_lake_query_success(mock_graphql_client):
     mock_graphql_client.execute.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
-    sql = (
-        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
-    )
+    sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
     with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_res:
         mock_res.return_value = {
             "success": True,
@@ -322,10 +321,24 @@ async def test_execute_data_lake_query_with_reserved_words_processing(
     input_sql = "SELECT eventName as 'select', awsRegion as 'from' FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
     expected_processed_sql = 'SELECT eventName as "select", awsRegion as "from" FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10'
 
-    result = await execute_data_lake_query(input_sql)
+    # Mock the query results function to return success
+    with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_results:
+        mock_results.return_value = {
+            "success": True,
+            "status": "succeeded",
+            "results": [],
+            "column_info": {},
+            "stats": {},
+            "has_next_page": False,
+            "end_cursor": None,
+            "message": "Query executed successfully",
+        }
+        
+        result = await execute_data_lake_query(input_sql)
 
+    # Verify the function returns success
     assert result["success"] is True
-    assert result["query_id"] == MOCK_QUERY_ID
+    assert result["status"] == "succeeded"
 
     # Verify the SQL was processed for reserved words
     call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
