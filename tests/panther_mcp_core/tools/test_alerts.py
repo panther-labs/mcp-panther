@@ -229,8 +229,8 @@ async def test_update_alert_status_success(mock_rest_client):
     # Verify patch was called with correct parameters
     mock_rest_client.patch.assert_called_once()
     call_args = mock_rest_client.patch.call_args
-    assert call_args[1]["body"]["ids"] == [MOCK_ALERT["id"]]
-    assert call_args[1]["body"]["status"] == "TRIAGED"
+    assert call_args[1]["json_data"]["ids"] == [MOCK_ALERT["id"]]
+    assert call_args[1]["json_data"]["status"] == "TRIAGED"
 
 
 @pytest.mark.asyncio

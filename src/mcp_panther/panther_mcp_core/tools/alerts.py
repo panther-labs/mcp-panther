@@ -218,19 +218,11 @@ async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
     """
     logger.info(f"Fetching alert details for ID: {alert_id}")
     try:
-        client = await _create_panther_client()
-
-        # Prepare input variables
-        variables = {"id": alert_id}
-
-        # Execute the query asynchronously
-        async with await get_rest_client() as client:
+        # Execute the REST API call
+        async with get_rest_client() as client:
             alert_data, status = await client.get(
                 f"/alerts/{alert_id}", expected_codes=[200, 400, 404]
             )
-
-        # Get alert data
-        alert_data = result.get("alert", {})
 
         if status == 404:
             logger.warning(f"No alert found with ID: {alert_id}")
@@ -360,7 +352,7 @@ async def update_alert_status(alert_ids: List[str], status: str) -> Dict[str, An
         # Execute the REST API call
         async with get_rest_client() as client:
             result, status_code = await client.patch(
-                "/alerts", body=body, expected_codes=[204, 400, 404]
+                "/alerts", json_data=body, expected_codes=[204, 400, 404]
             )
 
         if status_code == 404:
@@ -423,7 +415,7 @@ async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
         # Execute the REST API call
         async with get_rest_client() as client:
             comment_data, status = await client.post(
-                "/alert-comments", body=body, expected_codes=[200, 400, 404]
+                "/alert-comments", json_data=body, expected_codes=[200, 400, 404]
             )
 
         if status == 404:
@@ -489,7 +481,7 @@ async def update_alert_assignee_by_id(
         # Execute the REST API call
         async with get_rest_client() as client:
             result, status = await client.patch(
-                "/alerts", body=body, expected_codes=[204, 400, 404]
+                "/alerts", json_data=body, expected_codes=[204, 400, 404]
             )
 
         if status == 404:
