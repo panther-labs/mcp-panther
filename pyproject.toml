@@ -31,6 +31,7 @@ dependencies = [
     "uvicorn>=0.24.0",
     "starlette>=0.35.0",
     "fastmcp>=2.3.3",
+    "sqlparse>=0.4.4",
 ]
 
 [project.urls]
