@@ -333,7 +333,7 @@ async def test_execute_data_lake_query_with_reserved_words_processing(
             "end_cursor": None,
             "message": "Query executed successfully",
         }
-        
+
         result = await execute_data_lake_query(input_sql)
 
     # Verify the function returns success

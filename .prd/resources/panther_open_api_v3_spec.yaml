@@ -869,6 +869,27 @@ paths:
             description: the maximum results to return
             default: 100
             format: int64
+        - name: name-contains
+          in: query
+          description: Substring search by name (case-insensitive)
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Substring search by name (case-insensitive)
+        - name: created-by
+          in: query
+          description: Only include rules whose creator matches this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules whose creator matches this user ID or actor ID
+        - name: last-modified-by
+          in: query
+          description: Only include rules last modified by this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules last modified by this user ID or actor ID
       responses:
         '200':
           description: OK response.
@@ -1178,6 +1199,81 @@ paths:
             description: the maximum results to return
             default: 100
             format: int64
+        - name: compliance-status
+          in: query
+          description: Only include policies with this compliance status
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include policies with this compliance status
+            enum:
+              - PASS
+              - FAIL
+              - ERROR
+        - name: name-contains
+          in: query
+          description: Substring search by name (case-insensitive)
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Substring search by name (case-insensitive)
+        - name: state
+          in: query
+          description: Only include policies in the given state
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include policies in the given state
+            enum:
+              - enabled
+              - disabled
+        - name: resource-type
+          in: query
+          description: Only include policies which apply to one of the given resource types
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Only include policies which apply to one of the given resource types
+        - name: severity
+          in: query
+          description: Only include policies with one of the given severities
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - INFO
+                - LOW
+                - MEDIUM
+                - HIGH
+                - CRITICAL
+            description: Only include policies with one of the given severities
+        - name: tag
+          in: query
+          description: Only include policies with one of the given tags (case-insensitive)
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Only include policies with one of the given tags (case-insensitive)
+        - name: created-by
+          in: query
+          description: Only include policies whose creator matches this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include policies whose creator matches this user ID or actor ID
+        - name: last-modified-by
+          in: query
+          description: Only include policies last modified by this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include policies last modified by this user ID or actor ID
       responses:
         '200':
           description: OK response.
@@ -1699,6 +1795,70 @@ paths:
             description: the maximum results to return
             default: 100
             format: int64
+        - name: name-contains
+          in: query
+          description: Substring search by name (case-insensitive)
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Substring search by name (case-insensitive)
+        - name: state
+          in: query
+          description: Only include rules in the given state
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules in the given state
+            enum:
+              - enabled
+              - disabled
+        - name: log-type
+          in: query
+          description: Only include rules which apply to one of the given log types
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Only include rules which apply to one of the given log types
+        - name: severity
+          in: query
+          description: Only include rules with one of the given severities
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - INFO
+                - LOW
+                - MEDIUM
+                - HIGH
+                - CRITICAL
+            description: Only include rules with one of the given severities
+        - name: tag
+          in: query
+          description: Only include rules with one of the given tags (case-insensitive)
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Only include rules with one of the given tags (case-insensitive)
+        - name: created-by
+          in: query
+          description: Only include rules whose creator matches this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules whose creator matches this user ID or actor ID
+        - name: last-modified-by
+          in: query
+          description: Only include rules last modified by this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules last modified by this user ID or actor ID
       responses:
         '200':
           description: OK response.
@@ -1890,6 +2050,70 @@ paths:
             description: the maximum results to return
             default: 100
             format: int64
+        - name: name-contains
+          in: query
+          description: Substring search by name (case-insensitive)
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Substring search by name (case-insensitive)
+        - name: state
+          in: query
+          description: Only include rules in the given state
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules in the given state
+            enum:
+              - enabled
+              - disabled
+        - name: scheduled-query
+          in: query
+          description: Only include rules which apply to one of these scheduled queries
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Only include rules which apply to one of these scheduled queries
+        - name: severity
+          in: query
+          description: Only include rules with one of the given severities
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - INFO
+                - LOW
+                - MEDIUM
+                - HIGH
+                - CRITICAL
+            description: Only include rules with one of the given severities
+        - name: tag
+          in: query
+          description: Only include rules with one of the given tags (case-insensitive)
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Only include rules with one of the given tags (case-insensitive)
+        - name: created-by
+          in: query
+          description: Only include rules whose creator matches this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules whose creator matches this user ID or actor ID
+        - name: last-modified-by
+          in: query
+          description: Only include rules last modified by this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules last modified by this user ID or actor ID
       responses:
         '200':
           description: OK response.
@@ -2089,6 +2313,70 @@ paths:
             type: boolean
             description: determines if associated python for the generated rule is returned
             default: false
+        - name: name-contains
+          in: query
+          description: Substring search by name (case-insensitive)
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Substring search by name (case-insensitive)
+        - name: state
+          in: query
+          description: Only include rules in the given state
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules in the given state
+            enum:
+              - enabled
+              - disabled
+        - name: log-type
+          in: query
+          description: Only include rules which apply to one of the given log types
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Only include rules which apply to one of the given log types
+        - name: severity
+          in: query
+          description: Only include rules with one of the given severities
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - INFO
+                - LOW
+                - MEDIUM
+                - HIGH
+                - CRITICAL
+            description: Only include rules with one of the given severities
+        - name: tag
+          in: query
+          description: Only include rules with one of the given tags (case-insensitive)
+          allowEmptyValue: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: Only include rules with one of the given tags (case-insensitive)
+        - name: created-by
+          in: query
+          description: Only include rules whose creator matches this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules whose creator matches this user ID or actor ID
+        - name: last-modified-by
+          in: query
+          description: Only include rules last modified by this user ID or actor ID
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Only include rules last modified by this user ID or actor ID
       responses:
         '200':
           description: OK response.
@@ -2272,6 +2560,24 @@ paths:
       summary: List users
       operationId: user#list
       parameters:
+        - name: cursor
+          in: query
+          description: Pagination token
+          allowEmptyValue: true
+          schema:
+            type: string
+            description: Pagination token
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          allowEmptyValue: true
+          schema:
+            type: integer
+            description: Maximum number of results to return
+            default: 60
+            format: int64
+            minimum: 1
+            maximum: 60
         - name: contains
           in: query
           description: Search name and email fields in a case-insensitive fashion
@@ -2309,17 +2615,6 @@ paths:
           schema:
             type: boolean
             description: Include deactivated users
-        - name: sort-dir
-          in: query
-          description: The sort direction of the results
-          allowEmptyValue: true
-          schema:
-            type: string
-            description: The sort direction of the results
-            default: asc
-            enum:
-              - asc
-              - desc
         - name: status
           in: query
           description: Show only users with this Cognito status
@@ -3185,13 +3480,14 @@ components:
           description: The integration label (name)
         logStreamType:
           type: string
-          description: The log stream type
+          description: 'The log stream type. Supported log stream types: Auto, JSON, JsonArray, Lines, CloudWatchLogs, XML'
           enum:
             - Auto
-            - CloudWatchLogs
             - JSON
             - JsonArray
             - Lines
+            - CloudWatchLogs
+            - XML
         logStreamTypeOptions:
           $ref: '#/components/schemas/HttpSourceAPI.LogStreamTypeOptions'
         logTypes:
@@ -3240,13 +3536,14 @@ components:
           description: The integration label (name)
         logStreamType:
           type: string
-          description: The log stream type
+          description: 'The log stream type. Supported log stream types: Auto, JSON, JsonArray, Lines, CloudWatchLogs, XML'
           enum:
             - Auto
-            - CloudWatchLogs
             - JSON
             - JsonArray
             - Lines
+            - CloudWatchLogs
+            - XML
         logStreamTypeOptions:
           $ref: '#/components/schemas/HttpSourceAPI.LogStreamTypeOptions'
         logTypes:
@@ -3322,6 +3619,11 @@ components:
         managed:
           type: boolean
           description: Determines if the policy is managed by panther
+        outputIDs:
+          type: array
+          items:
+            type: string
+          description: Destination IDs that override default alert routing based on severity
         reports:
           type: object
           description: Reports
@@ -3378,6 +3680,21 @@ components:
           description: The python body of the policy
         createdAt:
           type: string
+        createdBy:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The actor who created the rule
+        createdByExternal:
+          type: string
+          description: The text of the user-provided CreatedBy field when uploaded via CI/CD
         description:
           type: string
           description: The description of the policy
@@ -3395,6 +3712,11 @@ components:
         managed:
           type: boolean
           description: Determines if the policy is managed by panther
+        outputIDs:
+          type: array
+          items:
+            type: string
+          description: Destination IDs that override default alert routing based on severity
         reports:
           type: object
           description: Reports
@@ -3803,6 +4125,11 @@ components:
         managed:
           type: boolean
           description: Determines if the rule is managed by panther
+        outputIDs:
+          type: array
+          items:
+            type: string
+          description: Destination IDs that override default alert routing based on severity
         reports:
           type: object
           description: reports
@@ -3861,6 +4188,21 @@ components:
           description: The python body of the rule
         createdAt:
           type: string
+        createdBy:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The actor who created the rule
+        createdByExternal:
+          type: string
+          description: The text of the user-provided CreatedBy field when uploaded via CI/CD
         dedupPeriodMinutes:
           type: integer
           description: The amount of time in minutes for grouping alerts
@@ -3892,6 +4234,11 @@ components:
         managed:
           type: boolean
           description: Determines if the rule is managed by panther
+        outputIDs:
+          type: array
+          items:
+            type: string
+          description: Destination IDs that override default alert routing based on severity
         reports:
           type: object
           description: reports
@@ -4061,6 +4408,11 @@ components:
         managed:
           type: boolean
           description: Determines if the scheduled rule is managed by panther
+        outputIDs:
+          type: array
+          items:
+            type: string
+          description: Destination IDs that override default alert routing based on severity
         reports:
           type: object
           description: reports
@@ -4124,6 +4476,21 @@ components:
           description: The python body of the scheduled rule
         createdAt:
           type: string
+        createdBy:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The actor who created the rule
+        createdByExternal:
+          type: string
+          description: The text of the user-provided CreatedBy field when uploaded via CI/CD
         dedupPeriodMinutes:
           type: integer
           description: The amount of time in minutes for grouping alerts
@@ -4147,6 +4514,11 @@ components:
         managed:
           type: boolean
           description: Determines if the scheduled rule is managed by panther
+        outputIDs:
+          type: array
+          items:
+            type: string
+          description: Destination IDs that override default alert routing based on severity
         reports:
           type: object
           description: reports
@@ -4341,6 +4713,11 @@ components:
         managed:
           type: boolean
           description: Determines if the simple rule is managed by panther
+        outputIDs:
+          type: array
+          items:
+            type: string
+          description: Destination IDs that override default alert routing based on severity
         pythonBody:
           type: string
           description: The python body of the rule
@@ -4405,6 +4782,21 @@ components:
           description: The alert title represented in YAML
         createdAt:
           type: string
+        createdBy:
+          type: object
+          properties:
+            id:
+              type: string
+              enum:
+                - user
+                - api-token
+                - system
+            type:
+              type: string
+          description: The actor who created the rule
+        createdByExternal:
+          type: string
+          description: The text of the user-provided CreatedBy field when uploaded via CI/CD
         dedupPeriodMinutes:
           type: integer
           description: The amount of time in minutes for grouping alerts
@@ -4445,6 +4837,11 @@ components:
         managed:
           type: boolean
           description: Determines if the simple rule is managed by panther
+        outputIDs:
+          type: array
+          items:
+            type: string
+          description: Destination IDs that override default alert routing based on severity
         pythonBody:
           type: string
           description: The python body of the rule
