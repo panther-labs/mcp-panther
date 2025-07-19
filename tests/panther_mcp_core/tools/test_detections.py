@@ -1,6 +1,6 @@
 import pytest
 
-from mcp_panther.panther_mcp_core.tools.rules import (
+from mcp_panther.panther_mcp_core.tools.detections import (
     disable_detection,
     get_detection,
     list_detections,
@@ -51,7 +51,7 @@ MOCK_RULES_RESPONSE = {
     "next": "next-page-token",
 }
 
-RULES_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.rules"
+RULES_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.detections"
 
 
 @pytest.mark.asyncio
