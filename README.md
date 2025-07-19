@@ -51,7 +51,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `list_detections` | List detections from Panther with support for different detection types. Accepts a list with one detection type: ["rules"], ["scheduled_rules"], ["simple_rules"], or ["policies"] | "Show me all enabled rules" / "List all policies for AWS resources" |
+| `list_detections` | List detections from Panther with comprehensive filtering support. Supports multiple detection types and filtering by name, state, severity, tags, log types, resource types, and more | "Show me all enabled HIGH severity rules with tag 'AWS'" / "List disabled policies for S3 resources" / "Find all rules containing 'login' in the name" |
 | `get_detection` | Get detailed information about a specific detection including the detection body and tests. Accepts a list with one detection type: ["rules"], ["scheduled_rules"], ["simple_rules"], or ["policies"] | "Get details for rule ID abc123" / "Get details for policy ID AWS.S3.Bucket.PublicReadACP" |
 | `disable_detection` | Disable a detection by setting enabled to false. Supports rules, scheduled_rules, simple_rules, and policies | "Disable rule abc123" / "Disable policy AWS.S3.Bucket.PublicReadACP" |
 | `put_rule` | Update an existing rule or create a new one | "Update rule abc123 with new severity HIGH" |
