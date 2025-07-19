@@ -3,8 +3,9 @@ Tools for interacting with Panther rules.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
+from pydantic import Field
 from typing_extensions import Annotated
 
 from ..client import get_rest_client
@@ -13,6 +14,109 @@ from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
 
+# Detection type constants
+DETECTION_TYPES = {
+    "rules": "/rules",
+    "scheduled_rules": "/scheduled-rules",
+    "simple_rules": "/simple-rules",
+    "policies": "/policies",
+}
+
+# Response field mappings
+LIST_FIELD_MAP = {
+    "rules": "rules",
+    "scheduled_rules": "scheduled_rules",
+    "simple_rules": "simple_rules",
+    "policies": "policies",
+}
+
+SINGULAR_FIELD_MAP = {
+    "rules": "rule",
+    "scheduled_rules": "scheduled_rule",
+    "simple_rules": "simple_rule",
+    "policies": "policy",
+}
+
+# Valid parameter values
+VALID_SEVERITIES = ["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+VALID_STATES = ["enabled", "disabled"]
+VALID_COMPLIANCE_STATUSES = ["PASS", "FAIL", "ERROR"]
+
+
+def validate_detection_types(detection_types: list[str]) -> dict[str, Any] | None:
+    """Validate detection types and return error dict if invalid, None if valid."""
+    if not detection_types:
+        return {
+            "success": False,
+            "message": "At least one detection type must be specified.",
+        }
+
+    invalid_types = [dt for dt in detection_types if dt not in DETECTION_TYPES]
+    if invalid_types:
+        valid_types = ", ".join(DETECTION_TYPES.keys())
+        return {
+            "success": False,
+            "message": f"Invalid detection_types {invalid_types}. Valid values are: {valid_types}",
+        }
+    return None
+
+
+def get_endpoint_for_detection(
+    detection_type: str, detection_id: str | None = None
+) -> str:
+    """Get the API endpoint for a detection type, optionally with an ID."""
+    base_endpoint = DETECTION_TYPES[detection_type]
+    return f"{base_endpoint}/{detection_id}" if detection_id else base_endpoint
+
+
+def build_detection_params(
+    limit: int,
+    cursor: str | None,
+    detection_types: list[str],
+    name_contains: str | None,
+    state: str | None,
+    severity: list[str] | None,
+    tag: list[str] | None,
+    created_by: str | None,
+    last_modified_by: str | None,
+    log_type: list[str] | None,
+    resource_type: list[str] | None,
+    compliance_status: str | None,
+    detection_type: str,
+) -> dict[str, Any]:
+    """Build query parameters for detection API calls."""
+    params = {"limit": limit}
+
+    # Add cursor for single detection type queries only
+    if cursor and len(detection_types) == 1:
+        params["cursor"] = cursor
+        logger.info(f"Using cursor for pagination: {cursor}")
+
+    # Add common filtering parameters
+    if name_contains:
+        params["name-contains"] = name_contains
+    if state:
+        params["state"] = state
+    if severity:
+        params["severity"] = severity
+    if tag:
+        params["tag"] = tag
+    if created_by:
+        params["created-by"] = created_by
+    if last_modified_by:
+        params["last-modified-by"] = last_modified_by
+
+    # Add detection-type-specific parameters
+    if detection_type in ["rules", "simple_rules"] and log_type:
+        params["log-type"] = log_type
+    elif detection_type == "policies":
+        if resource_type:
+            params["resource-type"] = resource_type
+        if compliance_status:
+            params["compliance-status"] = compliance_status
+
+    return params
+
 
 @mcp_tool(
     annotations={
@@ -20,79 +124,91 @@ logger = logging.getLogger("mcp-panther")
     }
 )
 async def list_detections(
-    detection_types: Annotated[List[str], "Types of detections to list"] = ["rules"],
+    detection_types: Annotated[
+        list[str],
+        Field(
+            description="One or more detection types - rules, scheduled_rules, simple_rules, or policies.",
+            examples=[
+                ["rules", "simple_rules", "scheduled_rules"],
+                ["policies"],
+            ],
+        ),
+    ] = ["rules"],
     cursor: Annotated[
-        str | None, "Optional cursor for pagination from a previous query"
+        str | None,
+        Field(
+            description="Optional cursor for pagination from a previous query (only supported for single detection type)"
+        ),
     ] = None,
-    limit: Annotated[int, "Maximum number of results to return"] = 100,
+    limit: Annotated[
+        int,
+        Field(
+            description="Maximum number of results to return per detection type",
+            default=100,
+            ge=1,
+            le=1000,
+        ),
+    ] = 100,
     name_contains: Annotated[
-        str | None, "Substring search by name (case-insensitive)"
+        str | None, Field(description="Substring search by name (case-insensitive)")
     ] = None,
     state: Annotated[
-        str | None, "Filter by state: 'enabled' or 'disabled'"
-    ] = None,
+        str,
+        Field(
+            description="Filter by state - 'enabled' or 'disabled'", default="enabled"
+        ),
+    ] = "enabled",
     severity: Annotated[
-        List[str] | None, "Filter by severity levels: ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']"
-    ] = None,
+        list[str],
+        Field(
+            description="Filter by severity levels - INFO, LOW, MEDIUM, HIGH, or CRITICAL.",
+            examples=[
+                ["MEDIUM", "HIGH", "CRITICAL"],
+                ["INFO", "LOW"],
+            ],
+        ),
+    ] = ["MEDIUM", "HIGH", "CRITICAL"],
     tag: Annotated[
-        List[str] | None, "Filter by tags (case-insensitive)"
-    ] = None,
+        list[str],
+        Field(
+            description="A case-insensitive list of tags to filter by.",
+            examples=[["Initial Access", "Persistence"]],
+        ),
+    ] = [],
     log_type: Annotated[
-        List[str] | None, "Filter by log types (for rules and simple-rules only)"
-    ] = None,
+        list[str],
+        Field(
+            description="A list of log types to filter by (applies to rules and simple-rules only).",
+            examples=[["AWS.CloudTrail", "GCP.AuditLog"]],
+        ),
+    ] = [],
     resource_type: Annotated[
-        List[str] | None, "Filter by resource types (for policies only)"
-    ] = None,
+        list[str],
+        Field(
+            description="Filter by resource types (applies to policies only) - list of resource type names",
+            examples=[["AWS.S3.Bucket", "AWS.EC2.SecurityGroup"]],
+        ),
+    ] = [],
     compliance_status: Annotated[
-        str | None, "Filter by compliance status: 'PASS', 'FAIL', or 'ERROR' (for policies only)"
+        str | None,
+        Field(
+            description="Filter by compliance status (applies to policies only) - 'PASS', 'FAIL', or 'ERROR'"
+        ),
     ] = None,
     created_by: Annotated[
-        str | None, "Filter by creator user ID or actor ID"
+        str | None, Field(description="Filter by creator user ID or actor ID")
     ] = None,
     last_modified_by: Annotated[
-        str | None, "Filter by last modifier user ID or actor ID"
+        str | None, Field(description="Filter by last modifier user ID or actor ID")
     ] = None,
-) -> Dict[str, Any]:
-    """List detections from your Panther instance with support for multiple detection types and filtering.
-
-    Args:
-        detection_types: Types of detections to list. Valid options: ["rules"], ["scheduled_rules"], ["simple_rules"], ["policies"]. Can specify multiple types.
-        cursor: Optional cursor for pagination from a previous query (only supported for single detection type)
-        limit: Maximum number of results to return per detection type (default: 100)
-        name_contains: Substring search by name (case-insensitive)
-        state: Filter by state - 'enabled' or 'disabled'
-        severity: Filter by severity levels - list of ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
-        tag: Filter by tags (case-insensitive) - list of tag names
-        log_type: Filter by log types (applies to rules and simple-rules only) - list of log type names
-        resource_type: Filter by resource types (applies to policies only) - list of resource type names
-        compliance_status: Filter by compliance status (applies to policies only) - 'PASS', 'FAIL', or 'ERROR'
-        created_by: Filter by creator user ID or actor ID
-        last_modified_by: Filter by last modifier user ID or actor ID
-    """
-    if not detection_types:
-        return {
-            "success": False,
-            "message": "At least one detection type must be specified.",
-        }
+) -> dict[str, Any]:
+    """List detections from your Panther instance with support for multiple detection types and filtering."""
+    # Validate detection types
+    validation_error = validate_detection_types(detection_types)
+    if validation_error:
+        return validation_error
 
     logger.info(f"Fetching {limit} detections per type for types: {detection_types}")
-
-    # Map detection types to endpoints
-    endpoint_map = {
-        "rules": "/rules",
-        "scheduled_rules": "/scheduled-rules",
-        "simple_rules": "/simple-rules",
-        "policies": "/policies",
-    }
-
-    # Validate all detection types
-    invalid_types = [dt for dt in detection_types if dt not in endpoint_map]
-    if invalid_types:
-        valid_types = ", ".join(endpoint_map.keys())
-        return {
-            "success": False,
-            "message": f"Invalid detection_types {invalid_types}. Valid values are: {valid_types}",
-        }
 
     # For multiple detection types, cursor pagination is not supported
     if len(detection_types) > 1 and cursor:
@@ -102,25 +218,24 @@ async def list_detections(
         }
 
     # Validate filtering parameters
-    if state and state not in ["enabled", "disabled"]:
+    if state and state not in VALID_STATES:
         return {
             "success": False,
-            "message": "Invalid state value. Must be 'enabled' or 'disabled'.",
+            "message": f"Invalid state value. Must be one of: {', '.join(VALID_STATES)}",
         }
 
     if severity:
-        valid_severities = ["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
-        invalid_severities = [s for s in severity if s not in valid_severities]
+        invalid_severities = [s for s in severity if s not in VALID_SEVERITIES]
         if invalid_severities:
             return {
                 "success": False,
-                "message": f"Invalid severity values: {invalid_severities}. Valid values are: {', '.join(valid_severities)}",
+                "message": f"Invalid severity values: {invalid_severities}. Valid values are: {', '.join(VALID_SEVERITIES)}",
             }
 
-    if compliance_status and compliance_status not in ["PASS", "FAIL", "ERROR"]:
+    if compliance_status and compliance_status not in VALID_COMPLIANCE_STATUSES:
         return {
             "success": False,
-            "message": "Invalid compliance_status value. Must be 'PASS', 'FAIL', or 'ERROR'.",
+            "message": f"Invalid compliance_status value. Must be one of: {', '.join(VALID_COMPLIANCE_STATUSES)}",
         }
 
     # Validate detection-type-specific parameters
@@ -142,13 +257,8 @@ async def list_detections(
             "message": "compliance_status parameter is only valid for 'policies' detection type.",
         }
 
-    # Map detection types to response field names
-    field_map = {
-        "rules": "rules",
-        "scheduled_rules": "scheduled_rules",
-        "simple_rules": "simple_rules",
-        "policies": "policies",
-    }
+    # Use the centralized field mapping
+    field_map = LIST_FIELD_MAP
 
     try:
         all_results = {}
@@ -157,44 +267,25 @@ async def list_detections(
 
         async with get_rest_client() as client:
             for detection_type in detection_types:
-                # Prepare query parameters
-                params = {"limit": limit}
-                if cursor and cursor.lower() != "null" and len(detection_types) == 1:
-                    params["cursor"] = cursor
-                    logger.info(f"Using cursor for pagination: {cursor}")
-
-                # Add common filtering parameters
-                if name_contains:
-                    params["name-contains"] = name_contains
-                if state:
-                    params["state"] = state
-                if severity:
-                    params["severity"] = severity
-                if tag:
-                    params["tag"] = tag
-                if created_by:
-                    params["created-by"] = created_by
-                if last_modified_by:
-                    params["last-modified-by"] = last_modified_by
-
-                # Add detection-type-specific parameters
-                if detection_type == "rules":
-                    if log_type:
-                        params["log-type"] = log_type
-                elif detection_type == "simple_rules":
-                    if log_type:
-                        params["log-type"] = log_type
-                elif detection_type == "policies":
-                    if resource_type:
-                        params["resource-type"] = resource_type
-                    if compliance_status:
-                        params["compliance-status"] = compliance_status
-                elif detection_type == "scheduled_rules":
-                    # scheduled_rules has scheduled-query parameter, but we don't expose it yet
-                    pass
+                # Build query parameters using helper function
+                params = build_detection_params(
+                    limit,
+                    cursor,
+                    detection_types,
+                    name_contains,
+                    state,
+                    severity,
+                    tag,
+                    created_by,
+                    last_modified_by,
+                    log_type,
+                    resource_type,
+                    compliance_status,
+                    detection_type,
+                )
 
                 result, _ = await client.get(
-                    endpoint_map[detection_type], params=params
+                    get_endpoint_for_detection(detection_type), params=params
                 )
 
                 # Extract detections and pagination info
@@ -303,46 +394,34 @@ async def list_detections(
     }
 )
 async def get_detection(
-    detection_id: Annotated[str, "The ID of the detection to fetch"],
-    detection_type: Annotated[List[str], "Type of detection to fetch"] = ["rules"],
-) -> Dict[str, Any]:
-    """Get detailed information about a Panther detection, including the detection body and tests.
-
-    Args:
-        detection_id: The ID of the detection to fetch
-        detection_type: Type of detection to fetch. Valid options: ["rules"], ["scheduled_rules"], ["simple_rules"], ["policies"]. For single ID lookups, typically specify one type.
-    """
-    if not detection_type:
-        return {
-            "success": False,
-            "message": "At least one detection type must be specified.",
-        }
+    detection_id: Annotated[
+        str,
+        Field(
+            description="The ID of the detection to fetch",
+            examples=["AWS.Suspicious.S3.Activity", "GCP.K8S.Privileged.Pod.Created"],
+        ),
+    ],
+    detection_type: Annotated[
+        list[str],
+        Field(
+            description="One or more detection types - rules, scheduled_rules, simple_rules, or policies.",
+            examples=[
+                ["rules", "simple_rules", "scheduled_rules"],
+                ["policies"],
+            ],
+        ),
+    ] = ["rules"],
+) -> dict[str, Any]:
+    """Get detailed information about a Panther detection, including the detection body and tests."""
+    # Validate detection types
+    validation_error = validate_detection_types(detection_type)
+    if validation_error:
+        return validation_error
 
     logger.info(f"Fetching details for ID {detection_id} in types: {detection_type}")
 
-    # Map detection types to endpoints
-    endpoint_map = {
-        "rules": f"/rules/{detection_id}",
-        "scheduled_rules": f"/scheduled-rules/{detection_id}",
-        "simple_rules": f"/simple-rules/{detection_id}",
-        "policies": f"/policies/{detection_id}",
-    }
-
-    # Validate all detection types
-    invalid_types = [dt for dt in detection_type if dt not in endpoint_map]
-    if invalid_types:
-        return {
-            "success": False,
-            "message": f"Invalid detection_types {invalid_types}. Valid values are: rules, scheduled_rules, simple_rules, policies",
-        }
-
-    # Map detection types to response field names
-    field_map = {
-        "rules": "rule",
-        "scheduled_rules": "scheduled_rule",
-        "simple_rules": "simple_rule",
-        "policies": "policy",
-    }
+    # Use centralized field mapping
+    field_map = SINGULAR_FIELD_MAP
 
     try:
         found_results = {}
@@ -352,7 +431,8 @@ async def get_detection(
             for dt in detection_type:
                 # Allow 404 as a valid response to handle not found case
                 result, status = await client.get(
-                    endpoint_map[dt], expected_codes=[200, 404]
+                    get_endpoint_for_detection(dt, detection_id),
+                    expected_codes=[200, 404],
                 )
 
                 if status == 404:
@@ -400,52 +480,38 @@ async def get_detection(
     }
 )
 async def disable_detection(
-    detection_id: Annotated[str, "The ID of the detection to disable"],
-    detection_type: Annotated[str, "Type of detection to disable"] = "rules",
-) -> Dict[str, Any]:
-    """Disable a Panther detection by setting enabled to false.
-
-    Args:
-        detection_id: The ID of the detection to disable
-        detection_type: Type of detection to disable. Valid options: "rules", "scheduled_rules", "simple_rules", "policies"
-
-    Returns:
-        Dict containing:
-        - success: Boolean indicating if the update was successful
-        - [detection_type]: Updated detection information if successful
-        - message: Error message if unsuccessful
-    """
+    detection_id: Annotated[
+        str,
+        Field(
+            description="The ID of the detection to disable",
+            examples=["AWS.Suspicious.S3.Activity", "GCP.K8S.Privileged.Pod.Created"],
+        ),
+    ],
+    detection_type: Annotated[
+        str,
+        Field(
+            description="Type of detection to disable. Valid options: rules, scheduled_rules, simple_rules, or policies.",
+            examples=[["rules"], ["scheduled_rules"], ["simple_rules"], ["policies"]],
+        ),
+    ] = "rules",
+) -> dict[str, Any]:
+    """Disable a Panther detection by setting enabled to false."""
     logger.info(f"Disabling {detection_type} with ID: {detection_id}")
 
-    # Map detection types to endpoints
-    endpoint_map = {
-        "rules": f"/rules/{detection_id}",
-        "scheduled_rules": f"/scheduled-rules/{detection_id}",
-        "simple_rules": f"/simple-rules/{detection_id}",
-        "policies": f"/policies/{detection_id}",
-    }
-
-    # Map detection types to response field names
-    field_map = {
-        "rules": "rule",
-        "scheduled_rules": "scheduled_rule",
-        "simple_rules": "simple_rule",
-        "policies": "policy",
-    }
-
     # Validate detection type
-    if detection_type not in endpoint_map:
-        valid_types = ", ".join(endpoint_map.keys())
-        return {
-            "success": False,
-            "message": f"Invalid detection_type '{detection_type}'. Valid values are: {valid_types}",
-        }
+    validation_error = validate_detection_types([detection_type])
+    if validation_error:
+        return validation_error
+
+    # Use centralized field mapping
+    field_map = SINGULAR_FIELD_MAP
+    endpoint = get_endpoint_for_detection(detection_type, detection_id)
 
     try:
         async with get_rest_client() as client:
             # First get the current detection to preserve other fields
             current_detection, status = await client.get(
-                endpoint_map[detection_type], expected_codes=[200, 404]
+                endpoint, expected_codes=[200, 404]
             )
 
             if status == 404:
@@ -466,7 +532,7 @@ async def disable_detection(
 
             # Make the update request
             result, _ = await client.put(
-                endpoint_map[detection_type], json_data=current_detection, params=params
+                endpoint, json_data=current_detection, params=params
             )
 
         logger.info(f"Successfully disabled {detection_type} with ID: {detection_id}")

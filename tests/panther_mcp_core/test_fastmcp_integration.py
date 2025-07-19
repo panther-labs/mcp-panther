@@ -20,11 +20,11 @@ from src.mcp_panther.server import mcp
 async def test_tool_functionality():
     async with Client(mcp) as client:
         tools = await client.list_tools()
-        for tool in [t for t in tools if "metrics" in t.name]:
-            print(tool.name)
-            print(tool.description)
-            print(tool.inputSchema)
-            print(tool.annotations)
+        for tool in [t for t in tools if "list_detections" in t.name]:
+            print(f"Tool: {tool.name}")
+            print(f"Description: {tool.description}")
+            print(f"Input Schema: {tool.inputSchema}")
+            print(f"Annotations: {tool.annotations}")
             print("-" * 100)
         assert len(tools) > 0
 
