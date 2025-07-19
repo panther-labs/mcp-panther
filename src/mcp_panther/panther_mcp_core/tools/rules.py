@@ -25,13 +25,49 @@ async def list_detections(
         str | None, "Optional cursor for pagination from a previous query"
     ] = None,
     limit: Annotated[int, "Maximum number of results to return"] = 100,
+    name_contains: Annotated[
+        str | None, "Substring search by name (case-insensitive)"
+    ] = None,
+    state: Annotated[
+        str | None, "Filter by state: 'enabled' or 'disabled'"
+    ] = None,
+    severity: Annotated[
+        List[str] | None, "Filter by severity levels: ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']"
+    ] = None,
+    tag: Annotated[
+        List[str] | None, "Filter by tags (case-insensitive)"
+    ] = None,
+    log_type: Annotated[
+        List[str] | None, "Filter by log types (for rules and simple-rules only)"
+    ] = None,
+    resource_type: Annotated[
+        List[str] | None, "Filter by resource types (for policies only)"
+    ] = None,
+    compliance_status: Annotated[
+        str | None, "Filter by compliance status: 'PASS', 'FAIL', or 'ERROR' (for policies only)"
+    ] = None,
+    created_by: Annotated[
+        str | None, "Filter by creator user ID or actor ID"
+    ] = None,
+    last_modified_by: Annotated[
+        str | None, "Filter by last modifier user ID or actor ID"
+    ] = None,
 ) -> Dict[str, Any]:
-    """List detections from your Panther instance with support for multiple detection types.
+    """List detections from your Panther instance with support for multiple detection types and filtering.
 
     Args:
         detection_types: Types of detections to list. Valid options: ["rules"], ["scheduled_rules"], ["simple_rules"], ["policies"]. Can specify multiple types.
         cursor: Optional cursor for pagination from a previous query (only supported for single detection type)
         limit: Maximum number of results to return per detection type (default: 100)
+        name_contains: Substring search by name (case-insensitive)
+        state: Filter by state - 'enabled' or 'disabled'
+        severity: Filter by severity levels - list of ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+        tag: Filter by tags (case-insensitive) - list of tag names
+        log_type: Filter by log types (applies to rules and simple-rules only) - list of log type names
+        resource_type: Filter by resource types (applies to policies only) - list of resource type names
+        compliance_status: Filter by compliance status (applies to policies only) - 'PASS', 'FAIL', or 'ERROR'
+        created_by: Filter by creator user ID or actor ID
+        last_modified_by: Filter by last modifier user ID or actor ID
     """
     if not detection_types:
         return {
@@ -65,6 +101,47 @@ async def list_detections(
             "message": "Cursor pagination is not supported when querying multiple detection types. Please query one type at a time for pagination.",
         }
 
+    # Validate filtering parameters
+    if state and state not in ["enabled", "disabled"]:
+        return {
+            "success": False,
+            "message": "Invalid state value. Must be 'enabled' or 'disabled'.",
+        }
+
+    if severity:
+        valid_severities = ["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        invalid_severities = [s for s in severity if s not in valid_severities]
+        if invalid_severities:
+            return {
+                "success": False,
+                "message": f"Invalid severity values: {invalid_severities}. Valid values are: {', '.join(valid_severities)}",
+            }
+
+    if compliance_status and compliance_status not in ["PASS", "FAIL", "ERROR"]:
+        return {
+            "success": False,
+            "message": "Invalid compliance_status value. Must be 'PASS', 'FAIL', or 'ERROR'.",
+        }
+
+    # Validate detection-type-specific parameters
+    if log_type and not any(dt in ["rules", "simple_rules"] for dt in detection_types):
+        return {
+            "success": False,
+            "message": "log_type parameter is only valid for 'rules' and 'simple_rules' detection types.",
+        }
+
+    if resource_type and "policies" not in detection_types:
+        return {
+            "success": False,
+            "message": "resource_type parameter is only valid for 'policies' detection type.",
+        }
+
+    if compliance_status and "policies" not in detection_types:
+        return {
+            "success": False,
+            "message": "compliance_status parameter is only valid for 'policies' detection type.",
+        }
+
     # Map detection types to response field names
     field_map = {
         "rules": "rules",
@@ -85,6 +162,36 @@ async def list_detections(
                 if cursor and cursor.lower() != "null" and len(detection_types) == 1:
                     params["cursor"] = cursor
                     logger.info(f"Using cursor for pagination: {cursor}")
+
+                # Add common filtering parameters
+                if name_contains:
+                    params["name-contains"] = name_contains
+                if state:
+                    params["state"] = state
+                if severity:
+                    params["severity"] = severity
+                if tag:
+                    params["tag"] = tag
+                if created_by:
+                    params["created-by"] = created_by
+                if last_modified_by:
+                    params["last-modified-by"] = last_modified_by
+
+                # Add detection-type-specific parameters
+                if detection_type == "rules":
+                    if log_type:
+                        params["log-type"] = log_type
+                elif detection_type == "simple_rules":
+                    if log_type:
+                        params["log-type"] = log_type
+                elif detection_type == "policies":
+                    if resource_type:
+                        params["resource-type"] = resource_type
+                    if compliance_status:
+                        params["compliance-status"] = compliance_status
+                elif detection_type == "scheduled_rules":
+                    # scheduled_rules has scheduled-query parameter, but we don't expose it yet
+                    pass
 
                 result, _ = await client.get(
                     endpoint_map[detection_type], params=params

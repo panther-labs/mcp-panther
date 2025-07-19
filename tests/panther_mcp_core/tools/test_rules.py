@@ -698,3 +698,91 @@ async def test_list_detections_with_cursor_multiple_types():
         "Cursor pagination is not supported when querying multiple detection types"
         in result["message"]
     )
+
+
+@pytest.mark.asyncio
+async def test_list_detections_with_filtering_validation():
+    """Test validation of filtering parameters in list_detections."""
+    # Test invalid state
+    result = await list_detections(["rules"], state="invalid")
+    assert result["success"] is False
+    assert "Invalid state value" in result["message"]
+    
+    # Test invalid severity
+    result = await list_detections(["rules"], severity=["INVALID"])
+    assert result["success"] is False
+    assert "Invalid severity values" in result["message"]
+    
+    # Test invalid compliance_status  
+    result = await list_detections(["policies"], compliance_status="INVALID")
+    assert result["success"] is False
+    assert "Invalid compliance_status value" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_list_detections_with_detection_type_specific_params():
+    """Test validation of detection-type-specific parameters."""
+    # Test log_type with policies (should fail)
+    result = await list_detections(["policies"], log_type=["AWS.CloudTrail"])
+    assert result["success"] is False
+    assert "log_type parameter is only valid for 'rules' and 'simple_rules'" in result["message"]
+    
+    # Test resource_type with rules (should fail)
+    result = await list_detections(["rules"], resource_type=["AWS.S3.Bucket"])
+    assert result["success"] is False
+    assert "resource_type parameter is only valid for 'policies'" in result["message"]
+    
+    # Test compliance_status with rules (should fail)
+    result = await list_detections(["rules"], compliance_status="PASS")
+    assert result["success"] is False
+    assert "compliance_status parameter is only valid for 'policies'" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_with_filtering_params(mock_rest_client):
+    """Test that filtering parameters are properly passed to the API."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+    
+    await list_detections(
+        ["rules"],
+        name_contains="test",
+        state="enabled", 
+        severity=["HIGH", "CRITICAL"],
+        tag=["AWS", "Security"],
+        log_type=["AWS.CloudTrail"],
+        created_by="user123",
+        last_modified_by="user456"
+    )
+    
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == "/rules"
+    params = kwargs["params"]
+    assert params["name-contains"] == "test"
+    assert params["state"] == "enabled"
+    assert params["severity"] == ["HIGH", "CRITICAL"]
+    assert params["tag"] == ["AWS", "Security"]
+    assert params["log-type"] == ["AWS.CloudTrail"]
+    assert params["created-by"] == "user123"
+    assert params["last-modified-by"] == "user456"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_policies_with_filtering(mock_rest_client):
+    """Test policy-specific filtering parameters."""
+    mock_rest_client.get.return_value = (MOCK_POLICIES_RESPONSE, 200)
+    
+    await list_detections(
+        ["policies"],
+        resource_type=["AWS.S3.Bucket"],
+        compliance_status="FAIL"
+    )
+    
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert args[0] == "/policies"
+    params = kwargs["params"]
+    assert params["resource-type"] == ["AWS.S3.Bucket"]
+    assert params["compliance-status"] == "FAIL"
