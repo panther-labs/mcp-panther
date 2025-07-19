@@ -707,13 +707,13 @@ async def test_list_detections_with_filtering_validation():
     result = await list_detections(["rules"], state="invalid")
     assert result["success"] is False
     assert "Invalid state value" in result["message"]
-    
+
     # Test invalid severity
     result = await list_detections(["rules"], severity=["INVALID"])
     assert result["success"] is False
     assert "Invalid severity values" in result["message"]
-    
-    # Test invalid compliance_status  
+
+    # Test invalid compliance_status
     result = await list_detections(["policies"], compliance_status="INVALID")
     assert result["success"] is False
     assert "Invalid compliance_status value" in result["message"]
@@ -725,17 +725,22 @@ async def test_list_detections_with_detection_type_specific_params():
     # Test log_type with policies (should fail)
     result = await list_detections(["policies"], log_type=["AWS.CloudTrail"])
     assert result["success"] is False
-    assert "log_type parameter is only valid for 'rules' and 'simple_rules'" in result["message"]
-    
+    assert (
+        "log_type parameter is only valid for 'rules' and 'simple_rules'"
+        in result["message"]
+    )
+
     # Test resource_type with rules (should fail)
     result = await list_detections(["rules"], resource_type=["AWS.S3.Bucket"])
     assert result["success"] is False
     assert "resource_type parameter is only valid for 'policies'" in result["message"]
-    
+
     # Test compliance_status with rules (should fail)
     result = await list_detections(["rules"], compliance_status="PASS")
     assert result["success"] is False
-    assert "compliance_status parameter is only valid for 'policies'" in result["message"]
+    assert (
+        "compliance_status parameter is only valid for 'policies'" in result["message"]
+    )
 
 
 @pytest.mark.asyncio
@@ -743,18 +748,18 @@ async def test_list_detections_with_detection_type_specific_params():
 async def test_list_detections_with_filtering_params(mock_rest_client):
     """Test that filtering parameters are properly passed to the API."""
     mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
-    
+
     await list_detections(
         ["rules"],
         name_contains="test",
-        state="enabled", 
+        state="enabled",
         severity=["HIGH", "CRITICAL"],
         tag=["AWS", "Security"],
         log_type=["AWS.CloudTrail"],
         created_by="user123",
-        last_modified_by="user456"
+        last_modified_by="user456",
     )
-    
+
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
     assert args[0] == "/rules"
@@ -773,16 +778,487 @@ async def test_list_detections_with_filtering_params(mock_rest_client):
 async def test_list_detections_policies_with_filtering(mock_rest_client):
     """Test policy-specific filtering parameters."""
     mock_rest_client.get.return_value = (MOCK_POLICIES_RESPONSE, 200)
-    
+
     await list_detections(
-        ["policies"],
-        resource_type=["AWS.S3.Bucket"],
-        compliance_status="FAIL"
+        ["policies"], resource_type=["AWS.S3.Bucket"], compliance_status="FAIL"
     )
-    
+
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
     assert args[0] == "/policies"
     params = kwargs["params"]
     assert params["resource-type"] == ["AWS.S3.Bucket"]
     assert params["compliance-status"] == "FAIL"
+
+
+# Realistic Parameter Combination Tests
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_security_analyst_workflow_high_priority_aws_rules(
+    mock_rest_client,
+):
+    """Test realistic security analyst workflow: Find high priority AWS rules for incident response."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    result = await list_detections(
+        ["rules"],
+        severity=["HIGH", "CRITICAL"],
+        log_type=["AWS.CloudTrail", "AWS.VPCFlow"],
+        tag=["AWS", "Authentication"],
+        state="enabled",
+        limit=20,
+    )
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    params = kwargs["params"]
+    assert params["severity"] == ["HIGH", "CRITICAL"]
+    assert params["log-type"] == ["AWS.CloudTrail", "AWS.VPCFlow"]
+    assert params["tag"] == ["AWS", "Authentication"]
+    assert params["state"] == "enabled"
+    assert params["limit"] == 20
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_security_analyst_workflow_coverage_gap_analysis(
+    mock_rest_client,
+):
+    """Test realistic workflow: Identify coverage gaps for specific log sources."""
+
+    # Mock responses for both rules and simple_rules
+    def side_effect(endpoint, **kwargs):
+        if endpoint in ["/rules", "/simple-rules"]:
+            return (MOCK_RULES_RESPONSE, 200)
+        else:
+            return ({"results": []}, 200)
+
+    mock_rest_client.get.side_effect = side_effect
+
+    result = await list_detections(
+        ["rules", "simple_rules"],
+        log_type=["AWS.S3ServerAccess"],
+        state="enabled",
+        severity=["MEDIUM", "HIGH", "CRITICAL"],
+        name_contains="exfiltration",
+    )
+
+    # Multiple types with name_contains should succeed
+    assert result["success"] is True
+    assert "rules" in result
+    assert "simple_rules" in result
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_security_analyst_workflow_threat_hunting_scope(
+    mock_rest_client,
+):
+    """Test realistic workflow: Scope threat hunting rules by creator and modification."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    result = await list_detections(
+        ["rules"],
+        tag=["Threat Hunting", "Advanced Persistent Threat"],
+        severity=["MEDIUM", "HIGH", "CRITICAL"],
+        created_by="security-team",
+        last_modified_by="threat-hunter-1",
+        state="enabled",
+        limit=50,
+    )
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    params = kwargs["params"]
+    assert params["tag"] == ["Threat Hunting", "Advanced Persistent Threat"]
+    assert params["created-by"] == "security-team"
+    assert params["last-modified-by"] == "threat-hunter-1"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_security_analyst_workflow_compliance_audit(
+    mock_rest_client,
+):
+    """Test realistic workflow: Compliance audit for cloud security policies."""
+    mock_rest_client.get.return_value = (MOCK_POLICIES_RESPONSE, 200)
+
+    result = await list_detections(
+        ["policies"],
+        resource_type=["AWS.S3.Bucket", "AWS.EC2.Instance", "AWS.IAM.Role"],
+        severity=["HIGH", "CRITICAL"],
+        compliance_status="FAIL",
+        state="enabled",
+        tag=["Compliance", "SOC2", "CIS"],
+    )
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    params = kwargs["params"]
+    assert params["resource-type"] == [
+        "AWS.S3.Bucket",
+        "AWS.EC2.Instance",
+        "AWS.IAM.Role",
+    ]
+    assert params["compliance-status"] == "FAIL"
+    assert params["tag"] == ["Compliance", "SOC2", "CIS"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_security_analyst_workflow_insider_threat_investigation(
+    mock_rest_client,
+):
+    """Test realistic workflow: Investigate potential insider threat patterns."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    result = await list_detections(
+        ["rules"],
+        log_type=["Okta.SystemLog", "AWS.CloudTrail", "Box.Event"],
+        tag=["Insider Threat", "Data Exfiltration", "Privilege Escalation"],
+        severity=["MEDIUM", "HIGH", "CRITICAL"],
+        name_contains="suspicious",
+        state="enabled",
+    )
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    params = kwargs["params"]
+    assert params["log-type"] == ["Okta.SystemLog", "AWS.CloudTrail", "Box.Event"]
+    assert params["name-contains"] == "suspicious"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_security_analyst_workflow_incident_response_triage(
+    mock_rest_client,
+):
+    """Test realistic workflow: Rapid incident response triage for critical alerts."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    result = await list_detections(
+        ["rules"],
+        severity=["CRITICAL"],
+        tag=["Initial Access", "Credential Access", "Lateral Movement", "Exfiltration"],
+        state="enabled",
+        limit=10,  # Focus on top 10 most critical
+    )
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    params = kwargs["params"]
+    assert params["severity"] == ["CRITICAL"]
+    assert params["limit"] == 10
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_security_analyst_workflow_log_source_coverage_review(
+    mock_rest_client,
+):
+    """Test realistic workflow: Review detection coverage for specific log sources."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    result = await list_detections(
+        ["rules", "simple_rules"],  # This should work for coverage analysis
+        log_type=["AWS.CloudTrail"],
+        severity=["HIGH", "CRITICAL"],
+        state="enabled",
+    )
+
+    # Should succeed with proper multiple type handling
+    assert result["success"] is True or "multiple detection types" in result.get(
+        "message", ""
+    )
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_security_analyst_workflow_custom_rule_audit(
+    mock_rest_client,
+):
+    """Test realistic workflow: Audit custom (non-managed) rules for quality assurance."""
+    # Create custom rule mock (managed=False)
+    custom_rule_response = {"results": [{**MOCK_RULE, "managed": False}], "next": None}
+    mock_rest_client.get.return_value = (custom_rule_response, 200)
+
+    result = await list_detections(
+        ["rules"],
+        created_by="custom-rule-author",
+        severity=["MEDIUM", "HIGH", "CRITICAL"],
+        state="enabled",
+        tag=["Custom", "Organization Specific"],
+    )
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    params = kwargs["params"]
+    assert params["created-by"] == "custom-rule-author"
+    assert params["tag"] == ["Custom", "Organization Specific"]
+
+
+# Edge Cases and Boundary Condition Tests
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_empty_result_set(mock_rest_client):
+    """Test handling of empty result sets."""
+    empty_response = {"results": [], "next": None}
+    mock_rest_client.get.return_value = (empty_response, 200)
+
+    result = await list_detections(["rules"], severity=["CRITICAL"])
+
+    assert result["success"] is True
+    assert result["rules"] == []
+    assert result["total_rules"] == 0
+    assert result["has_next_page"] is False
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_maximum_limit(mock_rest_client):
+    """Test with maximum allowed limit value."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    result = await list_detections(["rules"], limit=1000)
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert kwargs["params"]["limit"] == 1000
+
+
+@pytest.mark.asyncio
+async def test_list_detections_minimum_limit():
+    """Test with minimum allowed limit value."""
+    result = await list_detections(["rules"], limit=1)
+    # Should not fail validation
+    assert "limit" not in result.get("message", "")
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_unicode_name_contains(mock_rest_client):
+    """Test handling of unicode characters in name_contains."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    result = await list_detections(
+        ["rules"],
+        name_contains="测试规则",  # Chinese characters
+    )
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert kwargs["params"]["name-contains"] == "测试规则"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_special_characters_in_filters(mock_rest_client):
+    """Test handling of special characters in filter parameters."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    result = await list_detections(
+        ["rules"],
+        name_contains="rule@#$%^&*()",
+        tag=["Tag with spaces", "Tag-with-dashes", "Tag_with_underscores"],
+        created_by="user@domain.com",
+    )
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_very_long_cursor(mock_rest_client):
+    """Test handling of very long cursor tokens."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    # Create a very long cursor token
+    long_cursor = "a" * 2000
+
+    result = await list_detections(["rules"], cursor=long_cursor)
+
+    assert result["success"] is True
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    assert kwargs["params"]["cursor"] == long_cursor
+
+
+# Error Handling Edge Cases
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_api_timeout_error(mock_rest_client):
+    """Test handling of API timeout errors."""
+    import asyncio
+
+    mock_rest_client.get.side_effect = asyncio.TimeoutError("Request timed out")
+
+    result = await list_detections(["rules"])
+
+    assert result["success"] is False
+    assert "Failed to list detection types" in result["message"]
+    assert "Request timed out" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_partial_failure_multiple_types(mock_rest_client):
+    """Test handling when one detection type succeeds and another fails."""
+
+    def side_effect(endpoint, **kwargs):
+        if endpoint == "/rules":
+            return (MOCK_RULES_RESPONSE, 200)
+        elif endpoint == "/policies":
+            raise Exception("Policies API unavailable")
+        else:
+            return ({"results": []}, 200)
+
+    mock_rest_client.get.side_effect = side_effect
+
+    result = await list_detections(["rules", "policies"])
+
+    assert result["success"] is False
+    assert "Failed to list detection types" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_malformed_api_response(mock_rest_client):
+    """Test handling of malformed API responses."""
+    # Missing 'results' key
+    malformed_response = {"next": None}
+    mock_rest_client.get.return_value = (malformed_response, 200)
+
+    result = await list_detections(["rules"])
+
+    assert result["success"] is True
+    assert result["rules"] == []  # Should handle missing 'results' gracefully
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_detection_with_malformed_response(mock_rest_client):
+    """Test get_detection with malformed API response."""
+    # API returns success but with unexpected structure
+    malformed_response = {"unexpected": "data"}
+    mock_rest_client.get.return_value = (malformed_response, 200)
+
+    result = await get_detection("test-rule", ["rules"])
+
+    assert result["success"] is True
+    assert result["rule"] == malformed_response
+
+
+# Parameter Validation Tests
+@pytest.mark.asyncio
+async def test_list_detections_invalid_severity_mixed_valid_invalid():
+    """Test validation with mix of valid and invalid severity values."""
+    result = await list_detections(["rules"], severity=["HIGH", "INVALID", "CRITICAL"])
+
+    assert result["success"] is False
+    assert "Invalid severity values: ['INVALID']" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_list_detections_case_sensitive_severity_validation():
+    """Test that severity validation is case-sensitive."""
+    result = await list_detections(["rules"], severity=["high", "CRITICAL"])
+
+    assert result["success"] is False
+    assert "Invalid severity values: ['high']" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_list_detections_case_sensitive_state_validation():
+    """Test that state validation is case-sensitive."""
+    result = await list_detections(["rules"], state="Enabled")
+
+    assert result["success"] is False
+    assert "Invalid state value" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_list_detections_cross_contamination_validation():
+    """Test validation prevents cross-contamination of detection-type-specific params."""
+    # Try to use log_type with policies
+    result = await list_detections(["policies"], log_type=["AWS.CloudTrail"])
+    assert result["success"] is False
+    assert (
+        "log_type parameter is only valid for 'rules' and 'simple_rules'"
+        in result["message"]
+    )
+
+    # Try to use resource_type with rules
+    result = await list_detections(["rules"], resource_type=["AWS.S3.Bucket"])
+    assert result["success"] is False
+    assert "resource_type parameter is only valid for 'policies'" in result["message"]
+
+    # Try to use compliance_status with rules
+    result = await list_detections(["rules"], compliance_status="FAIL")
+    assert result["success"] is False
+    assert (
+        "compliance_status parameter is only valid for 'policies'" in result["message"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_list_detections_mixed_types_with_restricted_params():
+    """Test mixed detection types with some having restricted parameters."""
+    # This should work - rules and simple_rules can use log_type
+    result = await list_detections(
+        ["rules", "simple_rules"], log_type=["AWS.CloudTrail"]
+    )
+    # Should not fail validation
+    assert "log_type parameter is only valid" not in result.get("message", "")
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_get_detection_empty_detection_id(mock_rest_client):
+    """Test get_detection with empty detection ID."""
+    mock_rest_client.get.return_value = ({}, 404)
+
+    result = await get_detection("", ["rules"])
+
+    assert result["success"] is False
+    mock_rest_client.get.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_disable_detection_already_disabled(mock_rest_client):
+    """Test disabling a detection that's already disabled."""
+    already_disabled_rule = {**MOCK_RULE, "enabled": False}
+    mock_rest_client.get.return_value = (already_disabled_rule, 200)
+    mock_rest_client.put.return_value = (already_disabled_rule, 200)
+
+    result = await disable_detection(MOCK_RULE["id"], "rules")
+
+    assert result["success"] is True
+    assert result["rule"]["enabled"] is False
+    # Should still make the API call
+    mock_rest_client.put.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_disable_detection_concurrent_modification(mock_rest_client):
+    """Test disable_detection when rule is modified between GET and PUT."""
+    # GET returns original rule
+    mock_rest_client.get.return_value = (MOCK_RULE, 200)
+    # PUT fails due to concurrent modification (422 Unprocessable Entity)
+    mock_rest_client.put.side_effect = Exception("Concurrent modification detected")
+
+    result = await disable_detection(MOCK_RULE["id"], "rules")
+
+    assert result["success"] is False
+    assert "Failed to disable rules" in result["message"]
+    assert "Concurrent modification detected" in result["message"]
