@@ -5,30 +5,102 @@ from typing import Dict, List, Optional, Union
 class Permission(Enum):
     """Panther permissions that can be required for tools."""
 
+    # Alert permissions
+    ALERT_READ = "Read Alerts"
     ALERT_MODIFY = "Manage Alerts"
-    ALERT_READ = "View Alerts"
-    DATA_ANALYTICS_READ = "Query Data Lake"
-    LOG_SOURCE_READ = "View Log Sources"
-    METRICS_READ = "Read Panther Metrics"
-    ORGANIZATION_API_TOKEN_READ = "Read API Token Info"
+
+    # Policy permissions
     POLICY_READ = "View Policies"
-    RULE_MODIFY = "Manage Rules"
+    POLICY_MODIFY = "Manage Policies"
+
+    # Resource permissions
+    RESOURCE_READ = "ResourceRead"  # Not in UI mapping, keeping raw value
+    RESOURCE_MODIFY = "ResourceModify"  # Not in UI mapping, keeping raw value
+
+    # Rule permissions
     RULE_READ = "View Rules"
-    USER_READ = "View Users"
+    RULE_MODIFY = "Manage Rules"
+
+    # Summary/metrics permissions
+    SUMMARY_READ = "Read Panther Metrics"
+
+    # Bulk upload permissions
+    BULK_UPLOAD = "Bulk Upload"
+    BULK_UPLOAD_VALIDATE = "Bulk Upload Validate"
+
+    # User permissions
+    USER_READ = "Read User Info"
+    USER_MODIFY = "Manage Users"
+
+    # API Token permissions
+    ORGANIZATION_API_TOKEN_READ = "Read API Token Info"
+    ORGANIZATION_API_TOKEN_MODIFY = "Manage API Tokens"
+
+    # General settings permissions
+    GENERAL_SETTINGS_READ = "Read Panther Settings Info"
+    GENERAL_SETTINGS_MODIFY = (
+        "GeneralSettingsModify"  # Not in UI mapping, keeping raw value
+    )
+
+    # Cloud security source permissions
+    CLOUDSEC_SOURCE_READ = "View Cloud Security Sources"
+    CLOUDSEC_SOURCE_MODIFY = "Manage Cloud Security Sources"
+
+    # Log source permissions
+    LOG_SOURCE_RAW_DATA_READ = (
+        "LogSourceRawDataRead"  # Not in UI mapping, keeping raw value
+    )
+    LOG_SOURCE_READ = "View Log Sources"
+    LOG_SOURCE_MODIFY = "Manage Log Sources"
+
+    # Destination permissions
+    DESTINATION_READ = "DestinationRead"  # Not in UI mapping, keeping raw value
+    DESTINATION_MODIFY = "DestinationModify"  # Not in UI mapping, keeping raw value
+
+    # Data analytics permissions
+    DATA_ANALYTICS_READ = "Query Data Lake"
+    DATA_ANALYTICS_MODIFY = "Manage Saved Searches"
+
+    # Lookup permissions
+    LOOKUP_READ = "LookupRead"  # Not in UI mapping, keeping raw value
+    LOOKUP_MODIFY = "LookupModify"  # Not in UI mapping, keeping raw value
+
+    # Panther AI permission
+    RUN_PANTHER_AI = "Run Panther AI"
 
 
-# Mapping from raw values to enum values
-RAW_TO_TITLE = {
-    "AlertModify": Permission.ALERT_MODIFY,
+# Mapping from raw permission constants to human-readable titles
+# The raw constants come from the backend, the titles are what the API returns
+RAW_TO_PERMISSION = {
     "AlertRead": Permission.ALERT_READ,
-    "DataAnalyticsRead": Permission.DATA_ANALYTICS_READ,
-    "LogSourceRead": Permission.LOG_SOURCE_READ,
-    "OrganizationAPITokenRead": Permission.ORGANIZATION_API_TOKEN_READ,
+    "AlertModify": Permission.ALERT_MODIFY,
     "PolicyRead": Permission.POLICY_READ,
-    "RuleModify": Permission.RULE_MODIFY,
+    "PolicyModify": Permission.POLICY_MODIFY,
+    "ResourceRead": Permission.RESOURCE_READ,
+    "ResourceModify": Permission.RESOURCE_MODIFY,
     "RuleRead": Permission.RULE_READ,
-    "SummaryRead": Permission.METRICS_READ,  # Allows reading data & alert metrics
+    "RuleModify": Permission.RULE_MODIFY,
+    "SummaryRead": Permission.SUMMARY_READ,
+    "BulkUpload": Permission.BULK_UPLOAD,
+    "BulkUploadValidate": Permission.BULK_UPLOAD_VALIDATE,
     "UserRead": Permission.USER_READ,
+    "UserModify": Permission.USER_MODIFY,
+    "OrganizationAPITokenRead": Permission.ORGANIZATION_API_TOKEN_READ,
+    "OrganizationAPITokenModify": Permission.ORGANIZATION_API_TOKEN_MODIFY,
+    "GeneralSettingsRead": Permission.GENERAL_SETTINGS_READ,
+    "GeneralSettingsModify": Permission.GENERAL_SETTINGS_MODIFY,
+    "CloudsecSourceRead": Permission.CLOUDSEC_SOURCE_READ,
+    "CloudsecSourceModify": Permission.CLOUDSEC_SOURCE_MODIFY,
+    "LogSourceRawDataRead": Permission.LOG_SOURCE_RAW_DATA_READ,
+    "LogSourceRead": Permission.LOG_SOURCE_READ,
+    "LogSourceModify": Permission.LOG_SOURCE_MODIFY,
+    "DestinationRead": Permission.DESTINATION_READ,
+    "DestinationModify": Permission.DESTINATION_MODIFY,
+    "DataAnalyticsRead": Permission.DATA_ANALYTICS_READ,
+    "DataAnalyticsModify": Permission.DATA_ANALYTICS_MODIFY,
+    "LookupRead": Permission.LOOKUP_READ,
+    "LookupModify": Permission.LOOKUP_MODIFY,
+    "RunPantherAI": Permission.RUN_PANTHER_AI,
 }
 
 
@@ -43,7 +115,9 @@ def convert_permissions(permissions: List[str]) -> List[Permission]:
     Returns:
         List of Permission enums with title values
     """
-    return [RAW_TO_TITLE[perm] for perm in permissions if perm in RAW_TO_TITLE]
+    return [
+        RAW_TO_PERMISSION[perm] for perm in permissions if perm in RAW_TO_PERMISSION
+    ]
 
 
 def perms(

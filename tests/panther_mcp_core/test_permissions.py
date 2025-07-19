@@ -9,16 +9,18 @@ from mcp_panther.panther_mcp_core.permissions import (
 
 def test_permission_enum():
     """Test that Permission enum values are correctly defined."""
-    assert Permission.ALERT_READ.value == "View Alerts"
+    assert Permission.ALERT_READ.value == "Read Alerts"
     assert Permission.ALERT_MODIFY.value == "Manage Alerts"
     assert Permission.DATA_ANALYTICS_READ.value == "Query Data Lake"
     assert Permission.LOG_SOURCE_READ.value == "View Log Sources"
-    assert Permission.METRICS_READ.value == "Read Panther Metrics"
+    assert Permission.SUMMARY_READ.value == "Read Panther Metrics"
     assert Permission.ORGANIZATION_API_TOKEN_READ.value == "Read API Token Info"
     assert Permission.POLICY_READ.value == "View Policies"
+    assert Permission.POLICY_MODIFY.value == "Manage Policies"
     assert Permission.RULE_MODIFY.value == "Manage Rules"
     assert Permission.RULE_READ.value == "View Rules"
-    assert Permission.USER_READ.value == "View Users"
+    assert Permission.USER_READ.value == "Read User Info"
+    assert Permission.USER_MODIFY.value == "Manage Users"
 
 
 def test_convert_permissions():
@@ -36,14 +38,14 @@ def test_perms():
     result = perms(any_of=[Permission.ALERT_READ, Permission.ALERT_MODIFY])
     assert "any_of" in result
     assert len(result["any_of"]) == 2
-    assert "View Alerts" in result["any_of"]
+    assert "Read Alerts" in result["any_of"]
     assert "Manage Alerts" in result["any_of"]
 
     # Test with all_of
     result = perms(all_of=[Permission.ALERT_READ, Permission.ALERT_MODIFY])
     assert "all_of" in result
     assert len(result["all_of"]) == 2
-    assert "View Alerts" in result["all_of"]
+    assert "Read Alerts" in result["all_of"]
     assert "Manage Alerts" in result["all_of"]
 
     # Test with both
@@ -54,10 +56,10 @@ def test_perms():
     assert len(result["all_of"]) == 1
 
     # Test with string values
-    result = perms(any_of=["View Alerts", "Manage Alerts"])
+    result = perms(any_of=["Read Alerts", "Manage Alerts"])
     assert "any_of" in result
     assert len(result["any_of"]) == 2
-    assert "View Alerts" in result["any_of"]
+    assert "Read Alerts" in result["any_of"]
     assert "Manage Alerts" in result["any_of"]
 
 
@@ -66,14 +68,14 @@ def test_any_perms():
     result = any_perms(Permission.ALERT_READ, Permission.ALERT_MODIFY)
     assert "any_of" in result
     assert len(result["any_of"]) == 2
-    assert "View Alerts" in result["any_of"]
+    assert "Read Alerts" in result["any_of"]
     assert "Manage Alerts" in result["any_of"]
 
     # Test with string values
-    result = any_perms("View Alerts", "Manage Alerts")
+    result = any_perms("Read Alerts", "Manage Alerts")
     assert "any_of" in result
     assert len(result["any_of"]) == 2
-    assert "View Alerts" in result["any_of"]
+    assert "Read Alerts" in result["any_of"]
     assert "Manage Alerts" in result["any_of"]
 
 
@@ -82,12 +84,12 @@ def test_all_perms():
     result = all_perms(Permission.ALERT_READ, Permission.ALERT_MODIFY)
     assert "all_of" in result
     assert len(result["all_of"]) == 2
-    assert "View Alerts" in result["all_of"]
+    assert "Read Alerts" in result["all_of"]
     assert "Manage Alerts" in result["all_of"]
 
     # Test with string values
-    result = all_perms("View Alerts", "Manage Alerts")
+    result = all_perms("Read Alerts", "Manage Alerts")
     assert "all_of" in result
     assert len(result["all_of"]) == 2
-    assert "View Alerts" in result["all_of"]
+    assert "Read Alerts" in result["all_of"]
     assert "Manage Alerts" in result["all_of"]

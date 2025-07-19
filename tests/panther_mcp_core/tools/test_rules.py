@@ -1,8 +1,8 @@
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.rules import (
-    disable_rule,
-    get_detection_by_id,
+    disable_detection,
+    get_detection,
     list_detections,
 )
 from tests.utils.helpers import patch_rest_client
@@ -104,11 +104,11 @@ async def test_list_detections_rules_error(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_rule_success(mock_rest_client):
+async def test_get_detection_rule_success(mock_rest_client):
     """Test successful retrieval of a single rule."""
     mock_rest_client.get.return_value = (MOCK_RULE, 200)
 
-    result = await get_detection_by_id(MOCK_RULE["id"], ["rules"])
+    result = await get_detection(MOCK_RULE["id"], ["rules"])
 
     assert result["success"] is True
     assert result["rule"]["id"] == MOCK_RULE["id"]
@@ -123,11 +123,11 @@ async def test_get_detection_by_id_rule_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_rule_not_found(mock_rest_client):
+async def test_get_detection_rule_not_found(mock_rest_client):
     """Test handling of non-existent rule."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_detection_by_id("nonexistent-rule", ["rules"])
+    result = await get_detection("nonexistent-rule", ["rules"])
 
     assert result["success"] is False
     assert (
@@ -138,11 +138,11 @@ async def test_get_detection_by_id_rule_not_found(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_rule_error(mock_rest_client):
+async def test_get_detection_rule_error(mock_rest_client):
     """Test handling of errors when getting rule by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_detection_by_id(MOCK_RULE["id"], ["rules"])
+    result = await get_detection(MOCK_RULE["id"], ["rules"])
 
     assert result["success"] is False
     assert "Failed" in result["message"]
@@ -150,16 +150,16 @@ async def test_get_detection_by_id_rule_error(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_disable_rule_success(mock_rest_client):
+async def test_disable_detection_success(mock_rest_client):
     """Test successful disabling of a rule."""
-    # For the disable_rule test, we need two responses:
+    # For the disable_detection test, we need two responses:
     # 1. GET to fetch current rule data
     # 2. PUT to update with enabled=False
     mock_rest_client.get.return_value = (MOCK_RULE, 200)
     disabled_rule = {**MOCK_RULE, "enabled": False}
     mock_rest_client.put.return_value = (disabled_rule, 200)
 
-    result = await disable_rule(MOCK_RULE["id"])
+    result = await disable_detection(MOCK_RULE["id"], "rules")
 
     assert result["success"] is True
     assert result["rule"]["enabled"] is False
@@ -173,23 +173,23 @@ async def test_disable_rule_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_disable_rule_not_found(mock_rest_client):
+async def test_disable_detection_not_found(mock_rest_client):
     """Test disabling a non-existent rule."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await disable_rule("nonexistent-rule")
+    result = await disable_detection("nonexistent-rule", "rules")
 
     assert result["success"] is False
-    assert "Rule with ID nonexistent-rule not found" in result["message"]
+    assert "Rules with ID nonexistent-rule not found" in result["message"]
 
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_disable_rule_error(mock_rest_client):
+async def test_disable_detection_error(mock_rest_client):
     """Test handling of errors when disabling a rule."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await disable_rule(MOCK_RULE["id"])
+    result = await disable_detection(MOCK_RULE["id"], "rules")
 
     assert result["success"] is False
     assert "Failed" in result["message"]
@@ -274,7 +274,7 @@ async def test_list_detections_scheduled_rules_with_pagination(mock_rest_client)
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_scheduled_rule_success(mock_rest_client):
+async def test_get_detection_scheduled_rule_success(mock_rest_client):
     """Test successful retrieval of a single scheduled rule."""
     scheduled_rule = {
         **MOCK_RULE,
@@ -286,7 +286,7 @@ async def test_get_detection_by_id_scheduled_rule_success(mock_rest_client):
     }
     mock_rest_client.get.return_value = (scheduled_rule, 200)
 
-    result = await get_detection_by_id(scheduled_rule["id"], ["scheduled_rules"])
+    result = await get_detection(scheduled_rule["id"], ["scheduled_rules"])
 
     assert result["success"] is True
     assert result["scheduled_rule"]["id"] == scheduled_rule["id"]
@@ -296,13 +296,11 @@ async def test_get_detection_by_id_scheduled_rule_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_scheduled_rule_not_found(mock_rest_client):
+async def test_get_detection_scheduled_rule_not_found(mock_rest_client):
     """Test handling of non-existent scheduled rule."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_detection_by_id(
-        "nonexistent.scheduled.rule", ["scheduled_rules"]
-    )
+    result = await get_detection("nonexistent.scheduled.rule", ["scheduled_rules"])
 
     assert result["success"] is False
     assert (
@@ -313,11 +311,11 @@ async def test_get_detection_by_id_scheduled_rule_not_found(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_scheduled_rule_error(mock_rest_client):
+async def test_get_detection_scheduled_rule_error(mock_rest_client):
     """Test handling of errors when getting scheduled rule by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_detection_by_id("scheduled.rule.id", ["scheduled_rules"])
+    result = await get_detection("scheduled.rule.id", ["scheduled_rules"])
 
     assert result["success"] is False
     assert "Failed" in result["message"]
@@ -392,7 +390,7 @@ async def test_list_detections_simple_rules_error(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_simple_rule_success(mock_rest_client):
+async def test_get_detection_simple_rule_success(mock_rest_client):
     """Test successful retrieval of a single simple rule."""
     simple_rule = {
         **MOCK_RULE,
@@ -402,7 +400,7 @@ async def test_get_detection_by_id_simple_rule_success(mock_rest_client):
     }
     mock_rest_client.get.return_value = (simple_rule, 200)
 
-    result = await get_detection_by_id(simple_rule["id"], ["simple_rules"])
+    result = await get_detection(simple_rule["id"], ["simple_rules"])
 
     assert result["success"] is True
     assert result["simple_rule"]["id"] == simple_rule["id"]
@@ -411,11 +409,11 @@ async def test_get_detection_by_id_simple_rule_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_simple_rule_not_found(mock_rest_client):
+async def test_get_detection_simple_rule_not_found(mock_rest_client):
     """Test handling of non-existent simple rule."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_detection_by_id("nonexistent.simple.rule", ["simple_rules"])
+    result = await get_detection("nonexistent.simple.rule", ["simple_rules"])
 
     assert result["success"] is False
     assert (
@@ -426,11 +424,11 @@ async def test_get_detection_by_id_simple_rule_not_found(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_simple_rule_error(mock_rest_client):
+async def test_get_detection_simple_rule_error(mock_rest_client):
     """Test handling of errors when getting simple rule by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_detection_by_id("simple.rule.id", ["simple_rules"])
+    result = await get_detection("simple.rule.id", ["simple_rules"])
 
     assert result["success"] is False
     assert "Failed" in result["message"]
@@ -533,11 +531,11 @@ async def test_list_detections_policies_error(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_policy_success(mock_rest_client):
+async def test_get_detection_policy_success(mock_rest_client):
     """Test successful retrieval of a single policy."""
     mock_rest_client.get.return_value = (MOCK_POLICY, 200)
 
-    result = await get_detection_by_id(MOCK_POLICY["id"], ["policies"])
+    result = await get_detection(MOCK_POLICY["id"], ["policies"])
 
     assert result["success"] is True
     assert result["policy"]["id"] == MOCK_POLICY["id"]
@@ -553,11 +551,11 @@ async def test_get_detection_by_id_policy_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_policy_not_found(mock_rest_client):
+async def test_get_detection_policy_not_found(mock_rest_client):
     """Test handling of non-existent policy."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_detection_by_id("nonexistent-policy", ["policies"])
+    result = await get_detection("nonexistent-policy", ["policies"])
 
     assert result["success"] is False
     assert (
@@ -568,11 +566,11 @@ async def test_get_detection_by_id_policy_not_found(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_policy_error(mock_rest_client):
+async def test_get_detection_policy_error(mock_rest_client):
     """Test handling of errors when getting policy by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_detection_by_id(MOCK_POLICY["id"], ["policies"])
+    result = await get_detection(MOCK_POLICY["id"], ["policies"])
 
     assert result["success"] is False
     assert "Failed to get detection details for types ['policies']" in result["message"]
@@ -592,9 +590,9 @@ async def test_list_detections_invalid_detection_type():
 
 
 @pytest.mark.asyncio
-async def test_get_detection_by_id_invalid_detection_type():
+async def test_get_detection_invalid_detection_type():
     """Test validation of invalid detection_type parameter."""
-    result = await get_detection_by_id("some-id", ["invalid_type"])
+    result = await get_detection("some-id", ["invalid_type"])
 
     assert result["success"] is False
     assert "Invalid detection_types ['invalid_type']" in result["message"]
@@ -636,7 +634,7 @@ async def test_list_detections_multiple_types(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_multiple_types_found_in_one(mock_rest_client):
+async def test_get_detection_multiple_types_found_in_one(mock_rest_client):
     """Test getting detection by ID when found in one of multiple types."""
 
     def side_effect(endpoint, **kwargs):
@@ -647,7 +645,7 @@ async def test_get_detection_by_id_multiple_types_found_in_one(mock_rest_client)
 
     mock_rest_client.get.side_effect = side_effect
 
-    result = await get_detection_by_id("some-id", ["rules", "policies"])
+    result = await get_detection("some-id", ["rules", "policies"])
 
     assert result["success"] is True
     assert "rule" in result
@@ -659,11 +657,11 @@ async def test_get_detection_by_id_multiple_types_found_in_one(mock_rest_client)
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
-async def test_get_detection_by_id_multiple_types_not_found(mock_rest_client):
+async def test_get_detection_multiple_types_not_found(mock_rest_client):
     """Test getting detection by ID when not found in any of multiple types."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_detection_by_id("some-id", ["rules", "policies"])
+    result = await get_detection("some-id", ["rules", "policies"])
 
     assert result["success"] is False
     assert (
@@ -682,9 +680,9 @@ async def test_list_detections_empty_types():
 
 
 @pytest.mark.asyncio
-async def test_get_detection_by_id_empty_types():
+async def test_get_detection_empty_types():
     """Test validation when no detection types are provided."""
-    result = await get_detection_by_id("some-id", [])
+    result = await get_detection("some-id", [])
 
     assert result["success"] is False
     assert "At least one detection type must be specified" in result["message"]
