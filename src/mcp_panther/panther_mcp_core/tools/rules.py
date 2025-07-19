@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 from typing_extensions import Annotated
 
 from ..client import get_rest_client
-from ..permissions import Permission, all_perms
+from ..permissions import Permission, all_perms, any_perms
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
@@ -195,7 +195,7 @@ async def list_detections(
         "permissions": all_perms(Permission.RULE_READ, Permission.POLICY_READ),
     }
 )
-async def get_detection_by_id(
+async def get_detection(
     detection_id: Annotated[str, "The ID of the detection to fetch"],
     detection_type: Annotated[List[str], "Type of detection to fetch"] = ["rules"],
 ) -> Dict[str, Any]:
@@ -289,53 +289,85 @@ async def get_detection_by_id(
 
 @mcp_tool(
     annotations={
-        "permissions": all_perms(Permission.RULE_MODIFY),
+        "permissions": any_perms(Permission.RULE_MODIFY, Permission.POLICY_MODIFY),
     }
 )
-async def disable_rule(rule_id: str) -> Dict[str, Any]:
-    """Disable a Panther rule by setting enabled to false.
+async def disable_detection(
+    detection_id: Annotated[str, "The ID of the detection to disable"],
+    detection_type: Annotated[str, "Type of detection to disable"] = "rules",
+) -> Dict[str, Any]:
+    """Disable a Panther detection by setting enabled to false.
 
     Args:
-        rule_id: The ID of the rule to disable
+        detection_id: The ID of the detection to disable
+        detection_type: Type of detection to disable. Valid options: "rules", "scheduled_rules", "simple_rules", "policies"
 
     Returns:
         Dict containing:
         - success: Boolean indicating if the update was successful
-        - rule: Updated rule information if successful
+        - [detection_type]: Updated detection information if successful
         - message: Error message if unsuccessful
     """
-    logger.info(f"Disabling rule with ID: {rule_id}")
+    logger.info(f"Disabling {detection_type} with ID: {detection_id}")
+
+    # Map detection types to endpoints
+    endpoint_map = {
+        "rules": f"/rules/{detection_id}",
+        "scheduled_rules": f"/scheduled-rules/{detection_id}",
+        "simple_rules": f"/simple-rules/{detection_id}",
+        "policies": f"/policies/{detection_id}",
+    }
+
+    # Map detection types to response field names
+    field_map = {
+        "rules": "rule",
+        "scheduled_rules": "scheduled_rule",
+        "simple_rules": "simple_rule",
+        "policies": "policy",
+    }
+
+    # Validate detection type
+    if detection_type not in endpoint_map:
+        valid_types = ", ".join(endpoint_map.keys())
+        return {
+            "success": False,
+            "message": f"Invalid detection_type '{detection_type}'. Valid values are: {valid_types}",
+        }
 
     try:
         async with get_rest_client() as client:
-            # First get the current rule to preserve other fields
-            current_rule, status = await client.get(
-                f"/rules/{rule_id}", expected_codes=[200, 404]
+            # First get the current detection to preserve other fields
+            current_detection, status = await client.get(
+                endpoint_map[detection_type], expected_codes=[200, 404]
             )
 
             if status == 404:
                 return {
                     "success": False,
-                    "message": f"Rule with ID {rule_id} not found",
+                    "message": f"{detection_type.replace('_', ' ').title()} with ID {detection_id} not found",
                 }
 
             # Update only the enabled field
-            current_rule["enabled"] = False
+            current_detection["enabled"] = False
 
-            # Skip tests for simple disable operation
-            params = {"run-tests-first": "false"}
+            # Skip tests for simple disable operation (mainly for rules)
+            params = (
+                {"run-tests-first": "false"}
+                if detection_type in ["rules", "scheduled_rules", "simple_rules"]
+                else {}
+            )
 
             # Make the update request
             result, _ = await client.put(
-                f"/rules/{rule_id}", json_data=current_rule, params=params
+                endpoint_map[detection_type], json_data=current_detection, params=params
             )
 
-        logger.info(f"Successfully disabled rule with ID: {rule_id}")
-        return {"success": True, "rule": result}
+        logger.info(f"Successfully disabled {detection_type} with ID: {detection_id}")
+        return {"success": True, field_map[detection_type]: result}
 
     except Exception as e:
-        logger.error(f"Failed to disable rule: {str(e)}")
+        logger.error(f"Failed to disable {detection_type}: {str(e)}")
         return {
             "success": False,
-            "message": f"Failed to disable rule: {str(e)}",
+            "message": f"Failed to disable {detection_type}: {str(e)}",
         }

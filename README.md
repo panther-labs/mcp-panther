@@ -52,8 +52,8 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `list_detections` | List detections from Panther with support for different detection types. Accepts a list with one detection type: ["rules"], ["scheduled_rules"], ["simple_rules"], or ["policies"] | "Show me all enabled rules" / "List all policies for AWS resources" |
-| `get_detection_by_id` | Get detailed information about a specific detection including the detection body and tests. Accepts a list with one detection type: ["rules"], ["scheduled_rules"], ["simple_rules"], or ["policies"] | "Get details for rule ID abc123" / "Get details for policy ID AWS.S3.Bucket.PublicReadACP" |
-| `disable_rule` | Disable a rule by setting enabled to false | "Disable rule abc123" |
+| `get_detection` | Get detailed information about a specific detection including the detection body and tests. Accepts a list with one detection type: ["rules"], ["scheduled_rules"], ["simple_rules"], or ["policies"] | "Get details for rule ID abc123" / "Get details for policy ID AWS.S3.Bucket.PublicReadACP" |
+| `disable_detection` | Disable a detection by setting enabled to false. Supports rules, scheduled_rules, simple_rules, and policies | "Disable rule abc123" / "Disable policy AWS.S3.Bucket.PublicReadACP" |
 | `put_rule` | Update an existing rule or create a new one | "Update rule abc123 with new severity HIGH" |
 | `get_global_helper_by_id` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
 | `list_global_helpers` | List all Panther global helpers with optional pagination | "Show me all global helpers for CrowdStrike events" |

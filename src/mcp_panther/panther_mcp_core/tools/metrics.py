@@ -60,7 +60,7 @@ class BytesProcessedInterval(int, Enum):
 
 @mcp_tool(
     annotations={
-        "permissions": all_perms(Permission.METRICS_READ),
+        "permissions": all_perms(Permission.SUMMARY_READ),
         "readOnlyHint": True,
     }
 )
@@ -166,7 +166,7 @@ async def get_severity_alert_metrics(
 
 @mcp_tool(
     annotations={
-        "permissions": all_perms(Permission.METRICS_READ),
+        "permissions": all_perms(Permission.SUMMARY_READ),
         "readOnlyHint": True,
     }
 )
@@ -274,7 +274,7 @@ async def get_rule_alert_metrics(
 
 @mcp_tool(
     annotations={
-        "permissions": all_perms(Permission.METRICS_READ),
+        "permissions": all_perms(Permission.SUMMARY_READ),
         "readOnlyHint": True,
     }
 )
