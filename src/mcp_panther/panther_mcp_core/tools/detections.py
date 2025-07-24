@@ -316,6 +316,7 @@ async def list_detections(
                         "tags": item.get("tags", []),
                         "reports": item.get("reports", {}),
                         "managed": item.get("managed", False),
+                        "createdBy": item.get("createdBy"),
                         "createdAt": item.get("createdAt"),
                         "lastModified": item.get("lastModified"),
                     }
@@ -333,6 +334,9 @@ async def list_detections(
                         "tags": item.get("tags", []),
                         "reports": item.get("reports", {}),
                         "managed": item.get("managed", False),
+                        "threshold": item.get("threshold"),
+                        "dedupPeriodMinutes": item.get("dedupPeriodMinutes"),
+                        "createdBy": item.get("createdBy"),
                         "createdAt": item.get("createdAt"),
                         "lastModified": item.get("lastModified"),
                     }
@@ -350,6 +354,9 @@ async def list_detections(
                         "tags": item.get("tags"),
                         "reports": item.get("reports", {}),
                         "managed": item.get("managed"),
+                        "threshold": item.get("threshold"),
+                        "dedupPeriodMinutes": item.get("dedupPeriodMinutes"),
+                        "createdBy": item.get("createdBy"),
                         "createdAt": item.get("createdAt"),
                         "lastModified": item.get("lastModified"),
                     }
