@@ -437,7 +437,9 @@ async def get_detection(
 
                 if status == 404:
                     not_found_types.append(dt)
-                    logger.warning(f"No {dt.rstrip('s')} found with ID: {detection_id}")
+                    # Use proper singular form from mapping instead of naive string manipulation
+                    singular_form = SINGULAR_FIELD_MAP[dt].replace("_", " ")
+                    logger.warning(f"No {singular_form} found with ID: {detection_id}")
                 else:
                     found_results[dt] = result
                     logger.info(
@@ -491,7 +493,7 @@ async def disable_detection(
         str,
         Field(
             description="Type of detection to disable. Valid options: rules, scheduled_rules, simple_rules, or policies.",
-            examples=[["rules"], ["scheduled_rules"], ["simple_rules"], ["policies"]],
+            examples=["rules", "scheduled_rules", "simple_rules", "policies"],
         ),
     ] = "rules",
 ) -> dict[str, Any]:
@@ -520,7 +522,8 @@ async def disable_detection(
                     "message": f"{detection_type.replace('_', ' ').title()} with ID {detection_id} not found",
                 }
 
-            # Update only the enabled field
+            # Disable the detection by setting enabled to False
+            # This modifies the API response object which is then sent back in the PUT request
             current_detection["enabled"] = False
 
             # Skip tests for simple disable operation (mainly for rules)
