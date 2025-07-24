@@ -8,7 +8,7 @@ All tool modules are imported here to ensure their decorators are processed.
 # Define all modules that should be available when importing this package
 __all__ = [
     "alerts",
-    "rules",
+    "detections",
     "data_lake",
     "data_models",
     "sources",
@@ -26,12 +26,12 @@ from . import (
     alerts,
     data_lake,
     data_models,
+    detections,
     globals,
     helpers,
     metrics,
     permissions,
     roles,
-    rules,
     schemas,
     sources,
     users,

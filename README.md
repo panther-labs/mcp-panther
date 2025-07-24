@@ -3,6 +3,7 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 Panther's Model Context Protocol (MCP) server provides functionality to:
+
 1. **Write and tune detections from your IDE**
 2. **Interactively query security logs using natural language**
 3. **Triage, comment, and resolve one or many alerts**
@@ -29,42 +30,57 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 </details>
 
 <details>
-<summary><strong>Data</strong></summary>
+<summary><strong>Data Lake</strong></summary>
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `execute_data_lake_query` | Execute SQL queries against Panther's data lake | "Query AWS CloudTrail logs for failed login attempts in the last day" |
-| `get_data_lake_query_results` | Get results from a previously executed data lake query | "Get results for query ID abc123" |
-| `list_data_lake_queries` | List previously executed data lake queries with comprehensive filtering options | "Show me all running queries from the last hour" |
-| `cancel_data_lake_query` | Cancel a running data lake query to free up resources and prevent system overload | "Cancel query abc123 that's taking too long" |
 | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
 | `list_databases` | List all available data lake databases in Panther | "List all available databases" |
-| `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
 | `list_database_tables` | List all available tables for a specific database in Panther's data lake | "What tables are in the panther_logs database" |
 | `summarize_alert_events` | Analyze patterns and relationships across multiple alerts by aggregating their event data | "Show me patterns in events from alerts abc123 and def456" |
 
 </details>
 
 <details>
-<summary><strong>Rules</strong></summary>
+<summary><strong>Sources</strong></summary>
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `disable_rule` | Disable a rule by setting enabled to false | "Disable rule abc123" |
-| `get_global_helper_by_id` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
-| `get_policy_by_id` | Get detailed information about a specific policy | "Get details for policy ID AWS.S3.Bucket.PublicReadACP" |
-| `get_rule_by_id` | Get detailed information about a specific rule | "Get details for rule ID abc123" |
-| `get_scheduled_rule_by_id` | Get detailed information about a specific scheduled rule | "Get details for scheduled rule abc123" |
-| `get_simple_rule_by_id` | Get detailed information about a specific simple rule | "Get details for simple rule abc123" |
-| `list_global_helpers` | List all Panther global helpers with optional pagination | "Show me all global helpers for CrowdStrike events" |
-| `list_policies` | List all Panther policies with optional pagination | "Show me all policies for AWS resources" |
-| `list_rules` | List all Panther rules with optional pagination | "Show me all enabled rules" |
-| `list_scheduled_rules` | List all scheduled rules with optional pagination | "List all scheduled rules in Panther" |
-| `list_simple_rules` | List all simple rules with optional pagination | "Show me all simple rules in Panther" |
-| `list_data_models` | List data models that control UDM mappings in rules | "Show me all data models for log parsing" |
-| `get_data_model_by_id` | Get detailed information about a specific data model | "Get the complete details for the 'AWS_CloudTrail' data model" |
+| `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
+
+</details>
+
+<details>
+<summary><strong>Detections</strong></summary>
+
+| Tool Name | Description | Sample Prompt |
+|-----------|-------------|---------------|
+| `list_detections` | List detections from Panther with comprehensive filtering support. Supports multiple detection types and filtering by name, state, severity, tags, log types, resource types, and more | "Show me all enabled HIGH severity rules with tag 'AWS'" / "List disabled policies for S3 resources" / "Find all rules containing 'login' in the name" |
+| `get_detection` | Get detailed information about a specific detection including the detection body and tests. Accepts a list with one detection type: ["rules"], ["scheduled_rules"], ["simple_rules"], or ["policies"] | "Get details for rule ID abc123" / "Get details for policy ID AWS.S3.Bucket.PublicReadACP" |
+| `disable_detection` | Disable a detection by setting enabled to false. Supports rules, scheduled_rules, simple_rules, and policies | "Disable rule abc123" / "Disable policy AWS.S3.Bucket.PublicReadACP" |
+
+</details>
+
+<details>
+<summary><strong>Global Helpers</strong></summary>
+
+| Tool Name | Description | Sample Prompt |
+|-----------|-------------|---------------|
 | `list_globals` | List global helper functions with filtering options | "Show me global helpers containing 'aws' in the name" |
 | `get_global_by_id` | Get detailed information and code for a specific global helper | "Get the complete code for global helper 'AWSUtilities'" |
+| `list_global_helpers` | List all Panther global helpers with optional pagination | "Show me all global helpers for CrowdStrike events" |
+| `get_global_helper_by_id` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
+
+</details>
+
+<details>
+<summary><strong>Data Models</strong></summary>
+
+| Tool Name | Description | Sample Prompt |
+|-----------|-------------|---------------|
+| `list_data_models` | List data models that control UDM mappings in rules | "Show me all data models for log parsing" |
+| `get_data_model_by_id` | Get detailed information about a specific data model | "Get the complete details for the 'AWS_CloudTrail' data model" |
 
 </details>
 
@@ -95,10 +111,10 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `list_panther_users` | List all Panther user accounts | "Show me all active Panther users" |
-| `get_user_by_id` | Get detailed information about a specific user | "Get details for user ID 'john.doe@company.com'" |
-| `get_permissions` | Get the current user's permissions | "What permissions do I have?" |
+| `get_user_by_id` | Get detailed information about a specific user | "Get details for user ID 'john.doe'" |
 | `list_roles` | List all roles with filtering options (name search, role IDs, sort direction) | "Show me all roles containing 'Admin' in the name" |
 | `get_role_by_id` | Get detailed information about a specific role including permissions | "Get complete details for the 'Admin' role" |
+| `get_permissions` | Get the current user's permissions | "What permissions do I have?" |
 
 </details>
 
@@ -127,6 +143,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 **Choose one of the following installation methods:**
 
 ### Docker (Recommended)
+
 The easiest way to get started is using our pre-built Docker image:
 
 ```json
@@ -152,11 +169,13 @@ The easiest way to get started is using our pre-built Docker image:
 ```
 
 ### UVX
+
 For Python users, you can run directly from PyPI using uvx:
 
 1. [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
 
 2. Configure your MCP client:
+
 ```json
 {
   "mcpServers": {
@@ -175,18 +194,21 @@ For Python users, you can run directly from PyPI using uvx:
 ## MCP Client Setup
 
 ### Cursor
+
 [Follow the instructions here](https://docs.cursor.com/context/model-context-protocol#configuring-mcp-servers) to configure your project or global MCP configuration. **It's VERY IMPORTANT that you do not check this file into version control.**
 
 Once configured, navigate to Cursor Settings > MCP to view the running server:
 
-<img src=".github/panther-mcp-cursor-config.png" width="500" />
+<img src=".github/panther-mcp-cursor-config.png" width="500" alt="Cursor MCP Configuration Screenshot" />
 
 **Tips:**
-* Be specific about where you want to generate new rules by using the `@` symbol and then typing a specific directory.
-* For more reliability during tool use, try selecting a specific model, like Claude 3.7 Sonnet.
-* If your MCP Client is failing to find any tools from the Panther MCP Server, try restarting the Client and ensuring the MCP server is running. In Cursor, refresh the MCP Server and start a new chat.
+
+- Be specific about where you want to generate new rules by using the `@` symbol and then typing a specific directory.
+- For more reliability during tool use, try selecting a specific model, like Claude 3.7 Sonnet.
+- If your MCP Client is failing to find any tools from the Panther MCP Server, try restarting the Client and ensuring the MCP server is running. In Cursor, refresh the MCP Server and start a new chat.
 
 ### Claude Desktop
+
 To use with Claude Desktop, manually configure your `claude_desktop_config.json`:
 
 1. Open the Claude Desktop settings and navigate to the Developer tab
@@ -213,7 +235,9 @@ To use with Claude Desktop, manually configure your `claude_desktop_config.json`
 If you run into any issues, [try the troubleshooting steps here](https://modelcontextprotocol.io/quickstart/user#troubleshooting).
 
 ### Goose
+
 Use with [Goose](https://block.github.io/goose/), Block's open-source AI agent:
+
 ```bash
 # Start Goose with the MCP server
 goose session --with-extension "uvx mcp-panther --compat-mode"
