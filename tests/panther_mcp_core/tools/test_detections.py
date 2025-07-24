@@ -19,6 +19,7 @@ MOCK_RULE = {
     "runbook": "",
     "severity": "MEDIUM",
     "threshold": 1,
+    "createdBy": {"id": "user-123", "type": "User"},
     "createdAt": "2024-11-14T17:09:49.841715953Z",
     "lastModified": "2024-11-14T17:09:49.841716265Z",
     "tags": ["Authentication", "Login"],
@@ -73,6 +74,9 @@ async def test_list_detections_rules_success(mock_rest_client):
     assert first_rule["severity"] == MOCK_RULE["severity"]
     assert first_rule["displayName"] == MOCK_RULE["displayName"]
     assert first_rule["enabled"] is True
+    assert first_rule["threshold"] == MOCK_RULE["threshold"]
+    assert first_rule["dedupPeriodMinutes"] == MOCK_RULE["dedupPeriodMinutes"]
+    assert first_rule["createdBy"] == MOCK_RULE["createdBy"]
 
 
 @pytest.mark.asyncio
@@ -444,6 +448,7 @@ MOCK_POLICY = {
     "resourceTypes": ["AWS.S3.Bucket"],
     "managed": False,
     "severity": "HIGH",
+    "createdBy": {"id": "user-456", "type": "User"},
     "createdAt": "2024-11-14T17:09:49.841715953Z",
     "lastModified": "2024-11-14T17:09:49.841716265Z",
     "tags": ["AWS", "S3", "Security"],
@@ -496,6 +501,7 @@ async def test_list_detections_policies_success(mock_rest_client):
     assert first_policy["displayName"] == MOCK_POLICY["displayName"]
     assert first_policy["enabled"] is True
     assert first_policy["resourceTypes"] == MOCK_POLICY["resourceTypes"]
+    assert first_policy["createdBy"] == MOCK_POLICY["createdBy"]
 
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
