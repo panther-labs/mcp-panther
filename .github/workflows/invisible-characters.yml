@@ -69,4 +69,4 @@ jobs:
         run: |
           python .github/scripts/lint-invisible-characters/lint-invisible-characters.py \
           ${{ needs.changed_files.outputs.changed_files }} \
-          --ignore .github/scripts/invisible
+          --ignore .github/scripts/lint-invisible-characters
