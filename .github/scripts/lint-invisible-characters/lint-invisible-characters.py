@@ -75,7 +75,7 @@ INVISIBLE_CHARS = {
 }
 
 # Characters to ignore (common legitimate whitespace)
-ALLOWED_CHARS = {0x0009, 0x000A, 0x000D, 0x0020}  # TAB, LF, CR, SPACE
+ALLOWED_CHARS = {"0009", "000A", "000D", "0020"}  # TAB, LF, CR, SPACE
 
 
 class Issue(NamedTuple):
@@ -108,7 +108,7 @@ def scan_file_for_invisible_chars(file_path: str) -> List[Issue]:
             codepoint = ord(char)
             hex_code = f"{codepoint:04X}"
             
-            if hex_code in INVISIBLE_CHARS and codepoint not in ALLOWED_CHARS:
+            if hex_code in INVISIBLE_CHARS and hex_code not in ALLOWED_CHARS:
                 issues.append(Issue(
                     file=file_path,
                     line=line_num + 1,
