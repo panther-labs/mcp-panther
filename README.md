@@ -212,14 +212,22 @@ To use with Claude Desktop, manually configure your `claude_desktop_config.json`
 
 If you run into any issues, [try the troubleshooting steps here](https://modelcontextprotocol.io/quickstart/user#troubleshooting).
 
-### Goose
-Use with [Goose](https://block.github.io/goose/), Block's open-source AI agent:
+### Goose CLI
+Use with [Goose CLI](https://block.github.io/goose/docs/getting-started/installation/), Block's open-source AI agent:
 ```bash
 # Start Goose with the MCP server
 goose session --with-extension "uvx mcp-panther --compat-mode"
 ```
 
 The `--compat-mode` flag enables compatibility mode for broader MCP client support, especially for clients using older MCP versions that may not support all the latest features.
+
+### Goose Desktop
+Use with [Goose Desktop](https://block.github.io/goose/docs/getting-started/installation/), Block's open-source AI agent:
+
+From 'Extensions' -> 'Add custom extension' provide your configuration information.
+
+<img src=".github/panther-mcp-goose-desktop-config.png" width="500" />
+
 
 ## Security Best Practices
 
