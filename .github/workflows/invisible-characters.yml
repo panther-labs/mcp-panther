@@ -1,0 +1,40 @@
+name: Detect Invisible Characters in Changed Files
+
+on:
+  pull_request:
+
+
+jobs:
+  changed_files:
+    name: Changed Files
+    runs-on: ubuntu-latest
+    outputs:
+      changed_files: ${{ steps.changed_files.outputs.all_changed_files }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - name: Changed Files
+        id: changed_files
+        uses: ./.github/actions/changed_files
+  invisible_characters:
+    needs: changed_files
+    if: needs.changed_files.outputs.changed_files != ''
+    name: Detect Invisible Characters in Changed Files
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Detect invisible characters
+        run: |
+          python .github/scripts/lint-invisible.py \
+          ${{ needs.changed_files.outputs.changed_files }} \
+          --ignore .github/scripts/invisible
