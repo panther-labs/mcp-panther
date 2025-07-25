@@ -103,10 +103,14 @@ This starts the MCP Inspector server and provides an interactive web interface t
 You can also run the server directly:
 
 ```bash
+# STDIO transport (default)
 uv run python -m mcp_panther.server
+
+# Streamable HTTP transport
+uv run python -m mcp_panther.server --transport streamable-http --port 8000 --host 127.0.0.1
 ```
 
-This will start the server at http://127.0.0.1:8000/
+The streamable HTTP transport will start the server at http://127.0.0.1:8000/mcp
 
 ## Extending Functionality
 

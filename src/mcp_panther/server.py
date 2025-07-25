@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 import signal
@@ -6,9 +5,7 @@ import sys
 from importlib.metadata import version
 
 import click
-import uvicorn
-from starlette.applications import Starlette
-from starlette.routing import Mount
+from fastmcp import FastMCP
 
 # Server name
 MCP_SERVER_NAME = "mcp-panther"
@@ -103,9 +100,9 @@ def handle_signals():
 @click.version_option(version("mcp-panther"), "--version", "-v")
 @click.option(
     "--transport",
-    type=click.Choice(["stdio", "sse"]),
+    type=click.Choice(["stdio", "streamable-http"]),
     default=os.environ.get("MCP_TRANSPORT", default="stdio"),
-    help="Transport type (stdio or sse)",
+    help="Transport type (stdio or streamable-http)",
 )
 @click.option(
     COMPATIBILITY_MODE_FLAG,
@@ -116,12 +113,12 @@ def handle_signals():
 @click.option(
     "--port",
     default=int(os.environ.get("MCP_PORT", default="3000")),
-    help="Port to use for SSE transport",
+    help="Port to use for streamable HTTP transport",
 )
 @click.option(
     "--host",
     default=os.environ.get("MCP_HOST", default="127.0.0.1"),
-    help="Host to bind to for SSE transport",
+    help="Host to bind to for streamable HTTP transport",
 )
 @click.option(
     "--log-file",
@@ -147,25 +144,13 @@ def main(transport: str, compat_mode: bool, port: int, host: str, log_file: str 
 
     logger.info(f"Python {major}.{minor}.{micro}")
 
-    if transport == "sse":
-        # Create the Starlette app
-        app = Starlette(
-            debug=True,
-            routes=[
-                Mount("/", app=mcp.sse_app()),
-            ],
+    if transport == "streamable-http":
+        logger.info(
+            f"Starting Panther MCP Server with streamable HTTP transport on {host}:{port}"
         )
 
-        logger.info(f"Starting Panther MCP Server with SSE transport on {host}:{port}")
-        # Use Uvicorn's Config and Server classes for more control
-        config = uvicorn.Config(app, host=host, port=port, timeout_graceful_shutdown=1)
-        server = uvicorn.Server(config)
-
-        # Override the default behavior
-        server.force_exit = True  # This makes Ctrl+C force exit
-
         try:
-            asyncio.run(server.serve())
+            mcp.run(transport="streamable-http", host=host, port=port)
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received, forcing immediate exit")
             os._exit(0)
