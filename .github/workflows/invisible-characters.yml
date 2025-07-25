@@ -3,6 +3,11 @@ name: Detect Invisible Characters in Changed Files
 on:
   pull_request:
 
+permissions:
+  contents: read
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   changed_files:
@@ -16,8 +21,26 @@ jobs:
       - name: Changed Files
         id: changed_files
         uses: ./.github/actions/changed_files
-  invisible_characters:
+        
+  test_invisible_characters:
     needs: changed_files
+    if: contains(needs.changed_files.outputs.changed_files, '.github/scripts/lint-invisible-characters')
+    name: Test Invisible Characters in Changed Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test Invisible Characters
+        run: |
+          python .github/scripts/lint-invisible-characters/lint-invisible-characters.py \
+          .github/scripts/lint-invisible-characters/lint-invisible-characters-test-file.md
+  
+  invisible_characters:
+    needs: [changed_files, test_invisible_characters]
     if: needs.changed_files.outputs.changed_files != ''
     name: Detect Invisible Characters in Changed Files
     runs-on: ubuntu-latest
@@ -35,6 +58,6 @@ jobs:
 
       - name: Detect invisible characters
         run: |
-          python .github/scripts/lint-invisible.py \
+          python .github/scripts/lint-invisible-characters/lint-invisible-characters.py \
           ${{ needs.changed_files.outputs.changed_files }} \
           --ignore .github/scripts/invisible
