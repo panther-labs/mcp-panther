@@ -6,7 +6,7 @@ fmt:
 lint:
 	ruff check $(dirs)
 
-docker: test
+docker:
 	docker build -t mcp-panther -t mcp-panther:latest -t mcp-panther:$(shell git rev-parse --abbrev-ref HEAD | sed 's|/|-|g') .
 
 # Create a virtual environment using uv (https://github.com/astral-sh/uv)
