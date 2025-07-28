@@ -3,6 +3,7 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 Panther's Model Context Protocol (MCP) server provides functionality to:
+
 1. **Write and tune detections from your IDE**
 2. **Interactively query security logs using natural language**
 3. **Triage, comment, and resolve one or many alerts**
@@ -95,7 +96,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `list_panther_users` | List all Panther user accounts | "Show me all active Panther users" |
-| `get_user_by_id` | Get detailed information about a specific user | "Get details for user ID 'john.doe@company.com'" |
+| `get_user_by_id` | Get detailed information about a specific user | "Get details for user ID '<john.doe@company.com>'" |
 | `get_permissions` | Get the current user's permissions | "What permissions do I have?" |
 | `list_roles` | List all roles with filtering options (name search, role IDs, sort direction) | "Show me all roles containing 'Admin' in the name" |
 | `get_role_by_id` | Get detailed information about a specific role including permissions | "Get complete details for the 'Admin' role" |
@@ -127,6 +128,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 **Choose one of the following installation methods:**
 
 ### Docker (Recommended)
+
 The easiest way to get started is using our pre-built Docker image:
 
 ```json
@@ -152,11 +154,13 @@ The easiest way to get started is using our pre-built Docker image:
 ```
 
 ### UVX
+
 For Python users, you can run directly from PyPI using uvx:
 
 1. [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
 
 2. Configure your MCP client:
+
 ```json
 {
   "mcpServers": {
@@ -175,6 +179,7 @@ For Python users, you can run directly from PyPI using uvx:
 ## MCP Client Setup
 
 ### Cursor
+
 [Follow the instructions here](https://docs.cursor.com/context/model-context-protocol#configuring-mcp-servers) to configure your project or global MCP configuration. **It's VERY IMPORTANT that you do not check this file into version control.**
 
 Once configured, navigate to Cursor Settings > MCP to view the running server:
@@ -182,11 +187,13 @@ Once configured, navigate to Cursor Settings > MCP to view the running server:
 <img src=".github/panther-mcp-cursor-config.png" width="500" />
 
 **Tips:**
-* Be specific about where you want to generate new rules by using the `@` symbol and then typing a specific directory.
-* For more reliability during tool use, try selecting a specific model, like Claude 3.7 Sonnet.
-* If your MCP Client is failing to find any tools from the Panther MCP Server, try restarting the Client and ensuring the MCP server is running. In Cursor, refresh the MCP Server and start a new chat.
+
+- Be specific about where you want to generate new rules by using the `@` symbol and then typing a specific directory.
+- For more reliability during tool use, try selecting a specific model, like Claude 3.7 Sonnet.
+- If your MCP Client is failing to find any tools from the Panther MCP Server, try restarting the Client and ensuring the MCP server is running. In Cursor, refresh the MCP Server and start a new chat.
 
 ### Claude Desktop
+
 To use with Claude Desktop, manually configure your `claude_desktop_config.json`:
 
 1. Open the Claude Desktop settings and navigate to the Developer tab
@@ -213,7 +220,9 @@ To use with Claude Desktop, manually configure your `claude_desktop_config.json`
 If you run into any issues, [try the troubleshooting steps here](https://modelcontextprotocol.io/quickstart/user#troubleshooting).
 
 ### Goose CLI
+
 Use with [Goose CLI](https://block.github.io/goose/docs/getting-started/installation/), Block's open-source AI agent:
+
 ```bash
 # Start Goose with the MCP server
 goose session --with-extension "uvx mcp-panther --compat-mode"
@@ -222,12 +231,62 @@ goose session --with-extension "uvx mcp-panther --compat-mode"
 The `--compat-mode` flag enables compatibility mode for broader MCP client support, especially for clients using older MCP versions that may not support all the latest features.
 
 ### Goose Desktop
+
 Use with [Goose Desktop](https://block.github.io/goose/docs/getting-started/installation/), Block's open-source AI agent:
 
 From 'Extensions' -> 'Add custom extension' provide your configuration information.
 
 <img src=".github/panther-mcp-goose-desktop-config.png" width="500" />
 
+## Running the Server
+
+The MCP Panther server supports multiple transport protocols:
+
+### STDIO (Default)
+
+For local development and MCP client integration:
+
+```bash
+uv run python -m mcp_panther.server
+```
+
+### Streamable HTTP
+
+For running as a persistent web service:
+
+```bash
+docker run \
+  -e PANTHER_INSTANCE_URL=https://instance.domain/ \
+  -e PANTHER_API_TOKEN= \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
+  -e MCP_PORT=8000 \
+  --rm -i -p 8000:8000 \
+  ghcr.io/panther-labs/mcp-panther
+```
+
+You can then connect to the server at `http://localhost:8000/mcp`.
+
+To test the connection using FastMCP client:
+
+```python
+import asyncio
+from fastmcp import Client
+
+async def test_connection():
+    async with Client("http://localhost:8000/mcp") as client:
+        tools = await client.list_tools()
+        print(f"Available tools: {len(tools)}")
+
+asyncio.run(test_connection())
+```
+
+### Environment Variables
+
+- `MCP_TRANSPORT`: Set transport type (`stdio` or `streamable-http`)
+- `MCP_PORT`: Port for HTTP transport (default: 3000)
+- `MCP_HOST`: Host for HTTP transport (default: 127.0.0.1)
+- `MCP_LOG_FILE`: Log file path (optional)
 
 ## Security Best Practices
 
@@ -247,16 +306,6 @@ Check the server logs for detailed error messages: `tail -n 20 -F ~/Library/Logs
 - If you get a `{"success": false, "message": "Failed to [action]: Request failed (HTTP 403): {\"error\": \"forbidden\"}"}` error, it likely means your API token lacks the particular permission needed by the tool.
 - Ensure your Panther Instance URL is correctly set. You can view this in the `config://panther` resource from your MCP Client.
 
-## License
-
-This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
-
-## Contributors
-
-This project exists thanks to all the people who contribute. Special thanks to [Tomasz Tchorz](https://github.com/tomasz-sq) and [Glenn Edwards](https://github.com/glenn-sq) from [Block](https://block.xyz), who played a core role in launching MCP-Panther as a joint open-source effort with Panther.
-
-See our [CONTRIBUTORS.md](.github/CONTRIBUTORS.md) for a complete list of contributors.
-
 ## Contributing
 
 We welcome contributions to improve MCP-Panther! Here's how you can help:
@@ -267,3 +316,13 @@ We welcome contributions to improve MCP-Panther! Here's how you can help:
 4. **Share Use Cases**: Let us know how you're using MCP-Panther and what could make it better
 
 Please ensure your contributions follow our coding standards and include appropriate tests and documentation.
+
+## Contributors
+
+This project exists thanks to all the people who contribute. Special thanks to [Tomasz Tchorz](https://github.com/tomasz-sq) and [Glenn Edwards](https://github.com/glenn-sq) from [Block](https://block.xyz), who played a core role in launching MCP-Panther as a joint open-source effort with Panther.
+
+See our [CONTRIBUTORS.md](.github/CONTRIBUTORS.md) for a complete list of contributors.
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
