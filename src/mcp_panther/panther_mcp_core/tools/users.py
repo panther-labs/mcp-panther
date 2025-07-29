@@ -18,6 +18,7 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.USER_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_panther_users() -> dict[str, Any]:
@@ -58,6 +59,7 @@ async def list_panther_users() -> dict[str, Any]:
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.USER_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_user(

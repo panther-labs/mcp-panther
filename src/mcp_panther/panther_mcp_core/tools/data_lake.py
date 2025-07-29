@@ -143,6 +143,7 @@ class QueryStatus(str, Enum):
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def summarize_alert_events(
@@ -254,6 +255,7 @@ LIMIT 1000
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def query_data_lake(
@@ -498,6 +500,7 @@ async def _get_data_lake_query_results(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_databases() -> Dict[str, Any]:

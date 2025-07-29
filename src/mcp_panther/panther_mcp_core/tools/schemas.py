@@ -19,6 +19,7 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.LOG_SOURCE_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_log_type_schemas(
@@ -112,6 +113,7 @@ async def list_log_type_schemas(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.RULE_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_log_type_schema_details(

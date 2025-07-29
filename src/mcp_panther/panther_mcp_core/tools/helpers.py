@@ -18,6 +18,7 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": any_perms(Permission.RULE_READ, Permission.POLICY_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_global_helper(
@@ -68,6 +69,7 @@ async def get_global_helper(
 @mcp_tool(
     annotations={
         "permissions": any_perms(Permission.RULE_READ, Permission.POLICY_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_global_helpers(

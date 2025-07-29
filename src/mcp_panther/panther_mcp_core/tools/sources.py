@@ -19,6 +19,7 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.RULE_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_log_sources(

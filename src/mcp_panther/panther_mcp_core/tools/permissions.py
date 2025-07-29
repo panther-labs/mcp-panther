@@ -8,7 +8,11 @@ from .registry import mcp_tool
 logger = logging.getLogger("mcp-panther")
 
 
-@mcp_tool
+@mcp_tool(
+    annotations={
+        "readOnlyHint": True,
+    }
+)
 async def get_permissions() -> dict[str, Any]:
     """
     Get the current user's permissions. Use this to diagnose permission errors and determine if a new API token is needed.

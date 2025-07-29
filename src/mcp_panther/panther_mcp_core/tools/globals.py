@@ -17,6 +17,7 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.RULE_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_globals(
@@ -112,6 +113,7 @@ async def list_globals(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.RULE_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_global(

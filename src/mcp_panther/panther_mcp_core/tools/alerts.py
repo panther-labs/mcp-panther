@@ -18,6 +18,7 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.ALERT_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_alerts(
@@ -209,6 +210,7 @@ async def list_alerts(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.ALERT_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_alert(alert_id: str) -> Dict[str, Any]:
@@ -244,6 +246,7 @@ async def get_alert(alert_id: str) -> Dict[str, Any]:
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.ALERT_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_alert_comments(
@@ -306,6 +309,8 @@ async def list_alert_comments(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.ALERT_MODIFY),
+        "destructiveHint": True,
+        "idempotentHint": True,
     }
 )
 async def update_alert_status(alert_ids: List[str], status: str) -> Dict[str, Any]:
@@ -384,6 +389,7 @@ async def update_alert_status(alert_ids: List[str], status: str) -> Dict[str, An
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.ALERT_MODIFY),
+        "destructiveHint": True,
     }
 )
 async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
@@ -447,6 +453,8 @@ async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.ALERT_MODIFY),
+        "destructiveHint": True,
+        "idempotentHint": True,
     }
 )
 async def update_alert_assignee(
@@ -511,6 +519,7 @@ async def update_alert_assignee(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.ALERT_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_alert_events(alert_id: str, limit: int = 10) -> Dict[str, Any]:

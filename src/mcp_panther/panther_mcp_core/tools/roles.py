@@ -17,6 +17,7 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.USER_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_roles(
@@ -106,6 +107,7 @@ async def list_roles(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.USER_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_role(

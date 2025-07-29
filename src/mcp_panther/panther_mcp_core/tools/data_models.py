@@ -17,6 +17,7 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.RULE_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_data_models(
@@ -89,6 +90,7 @@ async def list_data_models(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.RULE_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_data_model(
