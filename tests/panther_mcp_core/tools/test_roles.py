@@ -1,7 +1,7 @@
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.roles import (
-    get_role_by_id,
+    get_role,
     list_roles,
 )
 from tests.utils.helpers import patch_rest_client
@@ -93,11 +93,11 @@ async def test_list_roles_error(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ROLES_MODULE_PATH)
-async def test_get_role_by_id_success(mock_rest_client):
+async def test_get_role_success(mock_rest_client):
     """Test successful retrieval of a single role."""
     mock_rest_client.get.return_value = (MOCK_ROLE, 200)
 
-    result = await get_role_by_id(MOCK_ROLE["id"])
+    result = await get_role(MOCK_ROLE["id"])
 
     assert result["success"] is True
     assert result["role"]["id"] == MOCK_ROLE["id"]
@@ -113,11 +113,11 @@ async def test_get_role_by_id_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ROLES_MODULE_PATH)
-async def test_get_role_by_id_not_found(mock_rest_client):
+async def test_get_role_not_found(mock_rest_client):
     """Test handling of non-existent role."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_role_by_id("nonexistent-role")
+    result = await get_role("nonexistent-role")
 
     assert result["success"] is False
     assert "No role found with ID" in result["message"]
@@ -125,11 +125,11 @@ async def test_get_role_by_id_not_found(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ROLES_MODULE_PATH)
-async def test_get_role_by_id_error(mock_rest_client):
+async def test_get_role_error(mock_rest_client):
     """Test handling of errors when getting role by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_role_by_id(MOCK_ROLE["id"])
+    result = await get_role(MOCK_ROLE["id"])
 
     assert result["success"] is False
     assert "Failed to get role details" in result["message"]

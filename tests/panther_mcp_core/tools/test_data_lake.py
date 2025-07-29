@@ -4,7 +4,7 @@ import pytest
 
 from mcp_panther.panther_mcp_core.tools.data_lake import (
     _cancel_data_lake_query,
-    execute_data_lake_query,
+    query_data_lake,
     wrap_reserved_words,
 )
 from tests.utils.helpers import patch_graphql_client
@@ -16,7 +16,7 @@ MOCK_QUERY_ID = "query-123456789"
 
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_execute_data_lake_query_success(mock_graphql_client):
+async def test_query_data_lake_success(mock_graphql_client):
     """Test successful execution of a data lake query."""
     mock_graphql_client.execute.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
@@ -32,11 +32,13 @@ async def test_execute_data_lake_query_success(mock_graphql_client):
             "has_next_page": False,
             "end_cursor": None,
             "message": "Query executed successfully",
+            "query_id": MOCK_QUERY_ID,
         }
-        result = await execute_data_lake_query(sql)
+        result = await query_data_lake(sql)
 
     assert result["success"] is True
     assert result["status"] == "succeeded"
+    assert result["query_id"] == MOCK_QUERY_ID
 
     mock_graphql_client.execute.assert_called_once()
     call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
@@ -46,7 +48,7 @@ async def test_execute_data_lake_query_success(mock_graphql_client):
 
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_execute_data_lake_query_custom_database(mock_graphql_client):
+async def test_query_data_lake_custom_database(mock_graphql_client):
     """Test executing a data lake query with a custom database."""
     mock_graphql_client.execute.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
@@ -63,11 +65,13 @@ async def test_execute_data_lake_query_custom_database(mock_graphql_client):
             "has_next_page": False,
             "end_cursor": None,
             "message": "Query executed successfully",
+            "query_id": MOCK_QUERY_ID,
         }
-        result = await execute_data_lake_query(sql, database_name=custom_db)
+        result = await query_data_lake(sql, database_name=custom_db)
 
     assert result["success"] is True
     assert result["status"] == "succeeded"
+    assert result["query_id"] == MOCK_QUERY_ID
 
     call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
     assert call_args["input"]["databaseName"] == custom_db
@@ -75,35 +79,39 @@ async def test_execute_data_lake_query_custom_database(mock_graphql_client):
 
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_execute_data_lake_query_error(mock_graphql_client):
+async def test_query_data_lake_error(mock_graphql_client):
     """Test handling of errors when executing a data lake query."""
     mock_graphql_client.execute.side_effect = Exception("Test error")
 
     sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
-    result = await execute_data_lake_query(sql)
+    result = await query_data_lake(sql)
 
     assert result["success"] is False
     assert "Failed to execute data lake query" in result["message"]
+    assert (
+        result["query_id"] is None
+    )  # No query_id when error occurs before query execution
 
 
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_execute_data_lake_query_missing_event_time(mock_graphql_client):
+async def test_query_data_lake_missing_event_time(mock_graphql_client):
     """Test that queries without p_event_time filter are rejected."""
     sql = "SELECT * FROM panther_logs.public.aws_cloudtrail LIMIT 10"
-    result = await execute_data_lake_query(sql)
+    result = await query_data_lake(sql)
 
     assert result["success"] is False
     assert (
         "Query must include `p_event_time` as a filter condition after WHERE or AND"
         in result["message"]
     )
+    assert result["query_id"] is None  # No query_id when validation fails
     mock_graphql_client.execute.assert_not_called()
 
 
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_execute_data_lake_query_with_event_time(mock_graphql_client):
+async def test_query_data_lake_with_event_time(mock_graphql_client):
     """Test that queries with p_event_time filter are accepted."""
     mock_graphql_client.execute.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
@@ -131,18 +139,20 @@ async def test_execute_data_lake_query_with_event_time(mock_graphql_client):
             "has_next_page": False,
             "end_cursor": None,
             "message": "Query executed successfully",
+            "query_id": MOCK_QUERY_ID,
         }
         for sql in valid_queries:
-            result = await execute_data_lake_query(sql)
+            result = await query_data_lake(sql)
             assert result["success"] is True, f"Query failed: {sql}"
             assert result["status"] == "succeeded"
+            assert result["query_id"] == MOCK_QUERY_ID
             mock_graphql_client.execute.assert_called_once()
             mock_graphql_client.execute.reset_mock()
 
 
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_execute_data_lake_query_invalid_event_time_usage(mock_graphql_client):
+async def test_query_data_lake_invalid_event_time_usage(mock_graphql_client):
     """Test that queries with invalid p_event_time usage are rejected."""
     mock_graphql_client.execute.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
@@ -164,12 +174,13 @@ async def test_execute_data_lake_query_invalid_event_time_usage(mock_graphql_cli
     ]
 
     for sql in invalid_queries:
-        result = await execute_data_lake_query(sql)
+        result = await query_data_lake(sql)
         assert result["success"] is False, f"Query should have failed: {sql}"
         assert (
             "Query must include `p_event_time` as a filter condition after WHERE or AND"
             in result["message"]
         )
+        assert result["query_id"] is None  # No query_id when validation fails
         mock_graphql_client.execute.assert_not_called()
 
 
@@ -309,10 +320,10 @@ def test_wrap_reserved_words_handles_errors():
 
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
-async def test_execute_data_lake_query_with_reserved_words_processing(
+async def test_query_data_lake_with_reserved_words_processing(
     mock_graphql_client,
 ):
-    """Test that execute_data_lake_query processes reserved words."""
+    """Test that query_data_lake processes reserved words."""
     mock_graphql_client.execute.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
@@ -332,13 +343,15 @@ async def test_execute_data_lake_query_with_reserved_words_processing(
             "has_next_page": False,
             "end_cursor": None,
             "message": "Query executed successfully",
+            "query_id": MOCK_QUERY_ID,
         }
 
-        result = await execute_data_lake_query(input_sql)
+        result = await query_data_lake(input_sql)
 
     # Verify the function returns success
     assert result["success"] is True
     assert result["status"] == "succeeded"
+    assert result["query_id"] == MOCK_QUERY_ID
 
     # Verify the SQL was processed for reserved words
     call_args = mock_graphql_client.execute.call_args[1]["variable_values"]

@@ -3,7 +3,10 @@ Tools for interacting with Panther's helpers.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
+
+from pydantic import Field
+from typing_extensions import Annotated
 
 from ..client import get_rest_client
 from ..permissions import Permission, any_perms
@@ -15,13 +18,19 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": any_perms(Permission.RULE_READ, Permission.POLICY_READ),
+        "readOnlyHint": True,
     }
 )
-async def get_global_helper_by_id(helper_id: str) -> Dict[str, Any]:
+async def get_global_helper(
+    helper_id: Annotated[
+        str,
+        Field(
+            description="The ID of the global helper to fetch",
+            examples=["panther_github_helpers"],
+        ),
+    ],
+) -> dict[str, Any]:
     """Get detailed information about a Panther global helper by ID
-
-    Args:
-        helper_id: The ID of the global helper to fetch
 
     Returns:
         Dict containing:
@@ -60,16 +69,32 @@ async def get_global_helper_by_id(helper_id: str) -> Dict[str, Any]:
 @mcp_tool(
     annotations={
         "permissions": any_perms(Permission.RULE_READ, Permission.POLICY_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_global_helpers(
-    cursor: str | None = None, limit: int = 100
-) -> Dict[str, Any]:
+    cursor: Annotated[
+        str | None,
+        Field(description="Optional cursor for pagination from a previous query"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(
+            description="Maximum number of results to return",
+            examples=[100, 25, 50],
+        ),
+    ] = 100,
+) -> dict[str, Any]:
     """List all global helpers from Panther with optional pagination
 
-    Args:
-        cursor: Optional cursor for pagination from a previous query
-        limit: Optional maximum number of results to return (default: 100)
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - global_helpers: List of global helpers if successful
+        - total_global_helpers: Number of global helpers returned
+        - has_next_page: Boolean indicating if more results are available
+        - next_cursor: Cursor for fetching the next page of results
+        - message: Error message if unsuccessful
     """
     logger.info("Fetching global helpers from Panther")
 

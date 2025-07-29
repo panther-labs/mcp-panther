@@ -20,10 +20,10 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `add_alert_comment` | Add a comment to a Panther alert | "Add comment 'Looks pretty bad' to alert abc123" |
-| `get_alert_by_id` | Get detailed information about a specific alert | "What's the status of alert 8def456?" |
+| `get_alert` | Get detailed information about a specific alert | "What's the status of alert 8def456?" |
 | `get_alert_events` | Get a small sampling of events for a given alert | "Show me events associated with alert 8def456" |
 | `list_alerts` | List alerts with comprehensive filtering options (date range, severity, status, etc.) | "Show me all high severity alerts from the last 24 hours" |
-| `update_alert_assignee_by_id` | Update the assignee of one or more alerts | "Assign alerts abc123 and def456 to John" |
+| `update_alert_assignee` | Update the assignee of one or more alerts | "Assign alerts abc123 and def456 to John" |
 | `update_alert_status` | Update the status of one or more alerts | "Mark alerts abc123 and def456 as resolved" |
 | `list_alert_comments` | List all comments for a specific alert | "Show me all comments for alert abc123" |
 
@@ -68,9 +68,9 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `list_globals` | List global helper functions with filtering options | "Show me global helpers containing 'aws' in the name" |
-| `get_global_by_id` | Get detailed information and code for a specific global helper | "Get the complete code for global helper 'AWSUtilities'" |
+| `get_global` | Get detailed information and code for a specific global helper | "Get the complete code for global helper 'AWSUtilities'" |
 | `list_global_helpers` | List all Panther global helpers with optional pagination | "Show me all global helpers for CrowdStrike events" |
-| `get_global_helper_by_id` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
+| `get_global_helper` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
 
 </details>
 
@@ -80,7 +80,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `list_data_models` | List data models that control UDM mappings in rules | "Show me all data models for log parsing" |
-| `get_data_model_by_id` | Get detailed information about a specific data model | "Get the complete details for the 'AWS_CloudTrail' data model" |
+| `get_data_model` | Get detailed information about a specific data model | "Get the complete details for the 'AWS_CloudTrail' data model" |
 
 </details>
 
@@ -111,10 +111,10 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `list_panther_users` | List all Panther user accounts | "Show me all active Panther users" |
-| `get_user_by_id` | Get detailed information about a specific user | "Get details for user ID '<john.doe@company.com>'" |
+| `get_user` | Get detailed information about a specific user | "Get details for user ID '<john.doe@company.com>'" |
 | `get_permissions` | Get the current user's permissions | "What permissions do I have?" |
 | `list_roles` | List all roles with filtering options (name search, role IDs, sort direction) | "Show me all roles containing 'Admin' in the name" |
-| `get_role_by_id` | Get detailed information about a specific role including permissions | "Get complete details for the 'Admin' role" |
+| `get_role` | Get detailed information about a specific role including permissions | "Get complete details for the 'Admin' role" |
 
 </details>
 

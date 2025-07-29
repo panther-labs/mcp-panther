@@ -3,7 +3,10 @@ Tools for interacting with Panther log sources.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
+
+from pydantic import Field
+from typing_extensions import Annotated
 
 from ..client import _create_panther_client
 from ..permissions import Permission, all_perms
@@ -16,22 +19,51 @@ logger = logging.getLogger("mcp-panther")
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.RULE_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_log_sources(
-    cursor: str | None = None,
-    log_types: List[str] | None = None,
-    is_healthy: bool | None = None,
-    integration_type: str | None = None,
-) -> Dict[str, Any]:
-    """List log sources from Panther with optional filters.
-
-    Args:
-        cursor: Optional cursor for pagination from a previous query
-        log_types: Optional list of log types to filter by
-        is_healthy: Optional boolean to filter by health status
-        integration_type: Optional integration type to filter by (e.g. "S3")
-    """
+    cursor: Annotated[
+        str | None,
+        Field(description="Optional cursor for pagination from a previous query"),
+    ] = None,
+    log_types: Annotated[
+        list[str],
+        Field(
+            description="Optional list of log types to filter by",
+            examples=[["AWS.CloudTrail", "AWS.S3ServerAccess"]],
+        ),
+    ] = [],
+    is_healthy: Annotated[
+        bool,
+        Field(
+            description="Optional boolean to filter by health status (default: True)"
+        ),
+    ] = True,
+    integration_type: Annotated[
+        str | None,
+        Field(
+            description="Optional integration type to filter by",
+            examples=[
+                "amazon-eventbridge",
+                "amazon-security-lake",
+                "aws-cloudwatch-logs",
+                "aws-s3",
+                "aws-scan",
+                "aws-sqs",
+                "azure-blob",
+                "azure-eventhub",
+                "gcp-gcs",
+                "gcp-pubsub",
+                "http-ingest",
+                "log-pulling",
+                "profile-pulling",
+                "s3-lookuptable",
+            ],
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """List log sources from Panther with optional filters."""
     logger.info("Fetching log sources from Panther")
 
     try:

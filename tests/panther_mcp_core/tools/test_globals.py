@@ -1,7 +1,7 @@
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.globals import (
-    get_global_by_id,
+    get_global,
     list_globals,
 )
 from tests.utils.helpers import patch_rest_client
@@ -100,11 +100,11 @@ async def test_list_globals_error(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(GLOBALS_MODULE_PATH)
-async def test_get_global_by_id_success(mock_rest_client):
+async def test_get_global_success(mock_rest_client):
     """Test successful retrieval of a single global helper."""
     mock_rest_client.get.return_value = (MOCK_GLOBAL, 200)
 
-    result = await get_global_by_id(MOCK_GLOBAL["id"])
+    result = await get_global(MOCK_GLOBAL["id"])
 
     assert result["success"] is True
     assert result["global"]["id"] == MOCK_GLOBAL["id"]
@@ -119,11 +119,11 @@ async def test_get_global_by_id_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(GLOBALS_MODULE_PATH)
-async def test_get_global_by_id_not_found(mock_rest_client):
+async def test_get_global_not_found(mock_rest_client):
     """Test handling of non-existent global helper."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_global_by_id("nonexistent-global")
+    result = await get_global("nonexistent-global")
 
     assert result["success"] is False
     assert "No global helper found with ID" in result["message"]
@@ -131,11 +131,11 @@ async def test_get_global_by_id_not_found(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(GLOBALS_MODULE_PATH)
-async def test_get_global_by_id_error(mock_rest_client):
+async def test_get_global_error(mock_rest_client):
     """Test handling of errors when getting global helper by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_global_by_id(MOCK_GLOBAL["id"])
+    result = await get_global(MOCK_GLOBAL["id"])
 
     assert result["success"] is False
     assert "Failed to get global helper details" in result["message"]
@@ -200,7 +200,7 @@ async def test_get_global_with_complex_body(mock_rest_client):
     }
     mock_rest_client.get.return_value = (complex_global, 200)
 
-    result = await get_global_by_id(complex_global["id"])
+    result = await get_global(complex_global["id"])
 
     assert result["success"] is True
     assert "advanced_threat_detection" in result["global"]["body"]

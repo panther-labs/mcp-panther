@@ -121,6 +121,7 @@ def build_detection_params(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.RULE_READ, Permission.POLICY_READ),
+        "readOnlyHint": True,
     }
 )
 async def list_detections(
@@ -398,6 +399,7 @@ async def list_detections(
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.RULE_READ, Permission.POLICY_READ),
+        "readOnlyHint": True,
     }
 )
 async def get_detection(
@@ -486,6 +488,8 @@ async def get_detection(
 @mcp_tool(
     annotations={
         "permissions": any_perms(Permission.RULE_MODIFY, Permission.POLICY_MODIFY),
+        "destructiveHint": True,
+        "idempotentHint": True,
     }
 )
 async def disable_detection(
