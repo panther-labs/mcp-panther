@@ -75,7 +75,7 @@ async def list_alerts(
     log_types: Annotated[
         List[str] | None,
         Field(description="Optional list of log‑type names to filter alerts by")
-    ] = None,
+    ] = [],
     name_contains: Annotated[
         str | None,
         Field(description="Optional substring to match within alert titles")
@@ -91,11 +91,11 @@ async def list_alerts(
     resource_types: Annotated[
         List[str] | None,
         Field(description="Optional list of AWS resource‑type names to filter alerts by")
-    ] = None,
+    ] = [],
     subtypes: Annotated[
         List[str] | None,
         Field(description="Optional list of alert subtypes (valid values depend on alert_type)")
-    ] = None,
+    ] = [],
     alert_type: Annotated[
         str,
         Field(
