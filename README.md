@@ -43,11 +43,22 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 </details>
 
 <details>
+<summary><strong>Scheduled Queries</strong></summary>
+
+| Tool Name | Description | Sample Prompt |
+|-----------|-------------|---------------|
+| `list_scheduled_queries` | List all scheduled queries with pagination support | "Show me all scheduled queries" / "List the first 25 scheduled queries" |
+| `get_scheduled_query` | Get detailed information about a specific scheduled query by ID | "Get details for scheduled query 'weekly-security-report'" |
+
+</details>
+
+<details>
 <summary><strong>Sources</strong></summary>
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `list_log_sources` | List log sources with optional filters (health status, log types, integration type) | "Show me all healthy S3 log sources" |
+| `get_http_log_source` | Get detailed information about a specific HTTP log source by ID | "Show me the configuration for HTTP source 'webhook-collector-123'" |
 
 </details>
 
