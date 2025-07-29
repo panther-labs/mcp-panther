@@ -88,4 +88,11 @@ async def test_list_panther_users_structure():
     import inspect
 
     sig = inspect.signature(list_panther_users)
-    assert len(sig.parameters) == 0  # No parameters expected
+    assert len(sig.parameters) == 2  # cursor and limit parameters expected
+
+    # Check parameter names and defaults
+    params = list(sig.parameters.keys())
+    assert "cursor" in params
+    assert "limit" in params
+    assert sig.parameters["cursor"].default is None
+    assert sig.parameters["limit"].default == 100
