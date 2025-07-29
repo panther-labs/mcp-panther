@@ -3,7 +3,7 @@ Tools for interacting with Panther roles.
 """
 
 import logging
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any
 
 from pydantic import Field
 
@@ -22,25 +22,33 @@ logger = logging.getLogger("mcp-panther")
 async def list_roles(
     name_contains: Annotated[
         str | None,
-        Field(description="A string to search for within the role name"),
+        Field(
+            description="Case-insensitive substring to search for within the role name",
+            examples=["Admin", "Analyst", "Read"],
+        ),
     ] = None,
     name: Annotated[
         str | None,
         Field(
-            description="An exact match for a role's name. If provided, other parameters are ignored"
+            description="Exact match for a role's name. If provided, other parameters are ignored",
+            examples=["Admin", "PantherReadOnly", "SecurityAnalyst"],
         ),
     ] = None,
     role_ids: Annotated[
-        list[str] | None,
-        Field(description="A list of role IDs to return"),
-    ] = None,
+        list[str],
+        Field(
+            description="List of specific role IDs to return",
+            examples=[["Admin", "PantherReadOnly"], ["SecurityAnalyst"]],
+        ),
+    ] = [],
     sort_dir: Annotated[
         str | None,
         Field(
-            description="The sort direction for the results", examples=["asc", "desc"]
+            description="Sort direction for the results",
+            examples=["asc", "desc"],
         ),
     ] = "asc",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List all roles from your Panther instance.
 
     Returns list of roles with metadata including permissions and settings.
@@ -108,7 +116,7 @@ async def get_role(
             examples=["Admin"],
         ),
     ],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get detailed information about a Panther role by ID
 
     Returns complete role information including all permissions and settings.

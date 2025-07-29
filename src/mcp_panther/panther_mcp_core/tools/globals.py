@@ -3,7 +3,7 @@ Tools for interacting with Panther global helpers.
 """
 
 import logging
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any
 
 from pydantic import Field
 
@@ -22,12 +22,13 @@ logger = logging.getLogger("mcp-panther")
 async def list_globals(
     cursor: Annotated[
         str | None,
-        Field(description="The pagination token to retrieve the next set of results"),
+        Field(description="Optional cursor for pagination from a previous query"),
     ] = None,
     limit: Annotated[
         int,
         Field(
-            description="The maximum number of results to return",
+            description="Maximum number of results to return (1-1000)",
+            examples=[100, 25, 50],
             ge=1,
             le=1000,
         ),
@@ -35,20 +36,25 @@ async def list_globals(
     name_contains: Annotated[
         str | None,
         Field(
-            description="A case-insensitive substring to search for in the global's name"
+            description="Case-insensitive substring to search for in the global's name",
+            examples=["aws", "crowdstrike", "utility"],
         ),
     ] = None,
     created_by: Annotated[
         str | None,
-        Field(description="Filters for globals created by a specific user or actor ID"),
+        Field(
+            description="Filter by creator user ID or actor ID",
+            examples=["user-123", "john.doe@company.com"],
+        ),
     ] = None,
     last_modified_by: Annotated[
         str | None,
         Field(
-            description="Filters for globals last modified by a specific user or actor ID"
+            description="Filter by last modifier user ID or actor ID",
+            examples=["user-456", "jane.smith@company.com"],
         ),
     ] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List all global helpers from your Panther instance. Global helpers are shared Python functions that can be used across multiple rules, policies, and other detections.
 
     Returns paginated list of global helpers with metadata including descriptions and code.
@@ -113,10 +119,10 @@ async def get_global(
         str,
         Field(
             description="The ID of the global helper to fetch",
-            examples=["MyGlobalHelper"],
+            examples=["MyGlobalHelper", "AWSUtilities", "CrowdStrikeHelpers"],
         ),
     ],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get detailed information about a Panther global helper by ID
 
     Returns complete global helper information including Python body code and usage details.

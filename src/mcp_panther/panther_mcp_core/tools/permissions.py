@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from ..client import get_rest_client
 from ..permissions import convert_permissions
@@ -9,7 +9,7 @@ logger = logging.getLogger("mcp-panther")
 
 
 @mcp_tool
-async def get_permissions() -> Dict[str, Any]:
+async def get_permissions() -> dict[str, Any]:
     """
     Get the current user's permissions. Use this to diagnose permission errors and determine if a new API token is needed.
     """

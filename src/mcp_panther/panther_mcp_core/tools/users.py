@@ -3,7 +3,7 @@ Tools for interacting with Panther users.
 """
 
 import logging
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any
 
 from pydantic import Field
 
@@ -20,7 +20,7 @@ logger = logging.getLogger("mcp-panther")
         "permissions": all_perms(Permission.USER_READ),
     }
 )
-async def list_panther_users() -> Dict[str, Any]:
+async def list_panther_users() -> dict[str, Any]:
     """List all Panther user accounts.
 
     Returns:
@@ -65,10 +65,10 @@ async def get_user(
         str,
         Field(
             description="The ID of the user to fetch",
-            examples=["user-123"],
+            examples=["user-123", "john.doe@company.com", "<admin@example.com>"],
         ),
     ],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get detailed information about a Panther user by ID
 
     Returns complete user information including email, names, role, authentication status, and timestamps.

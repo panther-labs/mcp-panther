@@ -3,7 +3,7 @@ Tools for interacting with Panther data-models.
 """
 
 import logging
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any
 
 from pydantic import Field
 
@@ -27,12 +27,13 @@ async def list_data_models(
     limit: Annotated[
         int,
         Field(
-            description="Optional maximum number of results to return",
+            description="Maximum number of results to return (1-1000)",
+            examples=[100, 25, 50],
             ge=1,
             le=1000,
         ),
     ] = 100,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List all data models from your Panther instance. Data models are used only in Panther's Python rules to map log type schema fields to a unified data model. They may also contain custom mappings for fields that are not part of the log type schema.
 
     Returns paginated list of data models with metadata including mappings and log types.
@@ -95,10 +96,10 @@ async def get_data_model(
         str,
         Field(
             description="The ID of the data model to fetch",
-            examples=["MyDataModel"],
+            examples=["MyDataModel", "AWS_CloudTrail", "StandardUser"],
         ),
     ],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get detailed information about a Panther data model, including the mappings and body
 
     Returns complete data model information including Python body code and UDM mappings.
