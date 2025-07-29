@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import Field
 from typing_extensions import Annotated
 
-from ..client import _create_panther_client
+from ..client import _create_panther_client, get_rest_client
 from ..permissions import Permission, all_perms
 from ..queries import GET_SOURCES_QUERY
 from .registry import mcp_tool
@@ -132,3 +132,69 @@ async def list_log_sources(
     except Exception as e:
         logger.error(f"Failed to fetch log sources: {str(e)}")
         return {"success": False, "message": f"Failed to fetch log sources: {str(e)}"}
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.LOG_SOURCE_READ),
+        "readOnlyHint": True,
+    }
+)
+async def get_http_log_source(
+    source_id: Annotated[
+        str,
+        Field(
+            description="The ID of the HTTP log source to fetch",
+            examples=["http-source-123", "webhook-collector-456"],
+        ),
+    ],
+) -> dict[str, Any]:
+    """Get detailed information about a specific HTTP log source by ID.
+
+    HTTP log sources are used to collect logs via HTTP endpoints/webhooks.
+    This tool provides detailed configuration information for troubleshooting
+    and monitoring HTTP log source integrations.
+
+    Args:
+        source_id: The ID of the HTTP log source to retrieve
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the query was successful
+        - source: HTTP log source information if successful, containing:
+            - integrationId: The source ID
+            - integrationLabel: The source name/label
+            - logTypes: List of log types this source handles
+            - logStreamType: Stream type (Auto, JSON, JsonArray, etc.)
+            - logStreamTypeOptions: Additional stream type configuration
+            - authMethod: Authentication method (None, Bearer, Basic, etc.)
+            - authBearerToken: Bearer token if using Bearer auth
+            - authUsername: Username if using Basic auth
+            - authPassword: Password if using Basic auth
+            - authHeaderKey: Header key for HMAC/SharedSecret auth
+            - authSecretValue: Secret value for HMAC/SharedSecret auth
+            - authHmacAlg: HMAC algorithm if using HMAC auth
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Fetching HTTP log source: {source_id}")
+
+    try:
+        # Execute the REST API call
+        async with get_rest_client() as client:
+            response_data, status_code = await client.get(
+                f"/log-sources/http/{source_id}"
+            )
+
+        logger.info(f"Successfully retrieved HTTP log source: {source_id}")
+
+        # Format the response
+        return {
+            "success": True,
+            "source": response_data,
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch HTTP log source: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to fetch HTTP log source: {str(e)}",
+        }

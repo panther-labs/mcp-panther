@@ -19,6 +19,7 @@ __all__ = [
     "schemas",
     "helpers",
     "permissions",
+    "scheduled_queries",
 ]
 
 # Import all tool modules to ensure decorators are processed
@@ -32,6 +33,7 @@ from . import (
     metrics,
     permissions,
     roles,
+    scheduled_queries,
     schemas,
     sources,
     users,
