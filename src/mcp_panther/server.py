@@ -27,7 +27,7 @@ def configure_logging(log_file: str | None = None, *, force: bool = False) -> No
 
     handler: logging.Handler
     if log_file:
-        handler = logging.FileHandler(log_file)
+        handler = logging.FileHandler(os.path.expanduser(log_file))
     else:
         handler = logging.StreamHandler(sys.stderr)
 
@@ -89,11 +89,13 @@ register_all_resources(mcp)
 def handle_signals():
     def signal_handler(sig, frame):
         logger.info(f"Received signal {sig}, shutting down...")
-        os._exit(0)
+        sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGHUP, signal_handler)
+    # SIGHUP is not available on Windows
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, signal_handler)
 
 
 @click.command()
@@ -153,7 +155,7 @@ def main(transport: str, compat_mode: bool, port: int, host: str, log_file: str 
             mcp.run(transport="streamable-http", host=host, port=port)
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received, forcing immediate exit")
-            os._exit(0)
+            sys.exit(0)
     else:
         logger.info("Starting Panther MCP Server with stdio transport")
         # Let FastMCP handle all the asyncio details internally
