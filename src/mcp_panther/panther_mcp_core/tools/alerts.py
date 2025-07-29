@@ -49,7 +49,7 @@ async def list_alerts(
         List[str],
         Field(
             description="Optional list of statuses to filter by",
-            examples=[["OPEN", "TRIAGED", "RESOLVED", "CLOSED"]],
+            examples=[["OPEN", "TRIAGED", "RESOLVED", "CLOSED"], ["RESOLVED", "CLOSED"], ["OPEN", "TRIAGED"]]
         ),
     ] = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
     cursor: Annotated[
