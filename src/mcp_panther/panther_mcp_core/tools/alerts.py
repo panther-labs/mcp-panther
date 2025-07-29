@@ -29,14 +29,14 @@ async def list_alerts(
         Field(
             description="Optional start date in ISO-8601 format. If provided, defaults to the start of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
-        )
+        ),
     ] = None,
     end_date: Annotated[
         str | None,
         Field(
             description="Optional end date in ISO-8601 format. If provided, defaults to the end of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
-        )
+        ),
     ] = None,
     severities: Annotated[
         List[str],
@@ -49,36 +49,43 @@ async def list_alerts(
         List[str],
         Field(
             description="Optional list of statuses to filter by",
-            examples=[["OPEN", "TRIAGED", "RESOLVED", "CLOSED"], ["RESOLVED", "CLOSED"], ["OPEN", "TRIAGED"]]
+            examples=[
+                ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
+                ["RESOLVED", "CLOSED"],
+                ["OPEN", "TRIAGED"],
+            ],
         ),
     ] = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
     cursor: Annotated[
         str | None,
-        Field(description="Optional cursor for pagination returned from a previous call")
+        Field(
+            description="Optional cursor for pagination returned from a previous call"
+        ),
     ] = None,
     detection_id: Annotated[
         str | None,
-        Field(description="Optional detection ID to filter alerts by; if provided, the date range is not required")
+        Field(
+            description="Optional detection ID to filter alerts by; if provided, the date range is not required"
+        ),
     ] = None,
     event_count_max: Annotated[
         int | None,
-        Field(description="Optional maximum number of events an alert may contain")
+        Field(description="Optional maximum number of events an alert may contain"),
     ] = None,
     event_count_min: Annotated[
         int | None,
-        Field(description="Optional minimum number of events an alert must contain")
+        Field(description="Optional minimum number of events an alert must contain"),
     ] = None,
     log_sources: Annotated[
         List[str] | None,
-        Field(description="Optional list of log‑source IDs to filter alerts by")
+        Field(description="Optional list of log‑source IDs to filter alerts by"),
     ] = [],
     log_types: Annotated[
         List[str] | None,
-        Field(description="Optional list of log‑type names to filter alerts by")
+        Field(description="Optional list of log‑type names to filter alerts by"),
     ] = [],
     name_contains: Annotated[
-        str | None,
-        Field(description="Optional substring to match within alert titles")
+        str | None, Field(description="Optional substring to match within alert titles")
     ] = None,
     page_size: Annotated[
         int,
@@ -90,11 +97,15 @@ async def list_alerts(
     ] = 25,
     resource_types: Annotated[
         List[str] | None,
-        Field(description="Optional list of AWS resource‑type names to filter alerts by")
+        Field(
+            description="Optional list of AWS resource‑type names to filter alerts by"
+        ),
     ] = [],
     subtypes: Annotated[
         List[str] | None,
-        Field(description="Optional list of alert subtypes (valid values depend on alert_type)")
+        Field(
+            description="Optional list of alert subtypes (valid values depend on alert_type)"
+        ),
     ] = [],
     alert_type: Annotated[
         str,
