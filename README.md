@@ -240,10 +240,8 @@ Use with [Goose CLI](https://block.github.io/goose/docs/getting-started/installa
 
 ```bash
 # Start Goose with the MCP server
-goose session --with-extension "uvx mcp-panther --compat-mode"
+goose session --with-extension "uvx mcp-panther"
 ```
-
-The `--compat-mode` flag enables compatibility mode for broader MCP client support, especially for clients using older MCP versions that may not support all the latest features.
 
 ### Goose Desktop
 

@@ -393,25 +393,16 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/a5/d5/22e36c95c83c80eb47c83f231095419cf57cf5cca5416f1c960032074c78/mcp-1.9.0-py3-none-any.whl", hash = "sha256:9dfb89c8c56f742da10a5910a1f64b0d2ac2c3ed2bd572ddb1cfab7f35957178", size = 125082 },
 ]
 
-[package.optional-dependencies]
-cli = [
-    { name = "python-dotenv" },
-    { name = "typer" },
-]
-
 [[package]]
 name = "mcp-panther"
-version = "1.1.0"
+version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "click" },
     { name = "fastmcp" },
     { name = "gql" },
-    { name = "mcp", extra = ["cli"] },
     { name = "sqlparse" },
-    { name = "starlette" },
-    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -425,14 +416,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.11.14" },
-    { name = "click", specifier = ">=8.1.0" },
-    { name = "fastmcp", specifier = ">=2.3.3" },
-    { name = "gql", specifier = ">=3.5.2" },
-    { name = "mcp", extras = ["cli"], specifier = ">=1.6.0" },
-    { name = "sqlparse", specifier = ">=0.4.4" },
-    { name = "starlette", specifier = ">=0.35.0" },
-    { name = "uvicorn", specifier = ">=0.24.0" },
+    { name = "aiohttp", specifier = ">=3.11.14,<4.0.0" },
+    { name = "click", specifier = ">=8.1.0,<9.0.0" },
+    { name = "fastmcp", specifier = ">=2.3.3,<3.0.0" },
+    { name = "gql", specifier = ">=3.5.2,<4.0.0" },
+    { name = "sqlparse", specifier = ">=0.4.4,<1.0.0" },
 ]
 
 [package.metadata.requires-dev]

@@ -57,23 +57,16 @@ try:
     from panther_mcp_core.prompts.registry import register_all_prompts
     from panther_mcp_core.resources.registry import register_all_resources
     from panther_mcp_core.tools.registry import register_all_tools
-    from panther_mcp_core.utils import COMPATIBILITY_MODE_FLAG, USE_LEGACY_MCP
 except ImportError:
     from .panther_mcp_core.prompts.registry import register_all_prompts
     from .panther_mcp_core.resources.registry import register_all_resources
     from .panther_mcp_core.tools.registry import register_all_tools
-    from .panther_mcp_core.utils import COMPATIBILITY_MODE_FLAG, USE_LEGACY_MCP
 
 # Server dependencies
 deps = [
     "gql[aiohttp]",
     "aiohttp",
 ]
-
-if USE_LEGACY_MCP:
-    from mcp.server.fastmcp import FastMCP
-else:
-    from fastmcp import FastMCP
 
 # Create the MCP server
 mcp = FastMCP(MCP_SERVER_NAME, dependencies=deps)
@@ -105,12 +98,6 @@ def handle_signals():
     help="Transport type (stdio or streamable-http)",
 )
 @click.option(
-    COMPATIBILITY_MODE_FLAG,
-    is_flag=True,
-    default=USE_LEGACY_MCP,
-    help="Enable compatibility mode for broader MCP client support",
-)
-@click.option(
     "--port",
     default=int(os.environ.get("MCP_PORT", default="3000")),
     help="Port to use for streamable HTTP transport",
@@ -126,7 +113,7 @@ def handle_signals():
     default=os.environ.get("MCP_LOG_FILE"),
     help="Write logs to this file instead of stderr",
 )
-def main(transport: str, compat_mode: bool, port: int, host: str, log_file: str | None):
+def main(transport: str, port: int, host: str, log_file: str | None):
     """Run the Panther MCP server with the specified transport"""
     # Set up signal handling
     handle_signals()
@@ -134,9 +121,6 @@ def main(transport: str, compat_mode: bool, port: int, host: str, log_file: str 
     # Reconfigure logging if a log file is provided
     if log_file:
         configure_logging(log_file, force=True)
-
-    if USE_LEGACY_MCP:
-        logger.info("using compatability mode")
 
     major = sys.version_info.major
     minor = sys.version_info.minor
