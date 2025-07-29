@@ -3,7 +3,9 @@ Tools for interacting with Panther alerts.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Annotated
+
+from pydantic import Field
 
 from ..client import (
     _get_today_date_range,
@@ -22,21 +24,96 @@ logger = logging.getLogger("mcp-panther")
     }
 )
 async def list_alerts(
-    start_date: str | None = None,
-    end_date: str | None = None,
-    severities: List[str] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
-    statuses: List[str] = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
-    cursor: str | None = None,
-    detection_id: str | None = None,
-    event_count_max: int | None = None,
-    event_count_min: int | None = None,
-    log_sources: List[str] | None = None,
-    log_types: List[str] | None = None,
-    name_contains: str | None = None,
-    page_size: int = 25,  # Default to 25, max is 50
-    resource_types: List[str] | None = None,
-    subtypes: List[str] | None = None,
-    alert_type: str = "ALERT",  # Defaults to ALERT per schema
+    start_date: Annotated[
+        str | None,
+        Field(
+            description="Optional start date in ISO-8601 format. If provided, defaults to the start of the current day UTC.",
+            examples=["2024-03-20T00:00:00Z"],
+        ),
+    ] = None,
+    end_date: Annotated[
+        str | None,
+        Field(
+            description="Optional end date in ISO-8601 format. If provided, defaults to the end of the current day UTC.",
+            examples=["2024-03-20T00:00:00Z"],
+        ),
+    ] = None,
+    severities: Annotated[
+        List[str],
+        Field(
+            description="Optional list of severities to filter by",
+            examples=[["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]],
+        ),
+    ] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+    statuses: Annotated[
+        List[str],
+        Field(
+            description="Optional list of statuses to filter by",
+            examples=[
+                ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
+                ["RESOLVED", "CLOSED"],
+                ["OPEN", "TRIAGED"],
+            ],
+        ),
+    ] = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
+    cursor: Annotated[
+        str | None,
+        Field(
+            description="Optional cursor for pagination returned from a previous call"
+        ),
+    ] = None,
+    detection_id: Annotated[
+        str | None,
+        Field(
+            description="Optional detection ID to filter alerts by; if provided, the date range is not required"
+        ),
+    ] = None,
+    event_count_max: Annotated[
+        int | None,
+        Field(description="Optional maximum number of events an alert may contain"),
+    ] = None,
+    event_count_min: Annotated[
+        int | None,
+        Field(description="Optional minimum number of events an alert must contain"),
+    ] = None,
+    log_sources: Annotated[
+        List[str] | None,
+        Field(description="Optional list of log‑source IDs to filter alerts by"),
+    ] = [],
+    log_types: Annotated[
+        List[str] | None,
+        Field(description="Optional list of log‑type names to filter alerts by"),
+    ] = [],
+    name_contains: Annotated[
+        str | None, Field(description="Optional substring to match within alert titles")
+    ] = None,
+    page_size: Annotated[
+        int,
+        Field(
+            description="Number of results per page (max 50, default 25)",
+            ge=1,
+            le=50,
+        ),
+    ] = 25,
+    resource_types: Annotated[
+        List[str] | None,
+        Field(
+            description="Optional list of AWS resource‑type names to filter alerts by"
+        ),
+    ] = [],
+    subtypes: Annotated[
+        List[str] | None,
+        Field(
+            description="Optional list of alert subtypes (valid values depend on alert_type)"
+        ),
+    ] = [],
+    alert_type: Annotated[
+        str,
+        Field(
+            description="Type of alerts to return",
+            examples=["ALERT", "DETECTION_ERROR", "SYSTEM_ERROR"],
+        ),
+    ] = "ALERT",
 ) -> Dict[str, Any]:
     """List alerts from Panther with comprehensive filtering options
 
@@ -112,13 +189,11 @@ async def list_alerts(
             logger.info(f"Filtering by detection ID: {detection_id}")
         else:
             # If no detection_id, we must have a date range
-            if not start_date or not end_date:
-                start_date, end_date = _get_today_date_range()
-                logger.info(
-                    f"No detection ID and missing date range, using last 24 hours: {start_date} to {end_date}"
-                )
-            else:
-                logger.info(f"Using provided date range: {start_date} to {end_date}")
+            default_start_date, default_end_date = _get_today_date_range()
+            if not start_date:
+                start_date = default_start_date
+            if not end_date:
+                end_date = default_end_date
 
             params["created-after"] = start_date
             params["created-before"] = end_date
