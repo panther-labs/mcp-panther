@@ -248,7 +248,7 @@ ORDER BY
     alert_count DESC
 LIMIT 1000
 """
-    return await execute_data_lake_query(query, "panther_signals.public")
+    return await query_data_lake(query, "panther_signals.public")
 
 
 @mcp_tool(
@@ -256,7 +256,7 @@ LIMIT 1000
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
     }
 )
-async def execute_data_lake_query(
+async def query_data_lake(
     sql: Annotated[
         str,
         Field(
@@ -294,6 +294,7 @@ async def execute_data_lake_query(
         - success: Boolean indicating if the query was successful
         - status: Status of the query (e.g., "succeeded", "failed", "cancelled")
         - message: Error message if unsuccessful
+        - query_id: The unique identifier for the query (null if query execution failed)
         - results: List of query result rows
         - column_info: Dict containing column names and types
         - stats: Dict containing stats about the query
@@ -322,6 +323,7 @@ async def execute_data_lake_query(
         return {
             "success": False,
             "message": error_msg,
+            "query_id": None,
         }
 
     try:
@@ -361,8 +363,9 @@ async def execute_data_lake_query(
                     return {
                         "success": False,
                         "status": "cancelled",
-                        "message": "Query time exceeded timeout, and has been cancelled. A longer timout may be required."
+                        "message": "Query time exceeded timeout, and has been cancelled. A longer timout may be required. "
                         "Retrying may be faster due to caching, or you may need to reduce the duration of data being queried.",
+                        "query_id": query_id,
                     }
             else:
                 return result
@@ -371,9 +374,12 @@ async def execute_data_lake_query(
                 sleep_time += 1
     except Exception as e:
         logger.error(f"Failed to execute data lake query: {str(e)}")
+        # Try to get query_id if it was set before the error
+        query_id = locals().get("query_id")
         return {
             "success": False,
             "message": f"Failed to execute data lake query: {str(e)}",
+            "query_id": query_id,
         }
 
 
@@ -418,7 +424,11 @@ async def _get_data_lake_query_results(
 
         if not query_data:
             logger.warning(f"No query found with ID: {query_id}")
-            return {"success": False, "message": f"No query found with ID: {query_id}"}
+            return {
+                "success": False,
+                "message": f"No query found with ID: {query_id}",
+                "query_id": query_id,
+            }
 
         # Get query status
         status = query_data.get("status")
@@ -427,18 +437,21 @@ async def _get_data_lake_query_results(
                 "success": True,
                 "status": "running",
                 "message": "Query is still running",
+                "query_id": query_id,
             }
         elif status == "failed":
             return {
                 "success": False,
                 "status": "failed",
                 "message": query_data.get("message", "Query failed"),
+                "query_id": query_id,
             }
         elif status == "cancelled":
             return {
                 "success": False,
                 "status": "cancelled",
                 "message": "Query was cancelled",
+                "query_id": query_id,
             }
 
         # Get results data
@@ -471,12 +484,14 @@ async def _get_data_lake_query_results(
             "has_next_page": results.get("pageInfo", {}).get("hasNextPage", False),
             "end_cursor": results.get("pageInfo", {}).get("endCursor"),
             "message": query_data.get("message", "Query executed successfully"),
+            "query_id": query_id,
         }
     except Exception as e:
         logger.error(f"Failed to fetch data lake query results: {str(e)}")
         return {
             "success": False,
             "message": f"Failed to fetch data lake query results: {str(e)}",
+            "query_id": query_id,
         }
 
 
