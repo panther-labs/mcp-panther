@@ -108,7 +108,7 @@ async def list_globals(
         "permissions": all_perms(Permission.RULE_READ),
     }
 )
-async def get_global_by_id(
+async def get_global(
     global_id: Annotated[
         str,
         Field(

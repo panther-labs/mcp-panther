@@ -60,7 +60,7 @@ async def list_panther_users() -> Dict[str, Any]:
         "permissions": all_perms(Permission.USER_READ),
     }
 )
-async def get_user_by_id(
+async def get_user(
     user_id: Annotated[
         str,
         Field(

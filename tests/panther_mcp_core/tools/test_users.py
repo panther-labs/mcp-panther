@@ -1,7 +1,7 @@
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.users import (
-    get_user_by_id,
+    get_user,
     list_panther_users,
 )
 from tests.utils.helpers import patch_rest_client
@@ -33,11 +33,11 @@ USERS_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.users"
 
 @pytest.mark.asyncio
 @patch_rest_client(USERS_MODULE_PATH)
-async def test_get_user_by_id_success(mock_rest_client):
+async def test_get_user_success(mock_rest_client):
     """Test successful retrieval of a single user."""
     mock_rest_client.get.return_value = (MOCK_USER, 200)
 
-    result = await get_user_by_id(MOCK_USER["id"])
+    result = await get_user(MOCK_USER["id"])
 
     assert result["success"] is True
     assert result["user"]["id"] == MOCK_USER["id"]
@@ -53,11 +53,11 @@ async def test_get_user_by_id_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(USERS_MODULE_PATH)
-async def test_get_user_by_id_not_found(mock_rest_client):
+async def test_get_user_not_found(mock_rest_client):
     """Test handling of non-existent user."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_user_by_id("nonexistent-user")
+    result = await get_user("nonexistent-user")
 
     assert result["success"] is False
     assert "No user found with ID" in result["message"]
@@ -65,11 +65,11 @@ async def test_get_user_by_id_not_found(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(USERS_MODULE_PATH)
-async def test_get_user_by_id_error(mock_rest_client):
+async def test_get_user_error(mock_rest_client):
     """Test handling of errors when getting user by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_user_by_id(MOCK_USER["id"])
+    result = await get_user(MOCK_USER["id"])
 
     assert result["success"] is False
     assert "Failed to get user details" in result["message"]

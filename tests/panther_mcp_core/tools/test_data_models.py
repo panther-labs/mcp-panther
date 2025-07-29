@@ -1,7 +1,7 @@
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.data_models import (
-    get_data_model_by_id,
+    get_data_model,
     list_data_models,
 )
 from tests.utils.helpers import patch_rest_client
@@ -93,11 +93,11 @@ async def test_list_data_models_error(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(DATA_MODELS_MODULE_PATH)
-async def test_get_data_model_by_id_success(mock_rest_client):
+async def test_get_data_model_success(mock_rest_client):
     """Test successful retrieval of a single data model."""
     mock_rest_client.get.return_value = (MOCK_DATA_MODEL, 200)
 
-    result = await get_data_model_by_id(MOCK_DATA_MODEL["id"])
+    result = await get_data_model(MOCK_DATA_MODEL["id"])
 
     assert result["success"] is True
     assert result["data_model"]["id"] == MOCK_DATA_MODEL["id"]
@@ -113,11 +113,11 @@ async def test_get_data_model_by_id_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(DATA_MODELS_MODULE_PATH)
-async def test_get_data_model_by_id_not_found(mock_rest_client):
+async def test_get_data_model_not_found(mock_rest_client):
     """Test handling of non-existent data model."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_data_model_by_id("nonexistent-data-model")
+    result = await get_data_model("nonexistent-data-model")
 
     assert result["success"] is False
     assert "No data model found with ID" in result["message"]
@@ -125,11 +125,11 @@ async def test_get_data_model_by_id_not_found(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(DATA_MODELS_MODULE_PATH)
-async def test_get_data_model_by_id_error(mock_rest_client):
+async def test_get_data_model_error(mock_rest_client):
     """Test handling of errors when getting data model by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_data_model_by_id(MOCK_DATA_MODEL["id"])
+    result = await get_data_model(MOCK_DATA_MODEL["id"])
 
     assert result["success"] is False
     assert "Failed to get data model details" in result["message"]
@@ -205,7 +205,7 @@ async def test_get_data_model_with_complex_mappings(mock_rest_client):
     }
     mock_rest_client.get.return_value = (complex_data_model, 200)
 
-    result = await get_data_model_by_id(complex_data_model["id"])
+    result = await get_data_model(complex_data_model["id"])
 
     assert result["success"] is True
     assert len(result["data_model"]["mappings"]) == 2

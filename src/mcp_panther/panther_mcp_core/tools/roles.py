@@ -100,7 +100,7 @@ async def list_roles(
         "permissions": all_perms(Permission.USER_READ),
     }
 )
-async def get_role_by_id(
+async def get_role(
     role_id: Annotated[
         str,
         Field(

@@ -2,11 +2,11 @@ import pytest
 
 from mcp_panther.panther_mcp_core.tools.alerts import (
     add_alert_comment,
-    get_alert_by_id,
+    get_alert,
     get_alert_events,
     list_alert_comments,
     list_alerts,
-    update_alert_assignee_by_id,
+    update_alert_assignee,
     update_alert_status,
 )
 from tests.utils.helpers import (
@@ -179,11 +179,11 @@ async def test_list_alerts_error(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ALERTS_MODULE_PATH)
-async def test_get_alert_by_id_success(mock_rest_client):
+async def test_get_alert_success(mock_rest_client):
     """Test successful retrieval of a single alert."""
     mock_rest_client.get.return_value = (MOCK_ALERT, 200)
 
-    result = await get_alert_by_id(MOCK_ALERT["id"])
+    result = await get_alert(MOCK_ALERT["id"])
 
     assert result["success"] is True
     assert result["alert"]["id"] == MOCK_ALERT["id"]
@@ -193,11 +193,11 @@ async def test_get_alert_by_id_success(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ALERTS_MODULE_PATH)
-async def test_get_alert_by_id_not_found(mock_rest_client):
+async def test_get_alert_not_found(mock_rest_client):
     """Test handling of non-existent alert."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_alert_by_id("nonexistent-alert")
+    result = await get_alert("nonexistent-alert")
 
     assert result["success"] is False
     assert "No alert found" in result["message"]
@@ -205,11 +205,11 @@ async def test_get_alert_by_id_not_found(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ALERTS_MODULE_PATH)
-async def test_get_alert_by_id_error(mock_rest_client):
+async def test_get_alert_error(mock_rest_client):
     """Test handling of errors when getting alert by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_alert_by_id(MOCK_ALERT["id"])
+    result = await get_alert(MOCK_ALERT["id"])
 
     assert result["success"] is False
     assert "Failed to fetch alert details" in result["message"]
@@ -313,7 +313,7 @@ async def test_update_alert_assignee_success(mock_rest_client):
     """Test successful update of alert assignee."""
     mock_rest_client.patch.return_value = ({}, 204)
 
-    result = await update_alert_assignee_by_id([MOCK_ALERT["id"]], "user-123")
+    result = await update_alert_assignee([MOCK_ALERT["id"]], "user-123")
 
     assert result["success"] is True
     assert result["alerts"] == [MOCK_ALERT["id"]]
@@ -325,7 +325,7 @@ async def test_update_alert_assignee_error(mock_rest_client):
     """Test handling of errors when updating alert assignee."""
     mock_rest_client.patch.side_effect = Exception("Test error")
 
-    result = await update_alert_assignee_by_id([MOCK_ALERT["id"]], "user-123")
+    result = await update_alert_assignee([MOCK_ALERT["id"]], "user-123")
 
     assert result["success"] is False
     assert "Failed to update alert assignee" in result["message"]
@@ -337,7 +337,7 @@ async def test_update_alert_assignee_not_found(mock_rest_client):
     """Test updating alert assignee with 404 error."""
     mock_rest_client.patch.return_value = ({}, 404)
 
-    result = await update_alert_assignee_by_id([MOCK_ALERT["id"]], "user-123")
+    result = await update_alert_assignee([MOCK_ALERT["id"]], "user-123")
 
     assert result["success"] is False
     assert "One or more alerts not found" in result["message"]
@@ -520,10 +520,10 @@ async def test_list_alerts_bad_request(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ALERTS_MODULE_PATH)
-async def test_get_alert_by_id_bad_request(mock_rest_client):
+async def test_get_alert_bad_request(mock_rest_client):
     """Test 400 error returns failure."""
     mock_rest_client.get.return_value = ({}, 400)
-    result = await get_alert_by_id("alert-123")
+    result = await get_alert("alert-123")
     assert result["success"] is False
     assert "Bad request" in result["message"]
 
@@ -553,6 +553,6 @@ async def test_add_alert_comment_bad_request(mock_rest_client):
 async def test_update_alert_assignee_bad_request(mock_rest_client):
     """Test 400 error returns failure."""
     mock_rest_client.patch.return_value = ({}, 400)
-    result = await update_alert_assignee_by_id(["alert-123"], "user-123")
+    result = await update_alert_assignee(["alert-123"], "user-123")
     assert result["success"] is False
     assert "Bad request" in result["message"]

@@ -90,7 +90,7 @@ async def list_data_models(
         "permissions": all_perms(Permission.RULE_READ),
     }
 )
-async def get_data_model_by_id(
+async def get_data_model(
     data_model_id: Annotated[
         str,
         Field(

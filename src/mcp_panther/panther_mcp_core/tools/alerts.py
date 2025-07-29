@@ -211,11 +211,8 @@ async def list_alerts(
         "permissions": all_perms(Permission.ALERT_READ),
     }
 )
-async def get_alert_by_id(alert_id: str) -> Dict[str, Any]:
-    """Get detailed information about a specific Panther alert by ID
-
-    TODO: v2.0 - Rename to get_alert() since by_id suffix is redundant
-    """
+async def get_alert(alert_id: str) -> Dict[str, Any]:
+    """Get detailed information about a specific Panther alert by ID"""
     logger.info(f"Fetching alert details for ID: {alert_id}")
     try:
         # Execute the REST API call
@@ -452,12 +449,10 @@ async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
         "permissions": all_perms(Permission.ALERT_MODIFY),
     }
 )
-async def update_alert_assignee_by_id(
+async def update_alert_assignee(
     alert_ids: List[str], assignee_id: str
 ) -> Dict[str, Any]:
     """Update the assignee of one or more alerts through the assignee's ID.
-
-    TODO: v2.0 - Rename to update_alert_assignee() since by_id suffix is redundant
 
     Args:
         alert_ids: List of alert IDs to update

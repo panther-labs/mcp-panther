@@ -17,7 +17,7 @@ logger = logging.getLogger("mcp-panther")
         "permissions": any_perms(Permission.RULE_READ, Permission.POLICY_READ),
     }
 )
-async def get_global_helper_by_id(helper_id: str) -> Dict[str, Any]:
+async def get_global_helper(helper_id: str) -> Dict[str, Any]:
     """Get detailed information about a Panther global helper by ID
 
     Args:
