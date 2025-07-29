@@ -3,7 +3,10 @@ Tools for interacting with Panther schemas.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
+
+from pydantic import Field
+from typing_extensions import Annotated
 
 from ..client import _create_panther_client
 from ..permissions import Permission, all_perms
@@ -19,21 +22,29 @@ logger = logging.getLogger("mcp-panther")
     }
 )
 async def list_log_type_schemas(
-    contains: str | None = None,
-    is_archived: bool | None = None,
-    is_in_use: bool | None = None,
-    is_managed: bool | None = None,
-) -> Dict[str, Any]:
+    contains: Annotated[
+        str | None,
+        Field(description="Optional filter by name or schema field name"),
+    ] = None,
+    is_archived: Annotated[
+        bool,
+        Field(
+            description="Filter by archive status (default: False shows non-archived)"
+        ),
+    ] = False,
+    is_in_use: Annotated[
+        bool,
+        Field(description="Filter for used/active schemas (default: False shows all)"),
+    ] = False,
+    is_managed: Annotated[
+        bool,
+        Field(description="Filter for pack-managed schemas (default: False shows all)"),
+    ] = False,
+) -> dict[str, Any]:
     """List all available log type schemas in Panther. Schemas are transformation instructions that convert raw audit logs
     into structured data for the data lake and real-time Python rules.
 
     Note: Pagination is not currently supported - all schemas will be returned in the first page.
-
-    Args:
-        contains: Optional filter by name or schema field name
-        is_archived: Optional filter by archive status
-        is_in_use: Optional filter used/not used schemas
-        is_managed: Optional filter by pack managed schemas
 
     Returns:
         Dict containing:
@@ -54,15 +65,15 @@ async def list_log_type_schemas(
     try:
         client = await _create_panther_client()
 
-        # Prepare input variables, only including non-None values
+        # Prepare input variables, only including non-default values
         input_vars = {}
         if contains is not None:
             input_vars["contains"] = contains
-        if is_archived is not None:
+        if is_archived:
             input_vars["isArchived"] = is_archived
-        if is_in_use is not None:
+        if is_in_use:
             input_vars["isInUse"] = is_in_use
-        if is_managed is not None:
+        if is_managed:
             input_vars["isManaged"] = is_managed
 
         variables = {"input": input_vars}
@@ -103,12 +114,17 @@ async def list_log_type_schemas(
         "permissions": all_perms(Permission.RULE_READ),
     }
 )
-async def get_panther_log_type_schema(schema_names: list[str]) -> Dict[str, Any]:
+async def get_log_type_schema_details(
+    schema_names: Annotated[
+        list[str],
+        Field(
+            description="List of schema names to get details for (max 5)",
+            examples=[["AWS.CloudTrail", "GCP.AuditLog"]],
+        ),
+    ],
+) -> dict[str, Any]:
     """Get detailed information for specific log type schemas, including their full specifications.
     Limited to 5 schemas at a time to prevent response size issues.
-
-    Args:
-        schema_names: List of schema names to get details for (max 5)
 
     Returns:
         Dict containing:
