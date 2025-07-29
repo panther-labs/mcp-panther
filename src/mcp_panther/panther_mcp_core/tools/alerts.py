@@ -71,7 +71,7 @@ async def list_alerts(
     log_sources: Annotated[
         List[str] | None,
         Field(description="Optional list of log‑source IDs to filter alerts by")
-    ] = None,
+    ] = [],
     log_types: Annotated[
         List[str] | None,
         Field(description="Optional list of log‑type names to filter alerts by")
