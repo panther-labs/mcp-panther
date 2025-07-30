@@ -62,7 +62,12 @@ async def test_rule_alert_metrics_invalid_interval():
                 "get_rule_alert_metrics",
                 {"interval_in_minutes": 45},  # Invalid interval
             )
-        assert "Error calling tool 'get_rule_alert_metrics'" in str(exc_info.value)
+        # FastMCP 2.10+ provides more specific validation error messages
+        error_msg = str(exc_info.value)
+        assert (
+            "Input validation error" in error_msg
+            or "Error calling tool 'get_rule_alert_metrics'" in error_msg
+        )
 
 
 @pytest.mark.asyncio
@@ -75,7 +80,12 @@ async def test_rule_alert_metrics_invalid_rule_ids():
                 "get_rule_alert_metrics",
                 {"rule_ids": ["invalid@rule.id"]},  # Invalid rule ID format
             )
-        assert "Error calling tool 'get_rule_alert_metrics'" in str(exc_info.value)
+        # FastMCP 2.10+ provides more specific validation error messages
+        error_msg = str(exc_info.value)
+        assert (
+            "Input validation error" in error_msg
+            or "Error calling tool 'get_rule_alert_metrics'" in error_msg
+        )
 
         # Test invalid rule ID format with spaces
         with pytest.raises(ToolError) as exc_info:
@@ -83,7 +93,12 @@ async def test_rule_alert_metrics_invalid_rule_ids():
                 "get_rule_alert_metrics",
                 {"rule_ids": ["AWS CloudTrail"]},  # Invalid rule ID format with spaces
             )
-        assert "Error calling tool 'get_rule_alert_metrics'" in str(exc_info.value)
+        # FastMCP 2.10+ provides more specific validation error messages
+        error_msg = str(exc_info.value)
+        assert (
+            "Input validation error" in error_msg
+            or "Error calling tool 'get_rule_alert_metrics'" in error_msg
+        )
 
         # Test invalid rule ID format with special characters
         with pytest.raises(ToolError) as exc_info:
@@ -93,7 +108,12 @@ async def test_rule_alert_metrics_invalid_rule_ids():
                     "rule_ids": ["AWS#CloudTrail"]
                 },  # Invalid rule ID format with special chars
             )
-        assert "Error calling tool 'get_rule_alert_metrics'" in str(exc_info.value)
+        # FastMCP 2.10+ provides more specific validation error messages
+        error_msg = str(exc_info.value)
+        assert (
+            "Input validation error" in error_msg
+            or "Error calling tool 'get_rule_alert_metrics'" in error_msg
+        )
 
 
 # Test constants

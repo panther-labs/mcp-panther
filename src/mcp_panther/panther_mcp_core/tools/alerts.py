@@ -3,7 +3,7 @@ Tools for interacting with Panther alerts.
 """
 
 import logging
-from typing import Any, Dict, List, Annotated
+from typing import Annotated, Any, Dict, List
 
 from pydantic import Field
 
