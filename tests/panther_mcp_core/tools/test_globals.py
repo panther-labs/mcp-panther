@@ -1,8 +1,8 @@
 import pytest
 
-from mcp_panther.panther_mcp_core.tools.globals import (
-    get_global,
-    list_globals,
+from mcp_panther.panther_mcp_core.tools.global_helpers import (
+    get_global_helper,
+    list_global_helpers,
 )
 from tests.utils.helpers import patch_rest_client
 
@@ -28,7 +28,7 @@ MOCK_GLOBALS_RESPONSE = {
     "next": "next-page-token",
 }
 
-GLOBALS_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.globals"
+GLOBALS_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.global_helpers"
 
 
 @pytest.mark.asyncio
@@ -37,15 +37,15 @@ async def test_list_globals_success(mock_rest_client):
     """Test successful listing of global helpers."""
     mock_rest_client.get.return_value = (MOCK_GLOBALS_RESPONSE, 200)
 
-    result = await list_globals()
+    result = await list_global_helpers()
 
     assert result["success"] is True
-    assert len(result["globals"]) == 2
-    assert result["total_globals"] == 2
+    assert len(result["global_helpers"]) == 2
+    assert result["total_global_helpers"] == 2
     assert result["has_next_page"] is True
     assert result["next_cursor"] == "next-page-token"
 
-    first_global = result["globals"][0]
+    first_global = result["global_helpers"][0]
     assert first_global["id"] == MOCK_GLOBAL["id"]
     assert first_global["description"] == MOCK_GLOBAL["description"]
     assert first_global["tags"] == MOCK_GLOBAL.get("tags")
@@ -59,7 +59,7 @@ async def test_list_globals_with_pagination(mock_rest_client):
     """Test listing global helpers with pagination."""
     mock_rest_client.get.return_value = (MOCK_GLOBALS_RESPONSE, 200)
 
-    await list_globals(cursor="some-cursor", limit=50)
+    await list_global_helpers(cursor="some-cursor", limit=50)
 
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
@@ -74,7 +74,7 @@ async def test_list_globals_with_filters(mock_rest_client):
     """Test listing global helpers with various filters."""
     mock_rest_client.get.return_value = (MOCK_GLOBALS_RESPONSE, 200)
 
-    await list_globals(
+    await list_global_helpers(
         name_contains="Helper", created_by="user-123", last_modified_by="user-456"
     )
 
@@ -92,7 +92,7 @@ async def test_list_globals_error(mock_rest_client):
     """Test handling of errors when listing global helpers."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await list_globals()
+    result = await list_global_helpers()
 
     assert result["success"] is False
     assert "Failed to list global helpers" in result["message"]
@@ -104,13 +104,13 @@ async def test_get_global_success(mock_rest_client):
     """Test successful retrieval of a single global helper."""
     mock_rest_client.get.return_value = (MOCK_GLOBAL, 200)
 
-    result = await get_global(MOCK_GLOBAL["id"])
+    result = await get_global_helper(MOCK_GLOBAL["id"])
 
     assert result["success"] is True
-    assert result["global"]["id"] == MOCK_GLOBAL["id"]
-    assert result["global"]["description"] == MOCK_GLOBAL["description"]
-    assert result["global"]["body"] == MOCK_GLOBAL["body"]
-    assert result["global"]["tags"] == MOCK_GLOBAL["tags"]
+    assert result["global_helper"]["id"] == MOCK_GLOBAL["id"]
+    assert result["global_helper"]["description"] == MOCK_GLOBAL["description"]
+    assert result["global_helper"]["body"] == MOCK_GLOBAL["body"]
+    assert result["global_helper"]["tags"] == MOCK_GLOBAL["tags"]
 
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
@@ -123,7 +123,7 @@ async def test_get_global_not_found(mock_rest_client):
     """Test handling of non-existent global helper."""
     mock_rest_client.get.return_value = ({}, 404)
 
-    result = await get_global("nonexistent-global")
+    result = await get_global_helper("nonexistent-global")
 
     assert result["success"] is False
     assert "No global helper found with ID" in result["message"]
@@ -135,7 +135,7 @@ async def test_get_global_error(mock_rest_client):
     """Test handling of errors when getting global helper by ID."""
     mock_rest_client.get.side_effect = Exception("Test error")
 
-    result = await get_global(MOCK_GLOBAL["id"])
+    result = await get_global_helper(MOCK_GLOBAL["id"])
 
     assert result["success"] is False
     assert "Failed to get global helper details" in result["message"]
@@ -148,11 +148,11 @@ async def test_list_globals_empty_results(mock_rest_client):
     empty_response = {"results": [], "next": None}
     mock_rest_client.get.return_value = (empty_response, 200)
 
-    result = await list_globals()
+    result = await list_global_helpers()
 
     assert result["success"] is True
-    assert len(result["globals"]) == 0
-    assert result["total_globals"] == 0
+    assert len(result["global_helpers"]) == 0
+    assert result["total_global_helpers"] == 0
     assert result["has_next_page"] is False
     assert result["next_cursor"] is None
 
@@ -163,7 +163,7 @@ async def test_list_globals_with_null_cursor(mock_rest_client):
     """Test listing global helpers with null cursor."""
     mock_rest_client.get.return_value = (MOCK_GLOBALS_RESPONSE, 200)
 
-    await list_globals(cursor="null")
+    await list_global_helpers(cursor="null")
 
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
@@ -179,13 +179,13 @@ async def test_list_globals_limit_validation(mock_rest_client):
     mock_rest_client.get.return_value = (MOCK_GLOBALS_RESPONSE, 200)
 
     # Test with minimum limit
-    await list_globals(limit=1)
+    await list_global_helpers(limit=1)
     args, kwargs = mock_rest_client.get.call_args
     assert kwargs["params"]["limit"] == 1
 
     # Test with maximum limit (should be handled by Annotated constraints)
     mock_rest_client.reset_mock()
-    await list_globals(limit=1000)
+    await list_global_helpers(limit=1000)
     args, kwargs = mock_rest_client.get.call_args
     assert kwargs["params"]["limit"] == 1000
 
@@ -200,9 +200,9 @@ async def test_get_global_with_complex_body(mock_rest_client):
     }
     mock_rest_client.get.return_value = (complex_global, 200)
 
-    result = await get_global(complex_global["id"])
+    result = await get_global_helper(complex_global["id"])
 
     assert result["success"] is True
-    assert "advanced_threat_detection" in result["global"]["body"]
-    assert "import re" in result["global"]["body"]
-    assert len(result["global"]["body"].split("\n")) > 5  # Multi-line function
+    assert "advanced_threat_detection" in result["global_helper"]["body"]
+    assert "import re" in result["global_helper"]["body"]
+    assert len(result["global_helper"]["body"].split("\n")) > 5  # Multi-line function

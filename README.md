@@ -34,7 +34,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `execute_data_lake_query` | Execute SQL queries against Panther's data lake | "Query AWS CloudTrail logs for failed login attempts in the last day" |
+| `query_data_lake` | Execute SQL queries against Panther's data lake with synchronous results | "Query AWS CloudTrail logs for failed login attempts in the last day" |
 | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
 | `list_databases` | List all available data lake databases in Panther | "List all available databases" |
 | `list_database_tables` | List all available tables for a specific database in Panther's data lake | "What tables are in the panther_logs database" |
@@ -78,10 +78,8 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `list_globals` | List global helper functions with filtering options | "Show me global helpers containing 'aws' in the name" |
-| `get_global` | Get detailed information and code for a specific global helper | "Get the complete code for global helper 'AWSUtilities'" |
-| `list_global_helpers` | List all Panther global helpers with optional pagination | "Show me all global helpers for CrowdStrike events" |
-| `get_global_helper` | Get detailed information about a specific global helper | "Get details for global helper ID panther_github_helpers" |
+| `list_global_helpers` | List global helper functions with comprehensive filtering options (name search, creator, modifier) | "Show me global helpers containing 'aws' in the name" |
+| `get_global_helper` | Get detailed information and complete Python code for a specific global helper | "Get the complete code for global helper 'AWSUtilities'" |
 
 </details>
 
@@ -101,7 +99,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `list_log_type_schemas` | List available log type schemas with optional filters | "Show me all AWS-related schemas" |
-| `get_panther_log_type_schema` | Get detailed information for specific log type schemas | "Get full details for AWS.CloudTrail schema" |
+| `get_log_type_schema_details` | Get detailed information for specific log type schemas | "Get full details for AWS.CloudTrail schema" |
 
 </details>
 
