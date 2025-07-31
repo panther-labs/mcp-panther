@@ -42,6 +42,9 @@ async def list_scheduled_queries(
     Scheduled queries are SQL queries that run automatically on a defined schedule
     for recurring analysis, reporting, and monitoring tasks.
 
+    Note: SQL content is excluded from list responses to prevent token limits.
+    Use get_scheduled_query() to retrieve the full SQL for a specific query.
+
     Returns:
         Dict containing:
         - success: Boolean indicating if the query was successful
@@ -49,7 +52,6 @@ async def list_scheduled_queries(
             - id: Query ID
             - name: Query name
             - description: Query description
-            - sql: The SQL query text
             - schedule: Schedule configuration (cron, rate, timeout)
             - managed: Whether the query is managed by Panther
             - createdAt: Creation timestamp
@@ -76,6 +78,12 @@ async def list_scheduled_queries(
         # Extract queries from response
         queries = response_data.get("results", [])
         next_cursor = response_data.get("next")
+
+        # Remove SQL content to prevent token limit issues
+        # Full SQL can be retrieved using get_scheduled_query
+        for query in queries:
+            if "sql" in query:
+                del query["sql"]
 
         logger.info(f"Successfully retrieved {len(queries)} scheduled queries")
 

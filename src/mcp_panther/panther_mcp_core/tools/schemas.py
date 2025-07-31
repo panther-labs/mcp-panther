@@ -45,8 +45,6 @@ async def list_log_type_schemas(
     """List all available log type schemas in Panther. Schemas are transformation instructions that convert raw audit logs
     into structured data for the data lake and real-time Python rules.
 
-    Note: Pagination is not currently supported - all schemas will be returned in the first page.
-
     Returns:
         Dict containing:
         - success: Boolean indicating if the query was successful
@@ -91,7 +89,6 @@ async def list_log_type_schemas(
             return {"success": False, "message": "No schemas data returned from server"}
 
         edges = schemas_data.get("edges", [])
-
         schemas = [edge["node"] for edge in edges] if edges else []
 
         logger.info(f"Successfully retrieved {len(schemas)} schemas")
