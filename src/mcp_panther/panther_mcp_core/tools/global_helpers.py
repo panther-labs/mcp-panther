@@ -20,7 +20,7 @@ logger = logging.getLogger("mcp-panther")
         "readOnlyHint": True,
     }
 )
-async def list_globals(
+async def list_global_helpers(
     cursor: Annotated[
         str | None,
         Field(description="Optional cursor for pagination from a previous query"),
@@ -100,8 +100,8 @@ async def list_globals(
 
         return {
             "success": True,
-            "globals": filtered_globals_metadata,
-            "total_globals": len(filtered_globals_metadata),
+            "global_helpers": filtered_globals_metadata,
+            "total_global_helpers": len(filtered_globals_metadata),
             "has_next_page": bool(next_cursor),
             "next_cursor": next_cursor,
         }
@@ -116,8 +116,8 @@ async def list_globals(
         "readOnlyHint": True,
     }
 )
-async def get_global(
-    global_id: Annotated[
+async def get_global_helper(
+    helper_id: Annotated[
         str,
         Field(
             description="The ID of the global helper to fetch",
@@ -129,26 +129,26 @@ async def get_global(
 
     Returns complete global helper information including Python body code and usage details.
     """
-    logger.info(f"Fetching global helper details for global ID: {global_id}")
+    logger.info(f"Fetching global helper details for helper ID: {helper_id}")
 
     try:
         async with get_rest_client() as client:
             # Allow 404 as a valid response to handle not found case
             result, status = await client.get(
-                f"/globals/{global_id}", expected_codes=[200, 404]
+                f"/globals/{helper_id}", expected_codes=[200, 404]
             )
 
             if status == 404:
-                logger.warning(f"No global helper found with ID: {global_id}")
+                logger.warning(f"No global helper found with ID: {helper_id}")
                 return {
                     "success": False,
-                    "message": f"No global helper found with ID: {global_id}",
+                    "message": f"No global helper found with ID: {helper_id}",
                 }
 
         logger.info(
-            f"Successfully retrieved global helper details for global ID: {global_id}"
+            f"Successfully retrieved global helper details for helper ID: {helper_id}"
         )
-        return {"success": True, "global": result}
+        return {"success": True, "global_helper": result}
     except Exception as e:
         logger.error(f"Failed to get global helper details: {str(e)}")
         return {

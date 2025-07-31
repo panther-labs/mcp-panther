@@ -2,16 +2,16 @@ from .registry import mcp_prompt
 
 
 @mcp_prompt(
-    name="Get Monthly Alert Summary",
-    description="Generates a comprehensive detection rule quality report for analyzing alert data a given month and year to identify problematic rules and opportunities for improvement, including alerts, detection errors, and system errors.",
+    name="get-monthly-detection-quality-report",
+    description="Generates a comprehensive detection quality report for analyzing alert data a given month and year to identify problematic rules and opportunities for improvement, including alerts, detection errors, and system errors.",
     tags={"reporting"},
 )
-def get_monthly_alert_summary(month: str = "January", year: str = "2025") -> str:
+def get_monthly_detection_quality_report(month: str, year: str) -> str:
     return f"""Build me a comprehensive rule quality report for {month} {year} that includes:
 
 SCOPE & DATA REQUIREMENTS:
 - Analyze ALL alert types: Alerts, detection errors, and system errors
-- Include severity breakdown with INFO-level alerts separated out
+- Include severity breakdown but exclude INFO-level alerts
 - Show alert status distribution
 - Calculate unique alerts vs total volume 
 - Identify any rules that generated errors during the period
@@ -50,7 +50,7 @@ Please provide specific, actionable recommendations with target metrics for impr
 
 
 @mcp_prompt(
-    name="Get Log Sources Report",
+    name="get-log-sources-report",
     description="Generates a report on the health of all Panther log sources and triages any unhealthy sources.",
     tags={"reporting"},
 )

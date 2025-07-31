@@ -20,7 +20,7 @@ logger = logging.getLogger("mcp-panther")
         "readOnlyHint": True,
     }
 )
-async def list_panther_users(
+async def list_users(
     cursor: Annotated[
         str | None,
         Field(description="Optional cursor for pagination from a previous query"),

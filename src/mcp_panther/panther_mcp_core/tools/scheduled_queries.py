@@ -7,6 +7,7 @@ various analysis and reporting purposes.
 
 import logging
 from typing import Annotated, Any, Dict
+from uuid import UUID
 
 from pydantic import Field
 
@@ -36,11 +37,20 @@ async def list_scheduled_queries(
             le=1000,
         ),
     ] = 100,
+    name_contains: Annotated[
+        str | None,
+        Field(
+            description="Optional substring to filter scheduled queries by name (case-insensitive)"
+        ),
+    ] = None,
 ) -> Dict[str, Any]:
     """List all scheduled queries from your Panther instance.
 
     Scheduled queries are SQL queries that run automatically on a defined schedule
     for recurring analysis, reporting, and monitoring tasks.
+
+    Note: SQL content is excluded from list responses to prevent token limits.
+    Use get_scheduled_query() to retrieve the full SQL for a specific query.
 
     Returns:
         Dict containing:
@@ -49,7 +59,6 @@ async def list_scheduled_queries(
             - id: Query ID
             - name: Query name
             - description: Query description
-            - sql: The SQL query text
             - schedule: Schedule configuration (cron, rate, timeout)
             - managed: Whether the query is managed by Panther
             - createdAt: Creation timestamp
@@ -77,6 +86,18 @@ async def list_scheduled_queries(
         queries = response_data.get("results", [])
         next_cursor = response_data.get("next")
 
+        # Remove SQL content to prevent token limit issues
+        # Full SQL can be retrieved using get_scheduled_query
+        for query in queries:
+            if "sql" in query:
+                del query["sql"]
+
+        # Filter by name_contains if provided
+        if name_contains:
+            queries = [
+                q for q in queries if name_contains.lower() in q.get("name", "").lower()
+            ]
+
         logger.info(f"Successfully retrieved {len(queries)} scheduled queries")
 
         # Format the response
@@ -103,10 +124,10 @@ async def list_scheduled_queries(
 )
 async def get_scheduled_query(
     query_id: Annotated[
-        str,
+        UUID,
         Field(
-            description="The ID of the scheduled query to fetch",
-            examples=["query-123", "monthly-security-report"],
+            description="The ID of the scheduled query to fetch (must be a UUID)",
+            examples=["6c6574cb-fbf9-49fc-baad-1a99464ef09e"],
         ),
     ],
 ) -> Dict[str, Any]:
@@ -134,7 +155,7 @@ async def get_scheduled_query(
     try:
         # Execute the REST API call
         async with get_rest_client() as client:
-            response_data, status_code = await client.get(f"/queries/{query_id}")
+            response_data, status_code = await client.get(f"/queries/{str(query_id)}")
 
         logger.info(f"Successfully retrieved scheduled query: {query_id}")
 

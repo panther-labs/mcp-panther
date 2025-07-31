@@ -2,7 +2,7 @@ import pytest
 
 from mcp_panther.panther_mcp_core.tools.users import (
     get_user,
-    list_panther_users,
+    list_users,
 )
 from tests.utils.helpers import patch_rest_client
 
@@ -75,19 +75,19 @@ async def test_get_user_error(mock_rest_client):
     assert "Failed to get user details" in result["message"]
 
 
-# Note: The list_panther_users function uses GraphQL (_execute_query) instead of REST,
+# Note: The list_users function uses GraphQL (_execute_query) instead of REST,
 # so we need to mock that differently. For now, we'll create a basic test structure.
 @pytest.mark.asyncio
-async def test_list_panther_users_structure():
-    """Test that the list_panther_users function has the correct structure."""
+async def test_list_users_structure():
+    """Test that the list_users function has the correct structure."""
     # This is a basic structure test since the function uses GraphQL
     # In a real implementation, you'd want to mock _execute_query
-    assert callable(list_panther_users)
+    assert callable(list_users)
 
     # Test that the function signature is correct
     import inspect
 
-    sig = inspect.signature(list_panther_users)
+    sig = inspect.signature(list_users)
     assert len(sig.parameters) == 2  # cursor and limit parameters expected
 
     # Check parameter names and defaults
