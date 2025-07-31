@@ -99,6 +99,46 @@ async def test_list_scheduled_queries_error(mock_get_client):
 
 @pytest.mark.asyncio
 @patch(f"{SCHEDULED_QUERIES_MODULE_PATH}.get_rest_client")
+async def test_list_scheduled_queries_name_contains_and_sql_removal(mock_get_client):
+    """Test filtering scheduled queries by name_contains and removal of 'sql' field."""
+    mock_client = create_mock_rest_client()
+    # Add a second query to test filtering
+    query1 = dict(MOCK_QUERY_DATA)
+    query2 = dict(MOCK_QUERY_DATA)
+    query2["id"] = "query-456"
+    query2["name"] = "Another Query"
+    query2["sql"] = "SELECT 1"
+    mock_query_list = {
+        "results": [query1, query2],
+        "next": None,
+    }
+    mock_client.get.return_value = (mock_query_list, 200)
+    mock_get_client.return_value = mock_client
+
+    # Should only return queries whose name contains 'test' (case-insensitive)
+    result = await list_scheduled_queries(name_contains="test")
+    assert result["success"] is True
+    assert result["total_queries"] == 1
+    assert result["queries"][0]["id"] == "query-123"
+    assert "sql" not in result["queries"][0]
+
+    # Should only return queries whose name contains 'another' (case-insensitive)
+    result2 = await list_scheduled_queries(name_contains="another")
+    assert result2["success"] is True
+    assert result2["total_queries"] == 1
+    assert result2["queries"][0]["id"] == "query-456"
+    assert "sql" not in result2["queries"][0]
+
+    # Should return both queries if no filter is applied
+    result3 = await list_scheduled_queries()
+    assert result3["success"] is True
+    assert result3["total_queries"] == 2
+    for q in result3["queries"]:
+        assert "sql" not in q
+
+
+@pytest.mark.asyncio
+@patch(f"{SCHEDULED_QUERIES_MODULE_PATH}.get_rest_client")
 async def test_get_scheduled_query_success(mock_get_client):
     """Test successful retrieval of a specific scheduled query."""
     mock_client = create_mock_rest_client()

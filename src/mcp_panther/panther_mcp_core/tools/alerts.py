@@ -3,7 +3,7 @@ Tools for interacting with Panther alerts.
 """
 
 import logging
-from typing import Annotated, Any, Dict, List
+from typing import Annotated, Any
 
 from pydantic import Field
 
@@ -39,14 +39,14 @@ async def list_alerts(
         ),
     ] = None,
     severities: Annotated[
-        List[str],
+        list[str],
         Field(
             description="Optional list of severities to filter by",
             examples=[["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]],
         ),
     ] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
     statuses: Annotated[
-        List[str],
+        list[str],
         Field(
             description="Optional list of statuses to filter by",
             examples=[
@@ -77,11 +77,11 @@ async def list_alerts(
         Field(description="Optional minimum number of events an alert must contain"),
     ] = None,
     log_sources: Annotated[
-        List[str] | None,
+        list[str] | None,
         Field(description="Optional list of log‑source IDs to filter alerts by"),
     ] = [],
     log_types: Annotated[
-        List[str] | None,
+        list[str] | None,
         Field(description="Optional list of log‑type names to filter alerts by"),
     ] = [],
     name_contains: Annotated[
@@ -96,15 +96,25 @@ async def list_alerts(
         ),
     ] = 25,
     resource_types: Annotated[
-        List[str] | None,
+        list[str] | None,
         Field(
             description="Optional list of AWS resource‑type names to filter alerts by"
         ),
     ] = [],
     subtypes: Annotated[
-        List[str] | None,
+        list[str] | None,
         Field(
-            description="Optional list of alert subtypes (valid values depend on alert_type)"
+            description="Optional list of alert subtypes (valid values depend on alert_type)",
+            examples=[
+                ["RULE"],  # Python rules only
+                ["SCHEDULED_RULE"],  # Scheduled queries only
+                ["POLICY"],  # Cloud policies only
+                ["RULE", "SCHEDULED_RULE"],  # Both rule types (when alert_type=ALERT)
+                [
+                    "RULE_ERROR",
+                    "SCHEDULED_RULE_ERROR",
+                ],  # When alert_type=DETECTION_ERROR
+            ],
         ),
     ] = [],
     alert_type: Annotated[
@@ -114,7 +124,7 @@ async def list_alerts(
             examples=["ALERT", "DETECTION_ERROR", "SYSTEM_ERROR"],
         ),
     ] = "ALERT",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List alerts from Panther with comprehensive filtering options
 
     Args:
@@ -288,7 +298,7 @@ async def list_alerts(
         "readOnlyHint": True,
     }
 )
-async def get_alert(alert_id: str) -> Dict[str, Any]:
+async def get_alert(alert_id: str) -> dict[str, Any]:
     """Get detailed information about a specific Panther alert by ID"""
     logger.info(f"Fetching alert details for ID: {alert_id}")
     try:
@@ -327,7 +337,7 @@ async def get_alert(alert_id: str) -> Dict[str, Any]:
 async def list_alert_comments(
     alert_id: str,
     limit: int = 25,  # , cursor: str = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get all comments for a specific Panther alert by ID.
 
     Args:
@@ -388,7 +398,7 @@ async def list_alert_comments(
         "idempotentHint": True,
     }
 )
-async def update_alert_status(alert_ids: List[str], status: str) -> Dict[str, Any]:
+async def update_alert_status(alert_ids: list[str], status: str) -> dict[str, Any]:
     """Update the status of one or more Panther alerts.
 
     Args:
@@ -467,7 +477,7 @@ async def update_alert_status(alert_ids: List[str], status: str) -> Dict[str, An
         "destructiveHint": True,
     }
 )
-async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
+async def add_alert_comment(alert_id: str, comment: str) -> dict[str, Any]:
     """Add a comment to a Panther alert. Comments support Markdown formatting.
 
     Args:
@@ -533,8 +543,8 @@ async def add_alert_comment(alert_id: str, comment: str) -> Dict[str, Any]:
     }
 )
 async def update_alert_assignee(
-    alert_ids: List[str], assignee_id: str
-) -> Dict[str, Any]:
+    alert_ids: list[str], assignee_id: str
+) -> dict[str, Any]:
     """Update the assignee of one or more alerts through the assignee's ID.
 
     Args:
@@ -597,7 +607,7 @@ async def update_alert_assignee(
         "readOnlyHint": True,
     }
 )
-async def get_alert_events(alert_id: str, limit: int = 10) -> Dict[str, Any]:
+async def get_alert_events(alert_id: str, limit: int = 10) -> dict[str, Any]:
     """
     Get events for a specific Panther alert by ID.
     We make a best effort to return the first events for an alert, but order is not guaranteed.
