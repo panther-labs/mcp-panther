@@ -20,7 +20,7 @@ def get_detection_rule_errors(start_date: str, end_date: str) -> str:
     tags={"triage"},
 )
 def prioritize_open_alerts(start_date: str, end_date: str) -> str:
-    return f"""Analyze alert signals and group them based on entity names. The goal is to identify patterns of related activity across alerts and triage them together.
+    return f"""Analyze open alerts and group them based on entity names. The goal is to identify patterns of related activity across alerts to be triaged together.
 
 1. Find all alerts between {start_date} and {end_date}.
 2. Summarize alert events and group them by entity names, combining similar alerts together.
