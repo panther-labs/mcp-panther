@@ -1,114 +1,5 @@
 from gql import gql
 
-# Alert Queries
-GET_TODAYS_ALERTS_QUERY = gql("""
-query FirstPageOfAllAlerts($input: AlertsInput!) {
-    alerts(input: $input) {
-        edges {
-            node {
-                id
-                title
-                severity
-                status
-                createdAt
-                type
-                description
-                reference
-                runbook
-                firstEventOccurredAt
-                lastReceivedEventAt
-                origin {
-                    ... on Detection {
-                        id
-                        name
-                    }
-                }
-            }
-        }
-        pageInfo {
-            hasNextPage
-            endCursor
-            hasPreviousPage
-            startCursor
-        }
-    }
-}
-""")
-
-GET_ALERT_BY_ID_QUERY = gql("""
-query GetAlertById($id: ID!) {
-    alert(id: $id) {
-        id
-        title
-        severity
-        status
-        createdAt
-        type
-        description
-        reference
-        runbook
-        firstEventOccurredAt
-        lastReceivedEventAt
-        updatedAt
-        origin {
-            ... on Detection {
-                id
-                name
-            }
-        }
-    }
-}
-""")
-
-UPDATE_ALERT_STATUS_MUTATION = gql("""
-mutation UpdateAlertStatusById($input: UpdateAlertStatusByIdInput!) {
-    updateAlertStatusById(input: $input) {
-        alerts {
-            id
-            status
-            updatedAt
-        }
-    }
-}
-""")
-
-ADD_ALERT_COMMENT_MUTATION = gql("""
-mutation CreateAlertComment($input: CreateAlertCommentInput!) {
-    createAlertComment(input: $input) {
-        comment {
-            id
-            body
-            createdAt
-            createdBy {
-                ... on User {
-                    id
-                    email
-                    givenName
-                    familyName
-                }
-            }
-            format
-        }
-    }
-}
-""")
-
-UPDATE_ALERTS_ASSIGNEE_BY_ID_MUTATION = gql("""
-mutation UpdateAlertsAssigneeById($input: UpdateAlertsAssigneeByIdInput!) {
-    updateAlertsAssigneeById(input: $input) {
-        alerts {
-            id
-            assignee {
-                id
-                email
-                givenName
-                familyName
-            }
-        }
-    }
-}
-""")
-
 # Source Queries
 GET_SOURCES_QUERY = gql("""
 query Sources($input: SourcesInput) {
@@ -243,8 +134,6 @@ query GetColumnDetails($databaseName: String!, $tableName: String!) {
 }
 """)
 
-# Add after ALL_DATABASE_ENTITIES_QUERY
-
 LIST_SCHEMAS_QUERY = gql("""
 query ListSchemas($input: SchemasInput!) {
     schemas(input: $input) {
@@ -280,27 +169,6 @@ mutation CreateOrUpdateSchema($input: CreateOrUpdateSchemaInput!) {
             discoveredSpec
             createdAt
             updatedAt
-        }
-    }
-}
-""")
-
-# User Queries
-LIST_USERS_QUERY = gql("""
-query ListUsers {
-    users {
-        id
-        email
-        givenName
-        familyName
-        createdAt
-        lastLoggedInAt
-        status
-        enabled
-        role {
-            id
-            name
-            permissions
         }
     }
 }
