@@ -116,7 +116,7 @@ async def list_alerts(
                 ],  # When alert_type=DETECTION_ERROR
             ],
         ),
-    ] = [],
+    ] = ["RULE", "SCHEDULED_RULE"],
     alert_type: Annotated[
         str,
         Field(

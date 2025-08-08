@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -156,8 +155,8 @@ class TestGetMetricsAlertsPerRule:
         self, mock_execute_query
     ):
         """Test function with custom date range."""
-        start_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
-        end_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
+        end_date = "2024-03-19T23:59:59.000Z"
 
         result = await get_rule_alert_metrics(start_date=start_date, end_date=end_date)
 
@@ -174,7 +173,7 @@ class TestGetMetricsAlertsPerRule:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with only one date provided."""
-        start_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
 
         result = await get_rule_alert_metrics(start_date=start_date)
 
@@ -301,8 +300,8 @@ class TestGetMetricsAlertsPerSeverity:
     ):
         """Test function with custom date range."""
         self.setup_mocks(mock_execute_query, mock_get_today_date_range)
-        start_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
-        end_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
+        end_date = "2024-03-19T23:59:59.000Z"
 
         result = await get_severity_alert_metrics(
             start_date=start_date, end_date=end_date
@@ -318,7 +317,7 @@ class TestGetMetricsAlertsPerSeverity:
     ):
         """Test function with only one date provided."""
         self.setup_mocks(mock_execute_query, mock_get_today_date_range)
-        start_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
 
         result = await get_severity_alert_metrics(start_date=start_date)
 
@@ -439,8 +438,8 @@ class TestGetMetricsAlertsPerSeverity:
     ):
         """Test function with combination of custom parameters."""
         self.setup_mocks(mock_execute_query, mock_get_today_date_range)
-        start_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
-        end_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
+        end_date = "2024-03-19T23:59:59.000Z"
 
         # Update mock response for this test
         mock_execute_query.return_value = {
@@ -535,8 +534,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with custom date range."""
-        start_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
-        end_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
+        end_date = "2024-03-19T23:59:59.000Z"
 
         result = await get_bytes_processed_per_log_type_and_source(
             start_date=start_date, end_date=end_date
@@ -551,7 +550,7 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with only one date provided."""
-        start_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
 
         result = await get_bytes_processed_per_log_type_and_source(
             start_date=start_date
@@ -569,8 +568,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         """Test function with different interval options."""
         # Test with 1h interval
         result = await get_bytes_processed_per_log_type_and_source(
-            start_date=datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc),
-            end_date=datetime(2024, 3, 1, 1, 0, 0, tzinfo=timezone.utc),
+            start_date="2024-03-01T00:00:00.000Z",
+            end_date="2024-03-01T01:00:00.000Z",
             interval_in_minutes=60,
         )
         assert result["success"] is True
@@ -579,8 +578,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         # Test with 12h interval
         mock_execute_query.reset_mock()
         result = await get_bytes_processed_per_log_type_and_source(
-            start_date=datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc),
-            end_date=datetime(2024, 3, 1, 12, 0, 0, tzinfo=timezone.utc),
+            start_date="2024-03-01T00:00:00.000Z",
+            end_date="2024-03-01T12:00:00.000Z",
             interval_in_minutes=720,
         )
         assert result["success"] is True
@@ -591,8 +590,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         mock_execute_query.side_effect = Exception("GraphQL error")
 
         result = await get_bytes_processed_per_log_type_and_source(
-            start_date=datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc),
-            end_date=datetime(2024, 3, 2, 0, 0, 0, tzinfo=timezone.utc),
+            start_date="2024-03-01T00:00:00.000Z",
+            end_date="2024-03-02T00:00:00.000Z",
         )
 
         assert result["success"] is False
@@ -604,8 +603,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         mock_execute_query.return_value = {"metrics": {"bytesProcessedPerSource": []}}
 
         result = await get_bytes_processed_per_log_type_and_source(
-            start_date=datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc),
-            end_date=datetime(2024, 3, 2, 0, 0, 0, tzinfo=timezone.utc),
+            start_date="2024-03-01T00:00:00.000Z",
+            end_date="2024-03-02T00:00:00.000Z",
         )
 
         assert result["success"] is True

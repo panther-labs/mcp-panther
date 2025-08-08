@@ -3,7 +3,6 @@ Tools for interacting with Panther metrics.
 """
 
 import logging
-from datetime import datetime
 from typing import Annotated, Any
 
 from pydantic import Field
@@ -11,7 +10,6 @@ from pydantic import Field
 from ..client import (
     _execute_query,
     _get_today_date_range,
-    graphql_date_format,
 )
 from ..permissions import Permission, all_perms
 from ..queries import (
@@ -32,14 +30,14 @@ logger = logging.getLogger("mcp-panther")
 )
 async def get_severity_alert_metrics(
     start_date: Annotated[
-        str | datetime | None,
+        str | None,
         Field(
             description="Optional start date in ISO-8601 format. If provided, defaults to the start of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
         ),
     ] = None,
     end_date: Annotated[
-        str | datetime | None,
+        str | None,
         Field(
             description="Optional end date in ISO-8601 format. If provided, defaults to the end of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
@@ -82,12 +80,6 @@ async def get_severity_alert_metrics(
         - interval_in_minutes: Grouping interval for the metrics
     """
     try:
-        # Convert datetime objects to strings if needed
-        if isinstance(start_date, datetime):
-            start_date = graphql_date_format(start_date)
-        if isinstance(end_date, datetime):
-            end_date = graphql_date_format(end_date)
-
         # If start or end date is missing, use today's date range
         if not start_date or not end_date:
             default_start_date, default_end_date = _get_today_date_range()
@@ -151,14 +143,14 @@ async def get_severity_alert_metrics(
 )
 async def get_rule_alert_metrics(
     start_date: Annotated[
-        str | datetime | None,
+        str | None,
         Field(
             description="Optional start date in ISO-8601 format. If provided, defaults to the start of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
         ),
     ] = None,
     end_date: Annotated[
-        str | datetime | None,
+        str | None,
         Field(
             description="Optional end date in ISO-8601 format. If provided, defaults to the end of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
@@ -188,12 +180,6 @@ async def get_rule_alert_metrics(
         - rule_ids: List of rule IDs if provided
     """
     try:
-        # Convert datetime objects to strings if needed
-        if isinstance(start_date, datetime):
-            start_date = graphql_date_format(start_date)
-        if isinstance(end_date, datetime):
-            end_date = graphql_date_format(end_date)
-
         # If start or end date is missing, use today's date range
         if not start_date or not end_date:
             default_start_date, default_end_date = _get_today_date_range()
@@ -258,14 +244,14 @@ async def get_rule_alert_metrics(
 )
 async def get_bytes_processed_per_log_type_and_source(
     start_date: Annotated[
-        str | datetime | None,
+        str | None,
         Field(
             description="Optional start date in ISO-8601 format. If provided, defaults to the start of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
         ),
     ] = None,
     end_date: Annotated[
-        str | datetime | None,
+        str | None,
         Field(
             description="Optional end date in ISO-8601 format. If provided, defaults to the end of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
@@ -291,12 +277,6 @@ async def get_bytes_processed_per_log_type_and_source(
         - interval_in_minutes: Grouping interval for the metrics
     """
     try:
-        # Convert datetime objects to strings if needed
-        if isinstance(start_date, datetime):
-            start_date = graphql_date_format(start_date)
-        if isinstance(end_date, datetime):
-            end_date = graphql_date_format(end_date)
-
         # If start or end date is missing, use today's date range
         if not start_date or not end_date:
             default_start_date, default_end_date = _get_today_date_range()

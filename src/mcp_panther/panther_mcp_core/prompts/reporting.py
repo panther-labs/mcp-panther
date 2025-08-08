@@ -7,7 +7,7 @@ from .registry import mcp_prompt
     tags={"reporting"},
 )
 def get_monthly_detection_quality_report(month: str, year: str) -> str:
-    return f"""Build me a comprehensive rule quality report for {month} {year} that includes:
+    return f"""Build a comprehensive rule quality report for {month} {year} that includes:
 
 SCOPE & DATA REQUIREMENTS:
 - Analyze ALL alert types: Alerts, detection errors, and system errors
@@ -50,14 +50,16 @@ Please provide specific, actionable recommendations with target metrics for impr
 
 
 @mcp_prompt(
-    name="get-log-sources-report",
-    description="Generates a report on the health of all Panther log sources and triages any unhealthy sources.",
+    name="get-monthly-log-sources-report",
+    description="Generates a monthly report on the health of all Panther log sources for a given month and year, and triages any unhealthy sources.",
     tags={"reporting"},
 )
-def get_log_sources_report() -> str:
-    return """You are an expert in security log ingestion pipelines. Your goal is to ensure that all Panther log sources are healthy, and if they are unhealthy, to understand the root cause and how to fix it. Follow these steps:
+def get_monthly_log_sources_report(month: str, year: str) -> str:
+    return f"""You are an expert in security log ingestion pipelines. Check the health of all Panther log sources for {month} {year}, and if they are unhealthy, understand the root cause and how to fix it. Follow these steps:
 
-1. List log sources
-2. If any log sources are unhealthy, search for a related SYSTEM alert for that source. You may need to look a few weeks back.
-3. If the reason for being unhealthy is a classification error, query the panther_monitor.public.classification_failures table with a matching p_source_id. Read the payload column and try to infer the log type based on the data, and then compare it to the log source's attached schemas to pinpoint why it isn't classifying.
-4. If no sources are unhealthy, print a summary of your findings. If several are unhealthy, triage one at a time, providing a summary for each one."""
+1. List log sources and their health status for {month} {year}.
+2. If any log sources are unhealthy, search for a related SYSTEM alert for that source during {month} {year}. You may need to look a few weeks back within the month.
+3. If the reason for being unhealthy is a classification error, query the panther_monitor.public.classification_failures table with a matching p_source_id for events in {month} {year}. Read the payload column and try to infer the log type based on the data, and then compare it to the log source's attached schemas to pinpoint why it isn't classifying.
+4. If no sources are unhealthy, print a summary of your findings for {month} {year}. If several are unhealthy, triage one at a time, providing a summary for each one.
+
+Be sure to scope all findings and queries to the specified month and year."""
