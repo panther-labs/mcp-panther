@@ -5,13 +5,21 @@ Tools for interacting with Panther alerts.
 import logging
 from typing import Annotated, Any
 
-from pydantic import Field
+from pydantic import BeforeValidator, Field
 
 from ..client import (
     _get_today_date_range,
     get_rest_client,
 )
 from ..permissions import Permission, all_perms
+from ..validators import (
+    _validate_alert_api_types,
+    _validate_alert_status,
+    _validate_iso_date,
+    _validate_severities,
+    _validate_statuses,
+    _validate_subtypes,
+)
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
@@ -26,6 +34,7 @@ logger = logging.getLogger("mcp-panther")
 async def list_alerts(
     start_date: Annotated[
         str | None,
+        BeforeValidator(_validate_iso_date),
         Field(
             description="Optional start date in ISO-8601 format. If provided, defaults to the start of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
@@ -33,6 +42,7 @@ async def list_alerts(
     ] = None,
     end_date: Annotated[
         str | None,
+        BeforeValidator(_validate_iso_date),
         Field(
             description="Optional end date in ISO-8601 format. If provided, defaults to the end of the current day UTC.",
             examples=["2024-03-20T00:00:00Z"],
@@ -40,6 +50,7 @@ async def list_alerts(
     ] = None,
     severities: Annotated[
         list[str],
+        BeforeValidator(_validate_severities),
         Field(
             description="Optional list of severities to filter by",
             examples=[["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]],
@@ -47,6 +58,7 @@ async def list_alerts(
     ] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
     statuses: Annotated[
         list[str],
+        BeforeValidator(_validate_statuses),
         Field(
             description="Optional list of statuses to filter by",
             examples=[
@@ -59,33 +71,42 @@ async def list_alerts(
     cursor: Annotated[
         str | None,
         Field(
-            description="Optional cursor for pagination returned from a previous call"
+            min_length=1,
+            description="Optional cursor for pagination returned from a previous call",
         ),
     ] = None,
     detection_id: Annotated[
         str | None,
         Field(
-            description="Optional detection ID to filter alerts by; if provided, the date range is not required"
+            min_length=1,
+            description="Optional detection ID to filter alerts by; if provided, the date range is not required",
         ),
     ] = None,
     event_count_max: Annotated[
         int | None,
-        Field(description="Optional maximum number of events an alert may contain"),
+        Field(
+            ge=1, description="Optional maximum number of events an alert may contain"
+        ),
     ] = None,
     event_count_min: Annotated[
-        int | None,
-        Field(description="Optional minimum number of events an alert must contain"),
-    ] = None,
+        int,
+        Field(
+            ge=1, description="Optional minimum number of events an alert must contain"
+        ),
+    ] = 1,
     log_sources: Annotated[
-        list[str] | None,
+        list[str],
         Field(description="Optional list of log‑source IDs to filter alerts by"),
     ] = [],
     log_types: Annotated[
-        list[str] | None,
+        list[str],
         Field(description="Optional list of log‑type names to filter alerts by"),
     ] = [],
     name_contains: Annotated[
-        str | None, Field(description="Optional substring to match within alert titles")
+        str | None,
+        Field(
+            min_length=1, description="Optional substring to match within alert titles"
+        ),
     ] = None,
     page_size: Annotated[
         int,
@@ -96,13 +117,14 @@ async def list_alerts(
         ),
     ] = 25,
     resource_types: Annotated[
-        list[str] | None,
+        list[str],
         Field(
             description="Optional list of AWS resource‑type names to filter alerts by"
         ),
     ] = [],
     subtypes: Annotated[
-        list[str] | None,
+        list[str],
+        BeforeValidator(_validate_subtypes),
         Field(
             description="Optional list of alert subtypes (valid values depend on alert_type)",
             examples=[
@@ -119,6 +141,7 @@ async def list_alerts(
     ] = ["RULE", "SCHEDULED_RULE"],
     alert_type: Annotated[
         str,
+        BeforeValidator(_validate_alert_api_types),
         Field(
             description="Type of alerts to return",
             examples=["ALERT", "DETECTION_ERROR", "SYSTEM_ERROR"],
@@ -298,7 +321,12 @@ async def list_alerts(
         "readOnlyHint": True,
     }
 )
-async def get_alert(alert_id: str) -> dict[str, Any]:
+async def get_alert(
+    alert_id: Annotated[
+        str,
+        Field(min_length=1, description="The ID of the alert to fetch"),
+    ],
+) -> dict[str, Any]:
     """Get detailed information about a specific Panther alert by ID"""
     logger.info(f"Fetching alert details for ID: {alert_id}")
     try:
@@ -335,8 +363,14 @@ async def get_alert(alert_id: str) -> dict[str, Any]:
     }
 )
 async def list_alert_comments(
-    alert_id: str,
-    limit: int = 25,  # , cursor: str = None
+    alert_id: Annotated[
+        str,
+        Field(min_length=1, description="The ID of the alert to get comments for"),
+    ],
+    limit: Annotated[
+        int,
+        Field(description="Maximum number of comments to return", ge=1, le=100),
+    ] = 25,
 ) -> dict[str, Any]:
     """Get all comments for a specific Panther alert by ID.
 
@@ -398,38 +432,37 @@ async def list_alert_comments(
         "idempotentHint": True,
     }
 )
-async def update_alert_status(alert_ids: list[str], status: str) -> dict[str, Any]:
+async def update_alert_status(
+    alert_ids: Annotated[
+        list[str],
+        Field(description="List of alert IDs to update"),
+    ],
+    status: Annotated[
+        str,
+        BeforeValidator(_validate_alert_status),
+        Field(
+            description="New status for the alerts",
+            examples=["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
+        ),
+    ],
+) -> dict[str, Any]:
     """Update the status of one or more Panther alerts.
-
-    Args:
-        alert_ids: List of alert IDs to update. Can be a single ID or multiple IDs.
-        status: The new status for the alerts. Must be one of:
-            - "OPEN": Alert is newly created and needs investigation
-            - "TRIAGED": Alert is being investigated
-            - "RESOLVED": Alert has been investigated and resolved
-            - "CLOSED": Alert has been closed (no further action needed)
 
     Returns:
         Dict containing:
         - success: Boolean indicating if the update was successful
         - alerts: List of updated alert IDs if successful
         - message: Error message if unsuccessful
-
-    Example:
-        # Update a single alert
-        result = await update_alert_status(["alert-123"], "TRIAGED")
-
-        # Update multiple alerts
-        result = await update_alert_status(["alert-123", "alert-456"], "RESOLVED")
     """
     logger.info(f"Updating status for alerts {alert_ids} to {status}")
 
     try:
-        # Validate status
-        valid_statuses = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"]
+        # Validate status (defensive programming - should also be caught by validator)
+        valid_statuses = {"OPEN", "TRIAGED", "RESOLVED", "CLOSED"}
         if status not in valid_statuses:
-            raise ValueError(f"Status must be one of {valid_statuses}")
-
+            raise ValueError(
+                f"Invalid status '{status}'. Must be one of: {', '.join(sorted(valid_statuses))}"
+            )
         # Prepare request body
         body = {
             "ids": alert_ids,
@@ -477,7 +510,16 @@ async def update_alert_status(alert_ids: list[str], status: str) -> dict[str, An
         "destructiveHint": True,
     }
 )
-async def add_alert_comment(alert_id: str, comment: str) -> dict[str, Any]:
+async def add_alert_comment(
+    alert_id: Annotated[
+        str,
+        Field(min_length=1, description="The ID of the alert to comment on"),
+    ],
+    comment: Annotated[
+        str,
+        Field(min_length=1, description="The comment text to add"),
+    ],
+) -> dict[str, Any]:
     """Add a comment to a Panther alert. Comments support Markdown formatting.
 
     Args:
@@ -543,13 +585,16 @@ async def add_alert_comment(alert_id: str, comment: str) -> dict[str, Any]:
     }
 )
 async def update_alert_assignee(
-    alert_ids: list[str], assignee_id: str
+    alert_ids: Annotated[
+        list[str],
+        Field(description="List of alert IDs to update"),
+    ],
+    assignee_id: Annotated[
+        str,
+        Field(min_length=1, description="The ID of the user to assign the alerts to"),
+    ],
 ) -> dict[str, Any]:
     """Update the assignee of one or more alerts through the assignee's ID.
-
-    Args:
-        alert_ids: List of alert IDs to update
-        assignee_id: The ID of the user to assign the alerts to
 
     Returns:
         Dict containing:
@@ -607,7 +652,16 @@ async def update_alert_assignee(
         "readOnlyHint": True,
     }
 )
-async def get_alert_events(alert_id: str, limit: int = 10) -> dict[str, Any]:
+async def get_alert_events(
+    alert_id: Annotated[
+        str,
+        Field(min_length=1, description="The ID of the alert to get events for"),
+    ],
+    limit: Annotated[
+        int,
+        Field(description="Maximum number of events to return", ge=1, le=10),
+    ] = 10,
+) -> dict[str, Any]:
     """
     Get events for a specific Panther alert by ID.
     We make a best effort to return the first events for an alert, but order is not guaranteed.
