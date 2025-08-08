@@ -3,9 +3,10 @@ Tools for interacting with Panther metrics.
 """
 
 import logging
+import re
 from typing import Annotated, Any
 
-from pydantic import Field
+from pydantic import BeforeValidator, Field
 
 from ..client import (
     _execute_query,
@@ -20,6 +21,55 @@ from ..queries import (
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
+
+
+def _validate_alert_types(v: list[str]) -> list[str]:
+    """Validate alert types are valid."""
+    valid_types = {"Rule", "Policy"}
+    for alert_type in v:
+        if alert_type not in valid_types:
+            raise ValueError(
+                f"Invalid alert type '{alert_type}'. Must be one of: {', '.join(sorted(valid_types))}"
+            )
+    return v
+
+
+def _validate_severities(v: list[str]) -> list[str]:
+    """Validate severities are valid."""
+    valid_severities = {"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"}
+    for severity in v:
+        if severity not in valid_severities:
+            raise ValueError(
+                f"Invalid severity '{severity}'. Must be one of: {', '.join(sorted(valid_severities))}"
+            )
+    return v
+
+
+def _validate_interval(v: int) -> int:
+    """Validate interval is one of the supported values."""
+    valid_intervals = {15, 30, 60, 180, 360, 720, 1440}
+    if v not in valid_intervals:
+        raise ValueError(
+            f"Invalid interval '{v}'. Must be one of: {', '.join(map(str, sorted(valid_intervals)))}"
+        )
+    return v
+
+
+def _validate_rule_ids(v: list[str] | None) -> list[str] | None:
+    """Validate rule IDs don't contain invalid characters."""
+    if v is None:
+        return v
+
+    # Rule IDs should not contain @, spaces, or special characters like #
+    invalid_pattern = re.compile(r"[@\s#]")
+
+    for rule_id in v:
+        if invalid_pattern.search(rule_id):
+            raise ValueError(
+                f"Invalid rule ID '{rule_id}'. Rule IDs cannot contain @, spaces, or # characters."
+            )
+
+    return v
 
 
 @mcp_tool(
@@ -45,6 +95,7 @@ async def get_severity_alert_metrics(
     ] = None,
     alert_types: Annotated[
         list[str],
+        BeforeValidator(_validate_alert_types),
         Field(
             description="The specific Panther alert types to get metrics for.",
             examples=[["Rule"], ["Policy"], ["Rule", "Policy"]],
@@ -52,6 +103,7 @@ async def get_severity_alert_metrics(
     ] = ["Rule"],
     severities: Annotated[
         list[str],
+        BeforeValidator(_validate_severities),
         Field(
             description="The specific Panther alert severities to get metrics for.",
             examples=[
@@ -63,6 +115,7 @@ async def get_severity_alert_metrics(
     ] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
     interval_in_minutes: Annotated[
         int,
+        BeforeValidator(_validate_interval),
         Field(
             description="How data points are aggregated over time, with smaller intervals providing more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents.",
             examples=[15, 30, 60, 180, 360, 720, 1440],
@@ -158,15 +211,20 @@ async def get_rule_alert_metrics(
     ] = None,
     interval_in_minutes: Annotated[
         int,
+        BeforeValidator(_validate_interval),
         Field(
             description="Intervals for aggregating data points. Smaller intervals provide more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents.",
             examples=[15, 30, 60, 180, 360, 720, 1440],
         ),
     ] = 15,
     rule_ids: Annotated[
-        list[str] | None,
-        Field(description="A valid JSON list of Panther rule IDs to get metrics for"),
-    ] = None,
+        list[str],
+        BeforeValidator(_validate_rule_ids),
+        Field(
+            description="A valid JSON list of Panther rule IDs to get metrics for",
+            examples=[["AppOmni.Alert.Passthrough", "Auth0.MFA.Policy.Disabled"]],
+        ),
+    ] = [],
 ) -> dict[str, Any]:
     """Gets alert metrics grouped by detection rule for ALL alert types, including alerts, detection errors, and system errors within a given time period. Use this tool to identify hot spots in alerts and use list_alerts for specific alert details.
 
@@ -259,6 +317,7 @@ async def get_bytes_processed_per_log_type_and_source(
     ] = None,
     interval_in_minutes: Annotated[
         int,
+        BeforeValidator(_validate_interval),
         Field(
             description="How data points are aggregated over time, with smaller intervals providing more granular detail of when events occurred, while larger intervals show broader trends but obscure the precise timing of incidents.",
             examples=[60, 720, 1440],
