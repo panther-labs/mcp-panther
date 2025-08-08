@@ -207,22 +207,6 @@ def graphql_date_format(input_date: datetime) -> str:
     return input_date.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def get_today_date_range() -> Tuple[datetime.datetime, datetime.datetime]:
-    """Get date range for the last 24 hours (UTC)"""
-    # Get current UTC time and shift back by one day since we're already in tomorrow
-    now = datetime.datetime.now(datetime.timezone.utc)
-    now = now - datetime.timedelta(days=1)
-
-    # Get start of today (midnight UTC)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # Get end of today (midnight UTC of next day)
-    today_end = today_start + datetime.timedelta(days=1)
-
-    logger.debug(f"Calculated date range - Start: {today_start}, End: {today_end}")
-    return today_start, today_end
-
-
 def _get_today_date_range() -> Tuple[str, str]:
     """Get date range for the last 24 hours (UTC)"""
     # Get current UTC time and shift back by one day since we're already in tomorrow

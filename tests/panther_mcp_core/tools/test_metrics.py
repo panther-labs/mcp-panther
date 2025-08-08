@@ -1,11 +1,8 @@
-from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.metrics import (
-    AlertSeverity,
-    MetricAlertType,
     get_bytes_processed_per_log_type_and_source,
     get_rule_alert_metrics,
     get_severity_alert_metrics,
@@ -64,13 +61,14 @@ def mock_execute_query():
 
 @pytest.fixture
 def mock_get_today_date_range():
-    """Fixture to mock the get_today_date_range function."""
+    """Fixture to mock the _get_today_date_range function."""
     with patch(
-        "mcp_panther.panther_mcp_core.tools.metrics.get_today_date_range"
+        "mcp_panther.panther_mcp_core.tools.metrics._get_today_date_range"
     ) as mock:
-        from_date = datetime(2024, 3, 20, 0, 0, 0, tzinfo=timezone.utc)
-        to_date = datetime(2024, 3, 20, 23, 59, 59, tzinfo=timezone.utc)
-        mock.return_value = (from_date, to_date)
+        # Return pre-formatted strings as _get_today_date_range does
+        start_date = "2024-03-20T00:00:00.000Z"
+        end_date = "2024-03-20T23:59:59.000Z"
+        mock.return_value = (start_date, end_date)
         yield mock
 
 
@@ -132,8 +130,8 @@ class TestGetMetricsAlertsPerRule:
 
         # Default mock for today's date range
         mock_get_today_date_range.return_value = (
-            datetime(2024, 3, 20, 0, 0, 0, tzinfo=timezone.utc),
-            datetime(2024, 3, 20, 23, 59, 59, tzinfo=timezone.utc),
+            "2024-03-20T00:00:00.000Z",
+            "2024-03-20T23:59:59.000Z",
         )
 
     async def test_default_parameters(
@@ -145,8 +143,8 @@ class TestGetMetricsAlertsPerRule:
         assert result["success"] is True
         assert "alerts_per_rule" in result
         assert len(result["alerts_per_rule"]) == 8
-        assert result["from_date"] == "2024-03-20T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-20T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
         assert result["interval_in_minutes"] == 15
 
         # Verify mock calls
@@ -157,16 +155,16 @@ class TestGetMetricsAlertsPerRule:
         self, mock_execute_query
     ):
         """Test function with custom date range."""
-        from_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
-        to_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
+        end_date = "2024-03-19T23:59:59.000Z"
 
-        result = await get_rule_alert_metrics(from_date=from_date, to_date=to_date)
+        result = await get_rule_alert_metrics(start_date=start_date, end_date=end_date)
 
         assert result["success"] is True
         assert "alerts_per_rule" in result
         assert len(result["alerts_per_rule"]) == 8
-        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-19T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-19T23:59:59.000Z"
 
         # Verify mock calls
         mock_execute_query.assert_called_once()
@@ -175,15 +173,15 @@ class TestGetMetricsAlertsPerRule:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with only one date provided."""
-        from_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
 
-        result = await get_rule_alert_metrics(from_date=from_date)
+        result = await get_rule_alert_metrics(start_date=start_date)
 
         assert result["success"] is True
         assert "alerts_per_rule" in result
         assert len(result["alerts_per_rule"]) == 8
-        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
 
         # Verify mock calls
         mock_get_today_date_range.assert_called_once()
@@ -270,8 +268,8 @@ class TestGetMetricsAlertsPerSeverity:
 
         # Default mock for today's date range
         mock_get_today_date_range.return_value = (
-            datetime(2024, 3, 20, 0, 0, 0, tzinfo=timezone.utc),
-            datetime(2024, 3, 20, 23, 59, 59, tzinfo=timezone.utc),
+            "2024-03-20T00:00:00.000Z",
+            "2024-03-20T23:59:59.000Z",
         )
 
     async def test_default_parameters(
@@ -285,8 +283,8 @@ class TestGetMetricsAlertsPerSeverity:
         assert len(result["alerts_per_severity"]) == 2
         assert result["total_alerts"] == 200
         assert result["interval_in_minutes"] == 1440
-        assert result["from_date"] == "2024-03-20T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-20T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
 
         # Verify severity data structure
         severity = result["alerts_per_severity"][0]
@@ -302,14 +300,16 @@ class TestGetMetricsAlertsPerSeverity:
     ):
         """Test function with custom date range."""
         self.setup_mocks(mock_execute_query, mock_get_today_date_range)
-        from_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
-        to_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
+        end_date = "2024-03-19T23:59:59.000Z"
 
-        result = await get_severity_alert_metrics(from_date=from_date, to_date=to_date)
+        result = await get_severity_alert_metrics(
+            start_date=start_date, end_date=end_date
+        )
 
         assert result["success"] is True
-        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-19T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-19T23:59:59.000Z"
         mock_execute_query.assert_called_once()
 
     async def test_get_severity_alert_metrics_with_partial_date_range(
@@ -317,13 +317,13 @@ class TestGetMetricsAlertsPerSeverity:
     ):
         """Test function with only one date provided."""
         self.setup_mocks(mock_execute_query, mock_get_today_date_range)
-        from_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
 
-        result = await get_severity_alert_metrics(from_date=from_date)
+        result = await get_severity_alert_metrics(start_date=start_date)
 
         assert result["success"] is True
-        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
         mock_execute_query.assert_called_once()
         mock_get_today_date_range.assert_called_once()
 
@@ -351,7 +351,7 @@ class TestGetMetricsAlertsPerSeverity:
             }
         }
 
-        result = await get_severity_alert_metrics(alert_types=[MetricAlertType.POLICY])
+        result = await get_severity_alert_metrics(alert_types=["Policy"])
 
         assert result["success"] is True
         assert len(result["alerts_per_severity"]) == 1
@@ -382,7 +382,7 @@ class TestGetMetricsAlertsPerSeverity:
             }
         }
 
-        result = await get_severity_alert_metrics(severities=[AlertSeverity.CRITICAL])
+        result = await get_severity_alert_metrics(severities=["CRITICAL"])
 
         assert result["success"] is True
         assert len(result["alerts_per_severity"]) == 1
@@ -438,8 +438,8 @@ class TestGetMetricsAlertsPerSeverity:
     ):
         """Test function with combination of custom parameters."""
         self.setup_mocks(mock_execute_query, mock_get_today_date_range)
-        from_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
-        to_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
+        end_date = "2024-03-19T23:59:59.000Z"
 
         # Update mock response for this test
         mock_execute_query.return_value = {
@@ -458,16 +458,16 @@ class TestGetMetricsAlertsPerSeverity:
         }
 
         result = await get_severity_alert_metrics(
-            from_date=from_date,
-            to_date=to_date,
-            alert_types=[MetricAlertType.POLICY],
-            severities=[AlertSeverity.CRITICAL],
+            start_date=start_date,
+            end_date=end_date,
+            alert_types=["Policy"],
+            severities=["CRITICAL"],
             interval_in_minutes=60,
         )
 
         assert result["success"] is True
-        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-19T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-19T23:59:59.000Z"
         assert result["interval_in_minutes"] == 60
         assert len(result["alerts_per_severity"]) == 1
         assert result["alerts_per_severity"][0]["label"] == "Policy CRITICAL"
@@ -501,8 +501,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
 
         # Default mock for today's date range
         mock_get_today_date_range.return_value = (
-            datetime(2024, 3, 20, 0, 0, 0, tzinfo=timezone.utc),
-            datetime(2024, 3, 20, 23, 59, 59, tzinfo=timezone.utc),
+            "2024-03-20T00:00:00.000Z",
+            "2024-03-20T23:59:59.000Z",
         )
 
     async def test_default_parameters(
@@ -515,8 +515,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         assert len(result["bytes_processed"]) == 2
         assert result["total_bytes"] == 3000000
         assert result["interval_in_minutes"] == 1440
-        assert result["from_date"] == "2024-03-20T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-20T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
 
         # Verify first series
         first_series = result["bytes_processed"][0]
@@ -534,29 +534,31 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with custom date range."""
-        from_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
-        to_date = datetime(2024, 3, 19, 23, 59, 59, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
+        end_date = "2024-03-19T23:59:59.000Z"
 
         result = await get_bytes_processed_per_log_type_and_source(
-            from_date=from_date, to_date=to_date
+            start_date=start_date, end_date=end_date
         )
 
         assert result["success"] is True
-        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-19T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-19T23:59:59.000Z"
         mock_execute_query.assert_called_once()
 
     async def test_partial_date_range(
         self, mock_execute_query, mock_get_today_date_range
     ):
         """Test function with only one date provided."""
-        from_date = datetime(2024, 3, 19, 0, 0, 0, tzinfo=timezone.utc)
+        start_date = "2024-03-19T00:00:00.000Z"
 
-        result = await get_bytes_processed_per_log_type_and_source(from_date=from_date)
+        result = await get_bytes_processed_per_log_type_and_source(
+            start_date=start_date
+        )
 
         assert result["success"] is True
-        assert result["from_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["to_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["start_date"] == "2024-03-19T00:00:00.000Z"
+        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
         mock_execute_query.assert_called_once()
         mock_get_today_date_range.assert_called_once()
 
@@ -566,8 +568,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         """Test function with different interval options."""
         # Test with 1h interval
         result = await get_bytes_processed_per_log_type_and_source(
-            from_date=datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc),
-            to_date=datetime(2024, 3, 1, 1, 0, 0, tzinfo=timezone.utc),
+            start_date="2024-03-01T00:00:00.000Z",
+            end_date="2024-03-01T01:00:00.000Z",
             interval_in_minutes=60,
         )
         assert result["success"] is True
@@ -576,8 +578,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         # Test with 12h interval
         mock_execute_query.reset_mock()
         result = await get_bytes_processed_per_log_type_and_source(
-            from_date=datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc),
-            to_date=datetime(2024, 3, 1, 12, 0, 0, tzinfo=timezone.utc),
+            start_date="2024-03-01T00:00:00.000Z",
+            end_date="2024-03-01T12:00:00.000Z",
             interval_in_minutes=720,
         )
         assert result["success"] is True
@@ -588,8 +590,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         mock_execute_query.side_effect = Exception("GraphQL error")
 
         result = await get_bytes_processed_per_log_type_and_source(
-            from_date=datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc),
-            to_date=datetime(2024, 3, 2, 0, 0, 0, tzinfo=timezone.utc),
+            start_date="2024-03-01T00:00:00.000Z",
+            end_date="2024-03-02T00:00:00.000Z",
         )
 
         assert result["success"] is False
@@ -601,8 +603,8 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         mock_execute_query.return_value = {"metrics": {"bytesProcessedPerSource": []}}
 
         result = await get_bytes_processed_per_log_type_and_source(
-            from_date=datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc),
-            to_date=datetime(2024, 3, 2, 0, 0, 0, tzinfo=timezone.utc),
+            start_date="2024-03-01T00:00:00.000Z",
+            end_date="2024-03-02T00:00:00.000Z",
         )
 
         assert result["success"] is True
