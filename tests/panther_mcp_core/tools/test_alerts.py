@@ -237,9 +237,9 @@ async def test_update_alert_status_success(mock_rest_client):
 async def test_update_alert_status_invalid_status():
     """Test handling of invalid status value."""
     result = await update_alert_status([MOCK_ALERT["id"]], "INVALID_STATUS")
-
     assert result["success"] is False
-    assert "Status must be one of" in result["message"]
+    assert "Invalid status" in result["message"]
+    assert "Must be one of" in result["message"]
 
 
 @pytest.mark.asyncio

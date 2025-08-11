@@ -6,14 +6,13 @@ import asyncio
 import logging
 import re
 import time
-from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Dict, List
 
 import sqlparse
 from pydantic import Field
 
-from ..client import _create_panther_client, get_today_date_range, graphql_date_format
+from ..client import _create_panther_client, _get_today_date_range
 from ..permissions import Permission, all_perms
 from ..queries import (
     CANCEL_DATA_LAKE_QUERY,
@@ -164,15 +163,17 @@ async def summarize_alert_events(
         ),
     ] = 30,
     start_date: Annotated[
-        datetime | None,
+        str | None,
         Field(
-            description="The start date of the analysis period. Defaults to start of today UTC."
+            description="Optional start date in ISO-8601 format. Defaults to start of today UTC.",
+            examples=["2024-03-20T00:00:00Z"],
         ),
     ] = None,
     end_date: Annotated[
-        datetime | None,
+        str | None,
         Field(
-            description="The end date of the analysis period. Defaults to end of today UTC."
+            description="Optional end date in ISO-8601 format. Defaults to end of today UTC.",
+            examples=["2024-03-20T00:00:00Z"],
         ),
     ] = None,
 ) -> Dict[str, Any]:
@@ -199,17 +200,17 @@ async def summarize_alert_events(
         raise ValueError("Time window must be 1, 5, 15, 30, or 60")
 
     # Get default date range if not provided
-    if start_date is None or end_date is None:
-        default_start, default_end = get_today_date_range()
+    if not start_date or not end_date:
+        default_start, default_end = _get_today_date_range()
         start_date = start_date or default_start
         end_date = end_date or default_end
 
     # Convert alert IDs list to SQL array
     alert_ids_str = ", ".join(f"'{aid}'" for aid in alert_ids)
 
-    # Convert datetime objects to GraphQL format for SQL query
-    start_date_str = graphql_date_format(start_date)
-    end_date_str = graphql_date_format(end_date)
+    # Use the date strings directly (already in GraphQL format)
+    start_date_str = start_date
+    end_date_str = end_date
 
     query = f"""
 SELECT
