@@ -95,4 +95,4 @@ async def test_list_users_structure():
     assert "cursor" in params
     assert "limit" in params
     assert sig.parameters["cursor"].default is None
-    assert sig.parameters["limit"].default == 100
+    assert sig.parameters["limit"].default == 60

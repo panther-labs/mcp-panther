@@ -28,11 +28,11 @@ async def list_users(
     limit: Annotated[
         int,
         Field(
-            description="Maximum number of results to return (1-1000)",
+            description="Maximum number of results to return (1-60)",
             ge=1,
-            le=1000,
+            le=60,
         ),
-    ] = 100,
+    ] = 60,
 ) -> dict[str, Any]:
     """List all Panther user accounts.
 
