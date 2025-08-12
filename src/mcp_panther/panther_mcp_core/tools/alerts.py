@@ -369,14 +369,10 @@ async def list_alert_comments(
     ],
     limit: Annotated[
         int,
-        Field(description="Maximum number of comments to return", ge=1, le=100),
+        Field(description="Maximum number of comments to return", ge=1, le=50),
     ] = 25,
 ) -> dict[str, Any]:
-    """Get all comments for a specific Panther alert by ID.
-
-    Args:
-        alert_id: The ID of the alert to get comments for
-        limit: Maximum number of comments to return (default: 25)
+    """Get all comments for a specific Panther alert.
 
     Returns:
         Dict containing:
@@ -522,10 +518,6 @@ async def add_alert_comment(
 ) -> dict[str, Any]:
     """Add a comment to a Panther alert. Comments support Markdown formatting.
 
-    Args:
-        alert_id: The ID of the alert to comment on
-        comment: The comment text to add
-
     Returns:
         Dict containing:
         - success: Boolean indicating if the comment was added successfully
@@ -659,18 +651,13 @@ async def get_alert_events(
     ],
     limit: Annotated[
         int,
-        Field(description="Maximum number of events to return", ge=1, le=10),
+        Field(description="Maximum number of events to return", ge=1, le=50),
     ] = 10,
 ) -> dict[str, Any]:
     """
-    Get events for a specific Panther alert by ID.
-    We make a best effort to return the first events for an alert, but order is not guaranteed.
-
+    Get events for a specific Panther alert.
+    Order of events is not guaranteed.
     This tool does not support pagination to prevent long-running, expensive queries.
-
-    Args:
-        alert_id: The ID of the alert to get events for
-        limit: Maximum number of events to return (default: 10, maximum: 10)
 
     Returns:
         Dict containing:

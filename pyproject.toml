@@ -1,6 +1,6 @@
 [project]
 name = "mcp-panther"
-version = "2.0.0"
+version = "2.0.1"
 description = "Panther Labs MCP Server"
 readme = "README.md"
 requires-python = ">=3.12"
