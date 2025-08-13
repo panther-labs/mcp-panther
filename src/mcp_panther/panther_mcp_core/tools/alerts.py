@@ -701,3 +701,232 @@ async def get_alert_events(
     except Exception as e:
         logger.error(f"Failed to fetch alert events: {str(e)}")
         return {"success": False, "message": f"Failed to fetch alert events: {str(e)}"}
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.ALERT_MODIFY),
+        "destructiveHint": True,
+        "idempotentHint": True,
+    }
+)
+async def bulk_update_alerts(
+    alert_ids: Annotated[
+        list[str],
+        Field(description="List of alert IDs to update"),
+    ],
+    status: Annotated[
+        str | None,
+        BeforeValidator(_validate_alert_status),
+        Field(
+            description="Optional new status for the alerts",
+            examples=["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
+        ),
+    ] = None,
+    assignee_id: Annotated[
+        str | None,
+        Field(
+            min_length=1,
+            description="Optional ID of the user to assign the alerts to",
+        ),
+    ] = None,
+    comment: Annotated[
+        str | None,
+        Field(
+            min_length=1,
+            description="Optional comment to add to all alerts",
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """Bulk update multiple alerts with status, assignee, and/or comment changes.
+
+    This tool allows you to efficiently update multiple alerts at once by setting their status,
+    assignee, and adding a comment. At least one of status, assignee_id, or comment must be provided.
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating overall success
+        - results: Dict with operation results:
+            - status_updates: List of alert IDs successfully updated with new status
+            - assignee_updates: List of alert IDs successfully updated with new assignee
+            - comments_added: List of alert IDs that successfully received comments
+            - failed_operations: List of failed operations with error details
+        - summary: Dict with counts of successful and failed operations
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Bulk updating {len(alert_ids)} alerts")
+
+    if not alert_ids:
+        return {
+            "success": False,
+            "message": "At least one alert ID must be provided",
+        }
+
+    if not any([status, assignee_id, comment]):
+        return {
+            "success": False,
+            "message": "At least one of status, assignee_id, or comment must be provided",
+        }
+
+    try:
+        results = {
+            "status_updates": [],
+            "assignee_updates": [],
+            "comments_added": [],
+            "failed_operations": [],
+        }
+
+        async with get_rest_client() as client:
+            # Update status if provided
+            if status:
+                try:
+                    logger.info(
+                        f"Updating status for {len(alert_ids)} alerts to {status}"
+                    )
+                    body = {"ids": alert_ids, "status": status}
+                    _, status_code = await client.patch(
+                        "/alerts", json_data=body, expected_codes=[204, 400, 404]
+                    )
+
+                    if status_code == 204:
+                        results["status_updates"] = alert_ids.copy()
+                        logger.info(
+                            f"Successfully updated status for {len(alert_ids)} alerts"
+                        )
+                    else:
+                        results["failed_operations"].append(
+                            {
+                                "operation": "status_update",
+                                "alert_ids": alert_ids,
+                                "error": f"HTTP {status_code} - Failed to update status",
+                            }
+                        )
+                        logger.error(f"Failed to update status: HTTP {status_code}")
+
+                except Exception as e:
+                    results["failed_operations"].append(
+                        {
+                            "operation": "status_update",
+                            "alert_ids": alert_ids,
+                            "error": str(e),
+                        }
+                    )
+                    logger.error(f"Exception updating status: {str(e)}")
+
+            # Update assignee if provided
+            if assignee_id:
+                try:
+                    logger.info(
+                        f"Updating assignee for {len(alert_ids)} alerts to {assignee_id}"
+                    )
+                    body = {"ids": alert_ids, "assignee": assignee_id}
+                    _, status_code = await client.patch(
+                        "/alerts", json_data=body, expected_codes=[204, 400, 404]
+                    )
+
+                    if status_code == 204:
+                        results["assignee_updates"] = alert_ids.copy()
+                        logger.info(
+                            f"Successfully updated assignee for {len(alert_ids)} alerts"
+                        )
+                    else:
+                        results["failed_operations"].append(
+                            {
+                                "operation": "assignee_update",
+                                "alert_ids": alert_ids,
+                                "error": f"HTTP {status_code} - Failed to update assignee",
+                            }
+                        )
+                        logger.error(f"Failed to update assignee: HTTP {status_code}")
+
+                except Exception as e:
+                    results["failed_operations"].append(
+                        {
+                            "operation": "assignee_update",
+                            "alert_ids": alert_ids,
+                            "error": str(e),
+                        }
+                    )
+                    logger.error(f"Exception updating assignee: {str(e)}")
+
+            # Add comment if provided
+            if comment:
+                successful_comments = []
+                for alert_id in alert_ids:
+                    try:
+                        logger.debug(f"Adding comment to alert {alert_id}")
+                        body = {
+                            "alertId": alert_id,
+                            "body": comment,
+                            "format": "PLAIN_TEXT",
+                        }
+                        _, status_code = await client.post(
+                            "/alert-comments",
+                            json_data=body,
+                            expected_codes=[200, 400, 404],
+                        )
+
+                        if status_code == 200:
+                            successful_comments.append(alert_id)
+                        else:
+                            results["failed_operations"].append(
+                                {
+                                    "operation": "add_comment",
+                                    "alert_ids": [alert_id],
+                                    "error": f"HTTP {status_code} - Failed to add comment",
+                                }
+                            )
+                            logger.error(
+                                f"Failed to add comment to {alert_id}: HTTP {status_code}"
+                            )
+
+                    except Exception as e:
+                        results["failed_operations"].append(
+                            {
+                                "operation": "add_comment",
+                                "alert_ids": [alert_id],
+                                "error": str(e),
+                            }
+                        )
+                        logger.error(
+                            f"Exception adding comment to {alert_id}: {str(e)}"
+                        )
+
+                results["comments_added"] = successful_comments
+                logger.info(
+                    f"Successfully added comments to {len(successful_comments)} alerts"
+                )
+
+        # Calculate summary statistics
+        total_operations = (
+            len(results["status_updates"])
+            + len(results["assignee_updates"])
+            + len(results["comments_added"])
+        )
+        total_failed = len(results["failed_operations"])
+
+        summary = {
+            "total_alerts": len(alert_ids),
+            "successful_operations": total_operations,
+            "failed_operations": total_failed,
+            "status_updates_count": len(results["status_updates"]),
+            "assignee_updates_count": len(results["assignee_updates"]),
+            "comments_added_count": len(results["comments_added"]),
+        }
+
+        logger.info(
+            f"Bulk update completed: {total_operations} successful, {total_failed} failed"
+        )
+
+        return {
+            "success": True,
+            "results": results,
+            "summary": summary,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to bulk update alerts: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to bulk update alerts: {str(e)}",
+        }

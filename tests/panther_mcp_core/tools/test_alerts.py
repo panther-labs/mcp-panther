@@ -2,6 +2,7 @@ import pytest
 
 from mcp_panther.panther_mcp_core.tools.alerts import (
     add_alert_comment,
+    bulk_update_alerts,
     get_alert,
     get_alert_events,
     list_alert_comments,
@@ -556,3 +557,258 @@ async def test_update_alert_assignee_bad_request(mock_rest_client):
     result = await update_alert_assignee(["alert-123"], "user-123")
     assert result["success"] is False
     assert "Bad request" in result["message"]
+
+
+# Tests for bulk_update_alerts
+@pytest.mark.asyncio
+async def test_bulk_update_alerts_validation_empty_alert_ids():
+    """Test validation when no alert IDs are provided."""
+    result = await bulk_update_alerts([], status="TRIAGED")
+    assert result["success"] is False
+    assert "At least one alert ID must be provided" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_bulk_update_alerts_validation_no_operations():
+    """Test validation when no operations are specified."""
+    result = await bulk_update_alerts(["alert-123"])
+    assert result["success"] is False
+    assert (
+        "At least one of status, assignee_id, or comment must be provided"
+        in result["message"]
+    )
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_status_only_success(mock_rest_client):
+    """Test successful bulk status update only."""
+    mock_rest_client.patch.return_value = ({}, 204)
+
+    alert_ids = ["alert-123", "alert-456"]
+    result = await bulk_update_alerts(alert_ids, status="TRIAGED")
+
+    assert result["success"] is True
+    assert result["results"]["status_updates"] == alert_ids
+    assert result["results"]["assignee_updates"] == []
+    assert result["results"]["comments_added"] == []
+    assert result["results"]["failed_operations"] == []
+    assert result["summary"]["status_updates_count"] == 2
+    assert result["summary"]["assignee_updates_count"] == 0
+    assert result["summary"]["comments_added_count"] == 0
+
+    # Verify patch was called once for status update
+    mock_rest_client.patch.assert_called_once()
+    call_args = mock_rest_client.patch.call_args
+    assert call_args[1]["json_data"]["ids"] == alert_ids
+    assert call_args[1]["json_data"]["status"] == "TRIAGED"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_assignee_only_success(mock_rest_client):
+    """Test successful bulk assignee update only."""
+    mock_rest_client.patch.return_value = ({}, 204)
+
+    alert_ids = ["alert-123", "alert-456"]
+    result = await bulk_update_alerts(alert_ids, assignee_id="user-789")
+
+    assert result["success"] is True
+    assert result["results"]["status_updates"] == []
+    assert result["results"]["assignee_updates"] == alert_ids
+    assert result["results"]["comments_added"] == []
+    assert result["results"]["failed_operations"] == []
+    assert result["summary"]["assignee_updates_count"] == 2
+
+    # Verify patch was called once for assignee update
+    mock_rest_client.patch.assert_called_once()
+    call_args = mock_rest_client.patch.call_args
+    assert call_args[1]["json_data"]["ids"] == alert_ids
+    assert call_args[1]["json_data"]["assignee"] == "user-789"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_comment_only_success(mock_rest_client):
+    """Test successful bulk comment addition only."""
+    mock_comment = {"id": "comment-123", "body": "Bulk comment"}
+    mock_rest_client.post.return_value = (mock_comment, 200)
+
+    alert_ids = ["alert-123", "alert-456"]
+    result = await bulk_update_alerts(alert_ids, comment="Bulk comment")
+
+    assert result["success"] is True
+    assert result["results"]["status_updates"] == []
+    assert result["results"]["assignee_updates"] == []
+    assert result["results"]["comments_added"] == alert_ids
+    assert result["results"]["failed_operations"] == []
+    assert result["summary"]["comments_added_count"] == 2
+
+    # Verify post was called twice for comments
+    assert mock_rest_client.post.call_count == 2
+    for call_args in mock_rest_client.post.call_args_list:
+        assert call_args[1]["json_data"]["body"] == "Bulk comment"
+        assert call_args[1]["json_data"]["format"] == "PLAIN_TEXT"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_all_operations_success(mock_rest_client):
+    """Test successful execution of all operations."""
+    mock_comment = {"id": "comment-123", "body": "Test comment"}
+    mock_rest_client.patch.return_value = ({}, 204)
+    mock_rest_client.post.return_value = (mock_comment, 200)
+
+    alert_ids = ["alert-123", "alert-456"]
+    result = await bulk_update_alerts(
+        alert_ids,
+        status="RESOLVED",
+        assignee_id="user-789",
+        comment="All operations test",
+    )
+
+    assert result["success"] is True
+    assert result["results"]["status_updates"] == alert_ids
+    assert result["results"]["assignee_updates"] == alert_ids
+    assert result["results"]["comments_added"] == alert_ids
+    assert result["results"]["failed_operations"] == []
+    assert result["summary"]["successful_operations"] == 6  # 2 alerts * 3 operations
+    assert result["summary"]["failed_operations"] == 0
+
+    # Verify patch called twice (status + assignee) and post called twice (comments)
+    assert mock_rest_client.patch.call_count == 2
+    assert mock_rest_client.post.call_count == 2
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_status_failure(mock_rest_client):
+    """Test handling of status update failure."""
+    mock_rest_client.patch.return_value = ({}, 400)
+
+    alert_ids = ["alert-123", "alert-456"]
+    result = await bulk_update_alerts(alert_ids, status="TRIAGED")
+
+    assert result["success"] is True
+    assert result["results"]["status_updates"] == []
+    assert result["results"]["failed_operations"] == [
+        {
+            "operation": "status_update",
+            "alert_ids": alert_ids,
+            "error": "HTTP 400 - Failed to update status",
+        }
+    ]
+    assert result["summary"]["failed_operations"] == 1
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_assignee_failure(mock_rest_client):
+    """Test handling of assignee update failure."""
+    mock_rest_client.patch.return_value = ({}, 404)
+
+    alert_ids = ["alert-123"]
+    result = await bulk_update_alerts(alert_ids, assignee_id="user-789")
+
+    assert result["success"] is True
+    assert result["results"]["assignee_updates"] == []
+    assert result["results"]["failed_operations"] == [
+        {
+            "operation": "assignee_update",
+            "alert_ids": alert_ids,
+            "error": "HTTP 404 - Failed to update assignee",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_comment_partial_failure(mock_rest_client):
+    """Test handling of partial comment failures."""
+    mock_comment = {"id": "comment-123", "body": "Test comment"}
+
+    # First call succeeds, second fails
+    mock_rest_client.post.side_effect = [(mock_comment, 200), ({}, 404)]
+
+    alert_ids = ["alert-123", "alert-456"]
+    result = await bulk_update_alerts(alert_ids, comment="Test comment")
+
+    assert result["success"] is True
+    assert result["results"]["comments_added"] == ["alert-123"]
+    assert len(result["results"]["failed_operations"]) == 1
+    assert result["results"]["failed_operations"][0]["operation"] == "add_comment"
+    assert result["results"]["failed_operations"][0]["alert_ids"] == ["alert-456"]
+    assert result["summary"]["comments_added_count"] == 1
+    assert result["summary"]["failed_operations"] == 1
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_mixed_success_failure(mock_rest_client):
+    """Test mixed success and failure scenarios."""
+    mock_comment = {"id": "comment-123", "body": "Test comment"}
+
+    # Status update succeeds, assignee update fails, comments partially succeed
+    mock_rest_client.patch.side_effect = [({}, 204), ({}, 400)]
+    mock_rest_client.post.side_effect = [(mock_comment, 200), ({}, 404)]
+
+    alert_ids = ["alert-123", "alert-456"]
+    result = await bulk_update_alerts(
+        alert_ids, status="RESOLVED", assignee_id="user-789", comment="Test comment"
+    )
+
+    assert result["success"] is True
+    assert result["results"]["status_updates"] == alert_ids
+    assert result["results"]["assignee_updates"] == []
+    assert result["results"]["comments_added"] == ["alert-123"]
+    assert len(result["results"]["failed_operations"]) == 2
+    assert result["summary"]["successful_operations"] == 3  # status (2) + comment (1)
+    assert result["summary"]["failed_operations"] == 2  # assignee + 1 comment
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_exception_handling(mock_rest_client):
+    """Test handling of exceptions during operations."""
+    mock_rest_client.patch.side_effect = Exception("Network error")
+
+    alert_ids = ["alert-123"]
+    result = await bulk_update_alerts(alert_ids, status="TRIAGED")
+
+    assert result["success"] is True
+    assert result["results"]["status_updates"] == []
+    assert len(result["results"]["failed_operations"]) == 1
+    assert result["results"]["failed_operations"][0]["operation"] == "status_update"
+    assert "Network error" in result["results"]["failed_operations"][0]["error"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_status_exception(mock_rest_client):
+    """Test handling of status update exception."""
+    mock_rest_client.patch.side_effect = Exception("Status update error")
+
+    alert_ids = ["alert-123"]
+    result = await bulk_update_alerts(alert_ids, status="TRIAGED")
+
+    assert result["success"] is True
+    assert result["results"]["status_updates"] == []
+    assert len(result["results"]["failed_operations"]) == 1
+    assert result["results"]["failed_operations"][0]["operation"] == "status_update"
+    assert "Status update error" in result["results"]["failed_operations"][0]["error"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_comment_exception(mock_rest_client):
+    """Test handling of comment addition exception."""
+    mock_rest_client.post.side_effect = Exception("Comment error")
+
+    alert_ids = ["alert-123"]
+    result = await bulk_update_alerts(alert_ids, comment="Test comment")
+
+    assert result["success"] is True
+    assert result["results"]["comments_added"] == []
+    assert len(result["results"]["failed_operations"]) == 1
+    assert result["results"]["failed_operations"][0]["operation"] == "add_comment"
+    assert "Comment error" in result["results"]["failed_operations"][0]["error"]
