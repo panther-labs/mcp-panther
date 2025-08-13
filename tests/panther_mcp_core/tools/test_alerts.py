@@ -580,6 +580,31 @@ async def test_bulk_update_alerts_validation_no_operations():
 
 
 @pytest.mark.asyncio
+async def test_bulk_update_alerts_validation_too_many_alerts():
+    """Test validation when too many alert IDs are provided."""
+    # Create 26 alert IDs (exceeds the 25 limit)
+    alert_ids = [f"alert-{i}" for i in range(26)]
+    result = await bulk_update_alerts(alert_ids, status="TRIAGED")
+    assert result["success"] is False
+    assert "Cannot bulk update more than 25 alerts at once" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(ALERTS_MODULE_PATH)
+async def test_bulk_update_alerts_validation_max_allowed_alerts(mock_rest_client):
+    """Test that exactly 25 alerts (the maximum) works correctly."""
+    mock_rest_client.patch.return_value = ({}, 204)
+    
+    # Create exactly 25 alert IDs (at the limit)
+    alert_ids = [f"alert-{i}" for i in range(25)]
+    result = await bulk_update_alerts(alert_ids, status="TRIAGED")
+    
+    assert result["success"] is True
+    assert result["results"]["status_updates"] == alert_ids
+    assert result["summary"]["total_alerts"] == 25
+
+
+@pytest.mark.asyncio
 @patch_rest_client(ALERTS_MODULE_PATH)
 async def test_bulk_update_alerts_status_only_success(mock_rest_client):
     """Test successful bulk status update only."""

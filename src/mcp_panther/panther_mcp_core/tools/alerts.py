@@ -713,7 +713,7 @@ async def get_alert_events(
 async def bulk_update_alerts(
     alert_ids: Annotated[
         list[str],
-        Field(description="List of alert IDs to update"),
+        Field(description="List of alert IDs to update (maximum 25)"),
     ],
     status: Annotated[
         str | None,
@@ -760,6 +760,12 @@ async def bulk_update_alerts(
         return {
             "success": False,
             "message": "At least one alert ID must be provided",
+        }
+
+    if len(alert_ids) > 25:
+        return {
+            "success": False,
+            "message": "Cannot bulk update more than 25 alerts at once",
         }
 
     if not any([status, assignee_id, comment]):
