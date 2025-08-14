@@ -102,7 +102,7 @@ async def test_query_data_lake_missing_event_time(mock_graphql_client):
 
     assert result["success"] is False
     assert (
-        "Query must include `p_event_time` as a filter condition after WHERE or AND"
+        "Query must include a time filter: either `p_event_time` condition or Panther macro"
         in result["message"]
     )
     assert result["query_id"] is None  # No query_id when validation fails
@@ -127,6 +127,12 @@ async def test_query_data_lake_with_event_time(mock_graphql_client):
         "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE aws_cloudtrail.p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10",
         "SELECT * FROM panther_logs.public.aws_cloudtrail t1 WHERE t1.p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10",
         "SELECT * FROM panther_logs.public.aws_cloudtrail t1 WHERE other_condition AND t1.p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10",
+        # Test Panther time macros
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') LIMIT 10",
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_between('2024-01-01', '2024-01-02') LIMIT 10",
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_around('2024-01-01 10:00:00', '10 m') LIMIT 10",
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_after('2024-01-01') AND other_condition LIMIT 10",
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE other_condition AND p_occurs_before('2024-01-01') LIMIT 10",
     ]
 
     with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_res:
@@ -177,7 +183,7 @@ async def test_query_data_lake_invalid_event_time_usage(mock_graphql_client):
         result = await query_data_lake(sql)
         assert result["success"] is False, f"Query should have failed: {sql}"
         assert (
-            "Query must include `p_event_time` as a filter condition after WHERE or AND"
+            "Query must include a time filter: either `p_event_time` condition or Panther macro"
             in result["message"]
         )
         assert result["query_id"] is None  # No query_id when validation fails
