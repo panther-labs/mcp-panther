@@ -248,9 +248,8 @@ ORDER BY
     event_day DESC,
     time_{time_window}_minute DESC,
     alert_count DESC
-LIMIT 1000
 """
-    return await query_data_lake(query, "panther_signals.public")
+    return await query_data_lake(query, "panther_signals.public", max_rows=1000)
 
 
 @mcp_tool(
@@ -273,55 +272,65 @@ async def query_data_lake(
             description="Timeout in seconds before the SQL query is cancelled. If the query fails due to timeout, the caller should consider a longer timeout."
         ),
     ] = 30,
+    max_rows: Annotated[
+        int,
+        Field(
+            description="Maximum number of result rows to return (prevents context overflow)",
+            ge=1,
+            le=1000,
+        ),
+    ] = 100,
 ) -> Dict[str, Any]:
-    """Execute custom SQL queries against Panther's data lake for advanced data analysis and aggregation.
+    """Query Panther's security data lake using SQL for log analysis and threat hunting.
 
-    All queries MUST conform to Snowflake's SQL syntax.
+    REQUIRED: Include time filter with p_event_time (required for performance and partitioning)
 
-    If the table has a `p_event_time` column, it must use a WHERE clause to filter upon it.
+    Best Practices:
+    - Use time macros: p_occurs_since('1 d'), p_occurs_between('2024-01-01', '2024-01-02')
+    - Start with summary queries, then drill down to specific timeframes
+    - Use p_any_* fields for faster correlation (p_any_ip_addresses, p_any_usernames, p_any_emails)
+    - Query specific fields instead of SELECT * for better performance
 
-    Guidance:
+    Common Examples:
+    - Recent failed logins: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL LIMIT 100"
+    - IP activity summary: "SELECT sourceippaddress, COUNT(*) FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('6 h') GROUP BY sourceippaddress LIMIT 50"
+    - User correlation: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('2 h') AND ARRAY_CONTAINS('user@domain.com'::VARIANT, p_any_emails)"
+    - Nested field access: "SELECT p_enrichment:ipinfo_privacy:\"context.ip_address\" FROM table WHERE p_occurs_since('1 h')"
 
-    For efficiency, when checking for values in an array, use the snowflake function `ARRAY_CONTAINS( <value_expr> , <array> )`.
-
-    When using `ARRAY_CONTAINS`, make sure to cast the value_expr to a variant, for example: `ARRAY_CONTAINS('example@example.com'::VARIANT, p_any_emails)`.
-
-    When interacting with `object` type columns use dot notation to traverse a path in a JSON object:
-    `<column>:<level1_element>.<level2_element>.<level3_element>`. Optionally enclose element names in double quotes: `<column>:"<level1_element>"."<level2_element>"."<level3_element>"`.
-
-    If an `object`/JSON element name does not conform to Snowflake SQL identifier rules, for example if it contains spaces, then
-    you must enclose the element name in double quotes.
+    Query Syntax (Snowflake SQL):
+    - Access nested JSON: column:field.subfield
+    - Quote special characters: column:"field name" or p_enrichment:"context.ip_address"
+    - Array searches: ARRAY_CONTAINS('value'::VARIANT, array_column)
 
     Returns:
-        Dict containing:
-        - success: Boolean indicating if the query was successful
-        - status: Status of the query (e.g., "succeeded", "failed", "cancelled")
-        - message: Error message if unsuccessful
-        - query_id: The unique identifier for the query (null if query execution failed)
-        - results: List of query result rows
-        - column_info: Dict containing column names and types
-        - stats: Dict containing stats about the query
-        - has_next_page: Boolean indicating if there are more results available
-        - end_cursor: Cursor for fetching the next page of results, or null if no more pages
+        Dict with query results:
+        - results: List of matching rows (limited by max_rows parameter for context window protection)
+        - results_truncated: True if results exceeded max_rows limit
+        - total_rows_available: Total rows found before limiting
+        - column_info: Column names and data types
+        - stats: Query performance metrics (execution time, bytes scanned)
+        - success/status/message: Query execution status
     """
     logger.info("Executing data lake query")
 
     start_time = time.time()
 
-    # Validate that the query includes a p_event_time filter after WHERE or AND
+    # Validate that the query includes a time filter (p_event_time or Panther macros)
     sql_lower = sql.lower().replace("\n", " ")
-    if (
-        not re.search(
-            r"\b(where|and)\s+.*?(?:[\w.]+\.)?p_event_time\s*(>=|<=|=|>|<|between)",
-            sql_lower,
-        )
-    ) and re.search(
+    has_p_event_time = re.search(
+        r"\b(where|and)\s+.*?(?:[\w.]+\.)?p_event_time\s*(>=|<=|=|>|<|between)",
+        sql_lower,
+    )
+    has_panther_macros = re.search(
+        r"p_occurs_(since|between|around|after|before)\s*\(",
+        sql_lower,
+    )
+
+    if (not (has_p_event_time or has_panther_macros)) and re.search(
         r"\Wpanther_(views|signals|rule_matches|rule_errors|monitor|logs|cloudsecurity)\.",
         sql_lower,
     ):
-        error_msg = (
-            "Query must include `p_event_time` as a filter condition after WHERE or AND"
-        )
+        error_msg = "Query must include a time filter: either `p_event_time` condition or Panther macro (p_occurs_since, p_occurs_between, etc.)"
         logger.error(error_msg)
         return {
             "success": False,
@@ -358,7 +367,9 @@ async def query_data_lake(
         while True:
             await asyncio.sleep(sleep_time)
 
-            result = await _get_data_lake_query_results(query_id=query_id)
+            result = await _get_data_lake_query_results(
+                query_id=query_id, max_rows=max_rows
+            )
 
             if result.get("status") == "running":
                 if (time.time() - start_time) >= timeout:
@@ -391,9 +402,10 @@ async def _get_data_lake_query_results(
         str,
         Field(
             description="The ID of the query to get results for",
-            examples=["1234567890"],
+            examples=["01be5f14-0206-3c48-000d-9eff005dd176"],
         ),
     ],
+    max_rows: int = 100,
 ) -> Dict[str, Any]:
     """Get the results of a previously executed data lake query.
 
@@ -466,6 +478,15 @@ async def _get_data_lake_query_results(
         # Extract results from edges
         query_results = [edge["node"] for edge in edges]
 
+        # Apply row limit with truncation tracking
+        original_count = len(query_results)
+        was_truncated = original_count > max_rows
+        if was_truncated:
+            query_results = query_results[:max_rows]
+            logger.info(
+                f"Query results truncated from {original_count} to {max_rows} rows for context window protection"
+            )
+
         logger.info(
             f"Successfully retrieved {len(query_results)} results for query ID: {query_id}"
         )
@@ -475,6 +496,9 @@ async def _get_data_lake_query_results(
             "success": True,
             "status": status,
             "results": query_results,
+            "results_truncated": was_truncated,
+            "total_rows_available": original_count,
+            "rows_returned": len(query_results),
             "column_info": {
                 "order": column_info.get("order", []),
                 "types": column_info.get("types", {}),
