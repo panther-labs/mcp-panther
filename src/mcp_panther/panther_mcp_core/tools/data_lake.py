@@ -280,6 +280,12 @@ async def query_data_lake(
             le=1000,
         ),
     ] = 100,
+    cursor: Annotated[
+        str | None,
+        Field(
+            description="Optional pagination cursor from previous query to fetch next page of results",
+        ),
+    ] = None,
 ) -> Dict[str, Any]:
     """Query Panther's security data lake using SQL for log analysis and threat hunting.
 
@@ -291,9 +297,14 @@ async def query_data_lake(
     - Use p_any_* fields for faster correlation (p_any_ip_addresses, p_any_usernames, p_any_emails)
     - Query specific fields instead of SELECT * for better performance
 
+    Pagination:
+    - First call: No cursor parameter - returns first page with max_rows results
+    - Subsequent calls: Use end_cursor from previous response to get next page
+    - Continue until has_next_page is False
+
     Common Examples:
-    - Recent failed logins: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL LIMIT 100"
-    - IP activity summary: "SELECT sourceippaddress, COUNT(*) FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('6 h') GROUP BY sourceippaddress LIMIT 50"
+    - Recent failed logins: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL"
+    - IP activity summary: "SELECT sourceippaddress, COUNT(*) FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('6 h') GROUP BY sourceippaddress"
     - User correlation: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('2 h') AND ARRAY_CONTAINS('user@domain.com'::VARIANT, p_any_emails)"
     - Nested field access: "SELECT p_enrichment:ipinfo_privacy:\"context.ip_address\" FROM table WHERE p_occurs_since('1 h')"
 
@@ -304,9 +315,12 @@ async def query_data_lake(
 
     Returns:
         Dict with query results:
-        - results: List of matching rows (limited by max_rows parameter for context window protection)
-        - results_truncated: True if results exceeded max_rows limit
-        - total_rows_available: Total rows found before limiting
+        - results: List of matching rows (paginated based on cursor parameter)
+        - results_truncated: True if results were truncated (only for non-paginated requests)
+        - total_rows_available: Total rows found (for non-paginated requests)
+        - has_next_page: True if more results are available
+        - end_cursor: Cursor for next page (use in subsequent call)
+        - start_cursor: Cursor used for current page (null for first page)
         - column_info: Column names and data types
         - stats: Query performance metrics (execution time, bytes scanned)
         - success/status/message: Query execution status
@@ -368,7 +382,7 @@ async def query_data_lake(
             await asyncio.sleep(sleep_time)
 
             result = await _get_data_lake_query_results(
-                query_id=query_id, max_rows=max_rows
+                query_id=query_id, max_rows=max_rows, cursor=cursor
             )
 
             if result.get("status") == "running":
@@ -406,6 +420,7 @@ async def _get_data_lake_query_results(
         ),
     ],
     max_rows: int = 100,
+    cursor: str | None = None,
 ) -> Dict[str, Any]:
     """Get the results of a previously executed data lake query.
 
@@ -423,8 +438,18 @@ async def _get_data_lake_query_results(
     logger.info(f"Fetching data lake queryresults for query ID: {query_id}")
 
     try:
-        # Prepare input variables
-        variables = {"id": query_id, "root": False}
+        # Prepare input variables for pagination
+        variables = {
+            "id": query_id,
+            "root": False,
+            "resultsInput": {
+                "pageSize": max_rows,
+                "cursor": cursor,
+            },
+        }
+
+        if cursor:
+            logger.info(f"Using pagination cursor: {cursor}")
 
         logger.debug(f"Query variables: {variables}")
 
@@ -478,14 +503,32 @@ async def _get_data_lake_query_results(
         # Extract results from edges
         query_results = [edge["node"] for edge in edges]
 
-        # Apply row limit with truncation tracking
+        # Check pagination info
+        page_info = results.get("pageInfo", {})
+        has_next_page = page_info.get("hasNextPage", False)
+        end_cursor = page_info.get("endCursor")
+
+        # Track pagination state
         original_count = len(query_results)
-        was_truncated = original_count > max_rows
-        if was_truncated:
-            query_results = query_results[:max_rows]
+
+        # For cursor-based requests, we don't truncate since GraphQL handles pagination
+        was_truncated = False
+        if cursor:
             logger.info(
-                f"Query results truncated from {original_count} to {max_rows} rows for context window protection"
+                f"Retrieved page of {len(query_results)} results using cursor pagination"
             )
+        else:
+            # For initial requests without cursor, apply legacy truncation if needed
+            was_truncated = original_count > max_rows
+            if was_truncated:
+                query_results = query_results[:max_rows]
+                logger.info(
+                    f"Query results truncated from {original_count} to {max_rows} rows for context window protection"
+                )
+            else:
+                logger.info(
+                    f"Retrieved {len(query_results)} results (no truncation needed)"
+                )
 
         logger.info(
             f"Successfully retrieved {len(query_results)} results for query ID: {query_id}"
@@ -508,8 +551,9 @@ async def _get_data_lake_query_results(
                 "execution_time": stats.get("executionTime", 0),
                 "row_count": stats.get("rowCount", 0),
             },
-            "has_next_page": results.get("pageInfo", {}).get("hasNextPage", False),
-            "end_cursor": results.get("pageInfo", {}).get("endCursor"),
+            "has_next_page": has_next_page,
+            "end_cursor": end_cursor,
+            "start_cursor": cursor,
             "message": query_data.get("message", "Query executed successfully"),
             "query_id": query_id,
         }
