@@ -378,8 +378,10 @@ async def test_query_data_lake_with_cursor_pagination(
     }
 
     cursor = "pagination_cursor_123"
-    test_sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d')"
-    
+    test_sql = (
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d')"
+    )
+
     # Mock the query results function to return paginated response
     with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_results:
         mock_results.return_value = {
@@ -401,7 +403,7 @@ async def test_query_data_lake_with_cursor_pagination(
 
     # Verify the function returns success with pagination info
     assert result["success"] is True
-    assert result["status"] == "succeeded" 
+    assert result["status"] == "succeeded"
     assert result["has_next_page"] is True
     assert result["end_cursor"] == "next_cursor_456"
     assert result["start_cursor"] == cursor
@@ -422,8 +424,10 @@ async def test_query_data_lake_first_page_without_cursor(
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
-    test_sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d')"
-    
+    test_sql = (
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d')"
+    )
+
     # Mock the query results function to return first page response
     with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_results:
         mock_results.return_value = {
@@ -454,3 +458,197 @@ async def test_query_data_lake_first_page_without_cursor(
     mock_results.assert_called_once_with(
         query_id=MOCK_QUERY_ID, max_rows=100, cursor=None
     )
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_query_data_lake_pagination_complete_workflow(
+    mock_graphql_client,
+):
+    """Test complete pagination workflow from first page to last page."""
+    mock_graphql_client.execute.return_value = {
+        "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+    }
+
+    test_sql = "SELECT eventName FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d')"
+
+    # Mock first page response
+    with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_results:
+        # First call - no cursor, has more pages
+        mock_results.return_value = {
+            "success": True,
+            "status": "succeeded",
+            "results": [{"eventName": "GetObject"}, {"eventName": "PutObject"}],
+            "results_truncated": False,
+            "total_rows_available": 2,
+            "column_info": {"order": ["eventName"], "types": {"eventName": "string"}},
+            "stats": {"bytes_scanned": 1024},
+            "has_next_page": True,
+            "end_cursor": "page2_cursor",
+            "start_cursor": None,
+            "message": "Query executed successfully",
+            "query_id": MOCK_QUERY_ID,
+        }
+
+        first_page = await query_data_lake(test_sql, max_rows=2)
+
+        # Verify first page response
+        assert first_page["success"] is True
+        assert first_page["has_next_page"] is True
+        assert first_page["end_cursor"] == "page2_cursor"
+        assert first_page["start_cursor"] is None
+        assert len(first_page["results"]) == 2
+
+        # Mock second page response
+        mock_results.return_value = {
+            "success": True,
+            "status": "succeeded",
+            "results": [{"eventName": "AssumeRole"}],
+            "results_truncated": False,
+            "total_rows_available": 1,
+            "column_info": {"order": ["eventName"], "types": {"eventName": "string"}},
+            "stats": {"bytes_scanned": 512},
+            "has_next_page": False,
+            "end_cursor": None,
+            "start_cursor": "page2_cursor",
+            "message": "Query executed successfully",
+            "query_id": MOCK_QUERY_ID,
+        }
+
+        second_page = await query_data_lake(test_sql, cursor="page2_cursor", max_rows=2)
+
+        # Verify second page response (last page)
+        assert second_page["success"] is True
+        assert second_page["has_next_page"] is False
+        assert second_page["end_cursor"] is None
+        assert second_page["start_cursor"] == "page2_cursor"
+        assert len(second_page["results"]) == 1
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_query_data_lake_legacy_truncation_behavior(
+    mock_graphql_client,
+):
+    """Test legacy truncation behavior for non-paginated requests."""
+    mock_graphql_client.execute.return_value = {
+        "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+    }
+
+    test_sql = (
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d')"
+    )
+
+    # Mock response that would exceed max_rows
+    with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_results:
+        mock_results.return_value = {
+            "success": True,
+            "status": "succeeded",
+            "results": [{"event": f"data_{i}"} for i in range(5)],  # 5 results
+            "results_truncated": True,  # Would be truncated to 3
+            "total_rows_available": 5,
+            "column_info": {"order": ["event"], "types": {"event": "string"}},
+            "stats": {"bytes_scanned": 2048},
+            "has_next_page": True,
+            "end_cursor": "truncated_cursor",
+            "start_cursor": None,
+            "message": "Query executed successfully",
+            "query_id": MOCK_QUERY_ID,
+        }
+
+        result = await query_data_lake(test_sql, max_rows=3)  # No cursor = legacy mode
+
+        # Verify truncation behavior is preserved
+        assert result["success"] is True
+        assert result["results_truncated"] is True
+        assert result["total_rows_available"] == 5
+        assert result["has_next_page"] is True
+        assert result["start_cursor"] is None
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_query_data_lake_pagination_with_empty_results(
+    mock_graphql_client,
+):
+    """Test pagination behavior when query returns no results."""
+    mock_graphql_client.execute.return_value = {
+        "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+    }
+
+    test_sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') AND eventName = 'NonExistentEvent'"
+
+    with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_results:
+        mock_results.return_value = {
+            "success": True,
+            "status": "succeeded",
+            "results": [],
+            "results_truncated": False,
+            "total_rows_available": 0,
+            "column_info": {"order": [], "types": {}},
+            "stats": {"bytes_scanned": 0},
+            "has_next_page": False,
+            "end_cursor": None,
+            "start_cursor": None,
+            "message": "Query executed successfully",
+            "query_id": MOCK_QUERY_ID,
+        }
+
+        result = await query_data_lake(test_sql, max_rows=10)
+
+        # Verify empty results handling
+        assert result["success"] is True
+        assert result["results"] == []
+        assert result["has_next_page"] is False
+        assert result["end_cursor"] is None
+        assert result["results_truncated"] is False
+        assert result["total_rows_available"] == 0
+
+
+@pytest.mark.asyncio
+@patch_graphql_client(DATA_LAKE_MODULE_PATH)
+async def test_query_data_lake_max_rows_parameter_limits(
+    mock_graphql_client,
+):
+    """Test that max_rows parameter respects limits and defaults."""
+    mock_graphql_client.execute.return_value = {
+        "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+    }
+
+    test_sql = (
+        "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d')"
+    )
+
+    with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_results:
+        mock_results.return_value = {
+            "success": True,
+            "status": "succeeded",
+            "results": [{"event": "test"}],
+            "results_truncated": False,
+            "total_rows_available": 1,
+            "column_info": {"order": ["event"], "types": {"event": "string"}},
+            "stats": {"bytes_scanned": 100},
+            "has_next_page": False,
+            "end_cursor": None,
+            "start_cursor": None,
+            "message": "Query executed successfully",
+            "query_id": MOCK_QUERY_ID,
+        }
+
+        # Test default max_rows (should be 100)
+        await query_data_lake(test_sql)
+        mock_results.assert_called_with(
+            query_id=MOCK_QUERY_ID, max_rows=100, cursor=None
+        )
+
+        # Test custom max_rows
+        await query_data_lake(test_sql, max_rows=50)
+        mock_results.assert_called_with(
+            query_id=MOCK_QUERY_ID, max_rows=50, cursor=None
+        )
+
+        # Test with cursor
+        await query_data_lake(test_sql, max_rows=25, cursor="test_cursor")
+        mock_results.assert_called_with(
+            query_id=MOCK_QUERY_ID, max_rows=25, cursor="test_cursor"
+        )
