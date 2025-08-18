@@ -2,6 +2,8 @@
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/panther-labs/mcp-panther)](https://archestra.ai/mcp-catalog/panther-labs__mcp-panther)
+
 Panther's Model Context Protocol (MCP) server provides functionality to:
 
 1. **Write and tune detections from your IDE**
