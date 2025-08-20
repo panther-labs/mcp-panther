@@ -394,7 +394,6 @@ async def test_query_data_lake_with_cursor_pagination(
             "stats": {"bytes_scanned": 1024},
             "has_next_page": True,
             "end_cursor": "next_cursor_456",
-            "start_cursor": cursor,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -406,7 +405,6 @@ async def test_query_data_lake_with_cursor_pagination(
     assert result["status"] == "succeeded"
     assert result["has_next_page"] is True
     assert result["end_cursor"] == "next_cursor_456"
-    assert result["start_cursor"] == cursor
 
     # Verify the cursor was passed to the results function
     mock_results.assert_called_once_with(
@@ -440,7 +438,6 @@ async def test_query_data_lake_first_page_without_cursor(
             "stats": {"bytes_scanned": 1024},
             "has_next_page": False,
             "end_cursor": None,
-            "start_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -452,7 +449,6 @@ async def test_query_data_lake_first_page_without_cursor(
     assert result["status"] == "succeeded"
     assert result["has_next_page"] is False
     assert result["end_cursor"] is None
-    assert result["start_cursor"] is None
 
     # Verify no cursor was passed to the results function
     mock_results.assert_called_once_with(
@@ -485,7 +481,6 @@ async def test_query_data_lake_pagination_complete_workflow(
             "stats": {"bytes_scanned": 1024},
             "has_next_page": True,
             "end_cursor": "page2_cursor",
-            "start_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -496,7 +491,6 @@ async def test_query_data_lake_pagination_complete_workflow(
         assert first_page["success"] is True
         assert first_page["has_next_page"] is True
         assert first_page["end_cursor"] == "page2_cursor"
-        assert first_page["start_cursor"] is None
         assert len(first_page["results"]) == 2
 
         # Mock second page response
@@ -510,7 +504,6 @@ async def test_query_data_lake_pagination_complete_workflow(
             "stats": {"bytes_scanned": 512},
             "has_next_page": False,
             "end_cursor": None,
-            "start_cursor": "page2_cursor",
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -521,7 +514,6 @@ async def test_query_data_lake_pagination_complete_workflow(
         assert second_page["success"] is True
         assert second_page["has_next_page"] is False
         assert second_page["end_cursor"] is None
-        assert second_page["start_cursor"] == "page2_cursor"
         assert len(second_page["results"]) == 1
 
 
@@ -551,7 +543,6 @@ async def test_query_data_lake_legacy_truncation_behavior(
             "stats": {"bytes_scanned": 2048},
             "has_next_page": True,
             "end_cursor": "truncated_cursor",
-            "start_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -563,7 +554,6 @@ async def test_query_data_lake_legacy_truncation_behavior(
         assert result["results_truncated"] is True
         assert result["total_rows_available"] == 5
         assert result["has_next_page"] is True
-        assert result["start_cursor"] is None
 
 
 @pytest.mark.asyncio
@@ -589,7 +579,6 @@ async def test_query_data_lake_pagination_with_empty_results(
             "stats": {"bytes_scanned": 0},
             "has_next_page": False,
             "end_cursor": None,
-            "start_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -630,7 +619,6 @@ async def test_query_data_lake_max_rows_parameter_limits(
             "stats": {"bytes_scanned": 100},
             "has_next_page": False,
             "end_cursor": None,
-            "start_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }

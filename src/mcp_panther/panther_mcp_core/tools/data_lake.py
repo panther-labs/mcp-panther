@@ -277,7 +277,7 @@ async def query_data_lake(
         Field(
             description="Maximum number of result rows to return (prevents context overflow)",
             ge=1,
-            le=1000,
+            le=999,
         ),
     ] = 100,
     cursor: Annotated[
@@ -336,7 +336,6 @@ async def query_data_lake(
         - total_rows_available: Total rows found (for non-paginated requests)
         - has_next_page: True if more results are available
         - end_cursor: Cursor for next page (use in subsequent call)
-        - start_cursor: Cursor used for current page (null for first page)
         - column_info: Column names and data types
         - stats: Query performance metrics (execution time, bytes scanned)
         - success/status/message: Query execution status
@@ -569,7 +568,6 @@ async def _get_data_lake_query_results(
             },
             "has_next_page": has_next_page,
             "end_cursor": end_cursor,
-            "start_cursor": cursor,
             "message": query_data.get("message", "Query executed successfully"),
             "query_id": query_id,
         }
