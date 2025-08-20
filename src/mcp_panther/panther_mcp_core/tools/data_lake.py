@@ -291,8 +291,24 @@ async def query_data_lake(
 
     REQUIRED: Include time filter with p_event_time (required for performance and partitioning)
 
+    Panther Time Filter Macros (Recommended - optimized for performance):
+    - p_occurs_since(timeOffset [, tableAlias[, column]])
+      Examples: p_occurs_since('1 d'), p_occurs_since('6 h'), p_occurs_since('2 weeks'), p_occurs_since(3600)
+      Time formats: '30 s', '15 m', '6 h', '2 d', '1 w' OR '2 weeks', '1 day' OR numeric seconds
+
+    - p_occurs_between(startTime, endTime [, tableAlias[, column]])
+      Examples: p_occurs_between('2024-01-01', '2024-01-02'), p_occurs_between('2024-03-20T00:00:00Z', '2024-03-20T23:59:59Z')
+
+    - p_occurs_around(timestamp, timeOffset [, tableAlias[, column]])
+      Example: p_occurs_around('2024-01-15T10:30:00Z', '1 h')  # ±1 hour around timestamp
+
+    - p_occurs_after(timestamp [, tableAlias[, column]])
+    - p_occurs_before(timestamp [, tableAlias[, column]])
+
+    Alternative (manual): WHERE p_event_time >= '2024-01-01' AND p_event_time < '2024-01-02'
+
     Best Practices:
-    - Use time macros: p_occurs_since('1 d'), p_occurs_between('2024-01-01', '2024-01-02')
+    - Always use time filters (macros preferred over manual p_event_time conditions)
     - Start with summary queries, then drill down to specific timeframes
     - Use p_any_* fields for faster correlation (p_any_ip_addresses, p_any_usernames, p_any_emails)
     - Query specific fields instead of SELECT * for better performance
