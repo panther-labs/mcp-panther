@@ -18,7 +18,7 @@ from pydantic import BeforeValidator, Field
 
 from ..client import get_rest_client
 from ..permissions import Permission, all_perms
-from ..utils.sql_validation import validate_sql_time_filter
+from ..utils.sql_validation import validate_sql_comprehensive
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
@@ -36,10 +36,19 @@ def _validate_sql_query(v: str) -> str:
     if not v or not v.strip():
         raise ValueError("SQL query cannot be empty")
 
-    sql_validation = validate_sql_time_filter(v.strip())
+    # Use comprehensive validation for saved queries
+    # Always require time filter and enforce read-only operations
+    sql_validation = validate_sql_comprehensive(
+        sql=v.strip(),
+        require_time_filter=True,
+        read_only=True,
+        database_name=None,  # Will be validated at query execution time
+    )
     if not sql_validation["valid"]:
         raise ValueError(sql_validation["error"])
-    return v.strip()
+
+    # Return the processed SQL with reserved words handled
+    return sql_validation.get("processed_sql", v.strip())
 
 
 def _validate_description(v: str | None) -> str | None:
@@ -163,6 +172,13 @@ async def create_saved_query(
         async with get_rest_client() as client:
             response_data, status_code = await client.post("/queries", json=query_data)
 
+            if status_code < 200 or status_code >= 300:
+                logger.error(f"API request failed with status {status_code}")
+                return {
+                    "success": False,
+                    "message": f"API request failed with status {status_code}",
+                }
+
         logger.info(
             f"Successfully created saved query: {name} with ID: {response_data.get('id')}"
         )
@@ -247,6 +263,13 @@ async def list_saved_queries(
         async with get_rest_client() as client:
             response_data, status_code = await client.get("/queries", params=params)
 
+            if status_code < 200 or status_code >= 300:
+                logger.error(f"API request failed with status {status_code}")
+                return {
+                    "success": False,
+                    "message": f"Failed to list saved queries: API returned status {status_code}",
+                }
+
         # Extract queries from response
         queries = response_data.get("results", [])
         next_cursor = response_data.get("next")
@@ -322,6 +345,13 @@ async def get_saved_query(
         # Execute the REST API call
         async with get_rest_client() as client:
             response_data, status_code = await client.get(f"/queries/{str(query_id)}")
+
+            if status_code < 200 or status_code >= 300:
+                logger.error(f"API request failed with status {status_code}")
+                return {
+                    "success": False,
+                    "message": f"Failed to fetch saved query: API returned status {status_code}",
+                }
 
         logger.info(f"Successfully retrieved saved query: {query_id}")
 

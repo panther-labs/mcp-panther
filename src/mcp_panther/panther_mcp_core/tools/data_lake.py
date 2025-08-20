@@ -9,7 +9,6 @@ import time
 from enum import Enum
 from typing import Annotated, Any, Dict, List
 
-import sqlparse
 from pydantic import Field
 
 from ..client import _create_panther_client, _get_today_date_range
@@ -22,113 +21,13 @@ from ..queries import (
     LIST_DATABASES_QUERY,
     LIST_TABLES_QUERY,
 )
-from ..utils.sql_validation import validate_sql_time_filter
+from ..utils.sql_validation import validate_sql_comprehensive
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
 
 INITIAL_QUERY_SLEEP_SECONDS = 1
 MAX_QUERY_SLEEP_SECONDS = 5
-
-
-# Snowflake reserved words that should be quoted when used as identifiers
-SNOWFLAKE_RESERVED_WORDS = {
-    "SELECT",
-    "FROM",
-    "WHERE",
-    "JOIN",
-    "LEFT",
-    "RIGHT",
-    "INNER",
-    "OUTER",
-    "ON",
-    "AS",
-    "ORDER",
-    "GROUP",
-    "BY",
-    "HAVING",
-    "UNION",
-    "ALL",
-    "DISTINCT",
-    "INSERT",
-    "UPDATE",
-    "DELETE",
-    "CREATE",
-    "ALTER",
-    "DROP",
-    "TABLE",
-    "VIEW",
-    "INDEX",
-    "COLUMN",
-    "PRIMARY",
-    "KEY",
-    "FOREIGN",
-    "UNIQUE",
-    "NOT",
-    "NULL",
-    "DEFAULT",
-    "CHECK",
-    "CONSTRAINT",
-    "REFERENCES",
-    "CASCADE",
-    "RESTRICT",
-    "SET",
-    "VALUES",
-    "INTO",
-    "CASE",
-    "WHEN",
-    "THEN",
-    "ELSE",
-    "END",
-    "IF",
-    "EXISTS",
-    "LIKE",
-    "BETWEEN",
-    "IN",
-    "IS",
-    "AND",
-    "OR",
-    "WITH",
-}
-
-
-def wrap_reserved_words(sql: str) -> str:
-    """
-    Simple function to wrap reserved words in SQL using sqlparse.
-
-    This function:
-    1. Parses the SQL using sqlparse
-    2. Identifies string literals that match reserved words
-    3. Converts single-quoted reserved words to double-quoted ones
-
-    Args:
-        sql: The SQL query string to process
-
-    Returns:
-        The SQL with reserved words properly quoted
-    """
-    try:
-        # Parse the SQL
-        parsed = sqlparse.parse(sql)[0]
-
-        # Convert the parsed SQL back to string, but process tokens
-        result = []
-        for token in parsed.flatten():
-            if token.ttype is sqlparse.tokens.Literal.String.Single:
-                # Remove quotes and check if it's a reserved word
-                value = token.value.strip("'")
-                if value.upper() in SNOWFLAKE_RESERVED_WORDS:
-                    # Convert to double-quoted identifier
-                    result.append(f'"{value}"')
-                else:
-                    result.append(token.value)
-            else:
-                result.append(token.value)
-
-        return "".join(result)
-    except Exception as e:
-        logger.warning(f"Failed to parse SQL for reserved words: {e}")
-        return sql
 
 
 class QueryStatus(str, Enum):
@@ -345,30 +244,37 @@ async def query_data_lake(
 
     start_time = time.time()
 
-    # Validate that the query includes a p_event_time filter for Panther tables
-    sql_lower = sql.lower().replace("\n", " ")
-
     # Check if query uses Panther tables that require time filters
+    sql_lower = sql.lower().replace("\n", " ")
     uses_panther_tables = re.search(
         r"\Wpanther_(views|signals|rule_matches|rule_errors|monitor|logs|cloudsecurity)\.",
         sql_lower,
     )
 
-    if uses_panther_tables:
-        # Use shared validation utility for time filter check
-        validation_result = validate_sql_time_filter(sql)
-        if not validation_result["valid"]:
-            error_msg = validation_result["error"]
-            logger.error(error_msg)
-            return {
-                "success": False,
-                "message": error_msg,
-                "query_id": None,
-            }
+    # Comprehensive SQL validation
+    # Only validate Panther database names, allow custom databases
+    db_name_to_validate = (
+        database_name if database_name.startswith("panther_") else None
+    )
+    validation_result = validate_sql_comprehensive(
+        sql=sql,
+        require_time_filter=bool(uses_panther_tables),
+        read_only=True,
+        database_name=db_name_to_validate,
+    )
+
+    if not validation_result["valid"]:
+        error_msg = validation_result["error"]
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+            "query_id": None,
+        }
 
     try:
-        # Process reserved words in the SQL
-        processed_sql = wrap_reserved_words(sql)
+        # Use the processed SQL from validation (with reserved words handled)
+        processed_sql = validation_result["processed_sql"]
         logger.debug(f"Original SQL: {sql}")
         logger.debug(f"Processed SQL: {processed_sql}")
 
