@@ -22,6 +22,7 @@ from ..queries import (
     LIST_DATABASES_QUERY,
     LIST_TABLES_QUERY,
 )
+from ..utils.sql_validation import validate_sql_time_filter
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
@@ -344,28 +345,26 @@ async def query_data_lake(
 
     start_time = time.time()
 
-    # Validate that the query includes a time filter (p_event_time or Panther macros)
+    # Validate that the query includes a p_event_time filter for Panther tables
     sql_lower = sql.lower().replace("\n", " ")
-    has_p_event_time = re.search(
-        r"\b(where|and)\s+.*?(?:[\w.]+\.)?p_event_time\s*(>=|<=|=|>|<|between)",
-        sql_lower,
-    )
-    has_panther_macros = re.search(
-        r"p_occurs_(since|between|around|after|before)\s*\(",
+
+    # Check if query uses Panther tables that require time filters
+    uses_panther_tables = re.search(
+        r"\Wpanther_(views|signals|rule_matches|rule_errors|monitor|logs|cloudsecurity)\.",
         sql_lower,
     )
 
-    if (not (has_p_event_time or has_panther_macros)) and re.search(
-        r"\Wpanther_(views|signals|rule_matches|rule_errors|monitor|logs|cloudsecurity)\.",
-        sql_lower,
-    ):
-        error_msg = "Query must include a time filter: either `p_event_time` condition or Panther macro (p_occurs_since, p_occurs_between, etc.)"
-        logger.error(error_msg)
-        return {
-            "success": False,
-            "message": error_msg,
-            "query_id": None,
-        }
+    if uses_panther_tables:
+        # Use shared validation utility for time filter check
+        validation_result = validate_sql_time_filter(sql)
+        if not validation_result["valid"]:
+            error_msg = validation_result["error"]
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "message": error_msg,
+                "query_id": None,
+            }
 
     try:
         # Process reserved words in the SQL
