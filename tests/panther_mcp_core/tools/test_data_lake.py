@@ -30,7 +30,7 @@ async def test_query_data_lake_success(mock_graphql_client):
             "column_info": {},
             "stats": {},
             "has_next_page": False,
-            "end_cursor": None,
+            "next_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -63,7 +63,7 @@ async def test_query_data_lake_custom_database(mock_graphql_client):
             "column_info": {},
             "stats": {},
             "has_next_page": False,
-            "end_cursor": None,
+            "next_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -143,7 +143,7 @@ async def test_query_data_lake_with_event_time(mock_graphql_client):
             "column_info": {},
             "stats": {},
             "has_next_page": False,
-            "end_cursor": None,
+            "next_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -347,7 +347,7 @@ async def test_query_data_lake_with_reserved_words_processing(
             "column_info": {},
             "stats": {},
             "has_next_page": False,
-            "end_cursor": None,
+            "next_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -393,7 +393,7 @@ async def test_query_data_lake_with_cursor_pagination(
             "column_info": {"order": ["event"], "types": {"event": "string"}},
             "stats": {"bytes_scanned": 1024},
             "has_next_page": True,
-            "end_cursor": "next_cursor_456",
+            "next_cursor": "next_cursor_456",
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -404,7 +404,7 @@ async def test_query_data_lake_with_cursor_pagination(
     assert result["success"] is True
     assert result["status"] == "succeeded"
     assert result["has_next_page"] is True
-    assert result["end_cursor"] == "next_cursor_456"
+    assert result["next_cursor"] == "next_cursor_456"
 
     # Verify the cursor was passed to the results function
     mock_results.assert_called_once_with(
@@ -437,7 +437,7 @@ async def test_query_data_lake_first_page_without_cursor(
             "column_info": {"order": ["event"], "types": {"event": "string"}},
             "stats": {"bytes_scanned": 1024},
             "has_next_page": False,
-            "end_cursor": None,
+            "next_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -448,7 +448,7 @@ async def test_query_data_lake_first_page_without_cursor(
     assert result["success"] is True
     assert result["status"] == "succeeded"
     assert result["has_next_page"] is False
-    assert result["end_cursor"] is None
+    assert result["next_cursor"] is None
 
     # Verify no cursor was passed to the results function
     mock_results.assert_called_once_with(
@@ -480,7 +480,7 @@ async def test_query_data_lake_pagination_complete_workflow(
             "column_info": {"order": ["eventName"], "types": {"eventName": "string"}},
             "stats": {"bytes_scanned": 1024},
             "has_next_page": True,
-            "end_cursor": "page2_cursor",
+            "next_cursor": "page2_cursor",
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -490,7 +490,7 @@ async def test_query_data_lake_pagination_complete_workflow(
         # Verify first page response
         assert first_page["success"] is True
         assert first_page["has_next_page"] is True
-        assert first_page["end_cursor"] == "page2_cursor"
+        assert first_page["next_cursor"] == "page2_cursor"
         assert len(first_page["results"]) == 2
 
         # Mock second page response
@@ -503,7 +503,7 @@ async def test_query_data_lake_pagination_complete_workflow(
             "column_info": {"order": ["eventName"], "types": {"eventName": "string"}},
             "stats": {"bytes_scanned": 512},
             "has_next_page": False,
-            "end_cursor": None,
+            "next_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -513,7 +513,7 @@ async def test_query_data_lake_pagination_complete_workflow(
         # Verify second page response (last page)
         assert second_page["success"] is True
         assert second_page["has_next_page"] is False
-        assert second_page["end_cursor"] is None
+        assert second_page["next_cursor"] is None
         assert len(second_page["results"]) == 1
 
 
@@ -542,7 +542,7 @@ async def test_query_data_lake_legacy_truncation_behavior(
             "column_info": {"order": ["event"], "types": {"event": "string"}},
             "stats": {"bytes_scanned": 2048},
             "has_next_page": True,
-            "end_cursor": "truncated_cursor",
+            "next_cursor": "truncated_cursor",
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -578,7 +578,7 @@ async def test_query_data_lake_pagination_with_empty_results(
             "column_info": {"order": [], "types": {}},
             "stats": {"bytes_scanned": 0},
             "has_next_page": False,
-            "end_cursor": None,
+            "next_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
@@ -589,7 +589,7 @@ async def test_query_data_lake_pagination_with_empty_results(
         assert result["success"] is True
         assert result["results"] == []
         assert result["has_next_page"] is False
-        assert result["end_cursor"] is None
+        assert result["next_cursor"] is None
         assert result["results_truncated"] is False
         assert result["total_rows_available"] == 0
 
@@ -618,7 +618,7 @@ async def test_query_data_lake_max_rows_parameter_limits(
             "column_info": {"order": ["event"], "types": {"event": "string"}},
             "stats": {"bytes_scanned": 100},
             "has_next_page": False,
-            "end_cursor": None,
+            "next_cursor": None,
             "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }

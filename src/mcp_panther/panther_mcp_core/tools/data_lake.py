@@ -194,7 +194,7 @@ async def summarize_alert_events(
         - column_info: Dict containing column names and types
         - stats: Dict containing stats about the query
         - has_next_page: Boolean indicating if there are more results available
-        - end_cursor: Cursor for fetching the next page of results, or null if no more pages
+        - next_cursor: Cursor for fetching the next page of results, or null if no more pages
     """
     if time_window not in [1, 5, 15, 30, 60]:
         raise ValueError("Time window must be 1, 5, 15, 30, or 60")
@@ -315,7 +315,7 @@ async def query_data_lake(
 
     Pagination:
     - First call: No cursor parameter - returns first page with max_rows results
-    - Subsequent calls: Use end_cursor from previous response to get next page
+    - Subsequent calls: Use next_cursor from previous response to get next page
     - Continue until has_next_page is False
 
     Common Examples:
@@ -335,7 +335,7 @@ async def query_data_lake(
         - results_truncated: True if results were truncated (only for non-paginated requests)
         - total_rows_available: Total rows found (for non-paginated requests)
         - has_next_page: True if more results are available
-        - end_cursor: Cursor for next page (use in subsequent call)
+        - next_cursor: Cursor for next page (use in subsequent call)
         - column_info: Column names and data types
         - stats: Query performance metrics (execution time, bytes scanned)
         - success/status/message: Query execution status
@@ -448,7 +448,7 @@ async def _get_data_lake_query_results(
         - column_info: Dict containing column names and types
         - stats: Dict containing stats about the query
         - has_next_page: Boolean indicating if there are more results available
-        - end_cursor: Cursor for fetching the next page of results, or null if no more pages
+        - next_cursor: Cursor for fetching the next page of results, or null if no more pages
     """
     logger.info(f"Fetching data lake queryresults for query ID: {query_id}")
 
@@ -567,7 +567,7 @@ async def _get_data_lake_query_results(
                 "row_count": stats.get("rowCount", 0),
             },
             "has_next_page": has_next_page,
-            "end_cursor": end_cursor,
+            "next_cursor": end_cursor,
             "message": query_data.get("message", "Query executed successfully"),
             "query_id": query_id,
         }
