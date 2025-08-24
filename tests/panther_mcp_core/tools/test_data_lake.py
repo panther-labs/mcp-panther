@@ -5,8 +5,8 @@ import pytest
 from mcp_panther.panther_mcp_core.tools.data_lake import (
     _cancel_data_lake_query,
     query_data_lake,
-    wrap_reserved_words,
 )
+from mcp_panther.panther_mcp_core.utils.sql_validation import wrap_reserved_words
 from tests.utils.helpers import patch_graphql_client
 
 DATA_LAKE_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.data_lake"
