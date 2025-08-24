@@ -6,7 +6,6 @@ from mcp_panther.panther_mcp_core.utils.sql_validation import (
     validate_panther_database_name,
     validate_sql_basic,
     validate_sql_comprehensive,
-    validate_sql_read_only,
     validate_sql_time_filter,
     wrap_reserved_words,
 )
@@ -161,58 +160,6 @@ class TestValidateSqlBasic:
         assert isinstance(result["valid"], bool)
 
 
-class TestValidateSqlReadOnly:
-    """Test the validate_sql_read_only function."""
-
-    def test_valid_read_only_sql(self):
-        """Test valid read-only SQL."""
-        sql = "SELECT * FROM users WHERE active = true"
-        result = validate_sql_read_only(sql)
-        assert result["valid"] is True
-        assert result["error"] is None
-
-    @pytest.mark.parametrize(
-        "keyword",
-        [
-            "DROP",
-            "DELETE",
-            "INSERT",
-            "UPDATE",
-            "CREATE",
-            "ALTER",
-            "TRUNCATE",
-            "REPLACE",
-            "MERGE",
-            "UPSERT",
-            "GRANT",
-            "REVOKE",
-            "COMMIT",
-            "ROLLBACK",
-            "SAVEPOINT",
-        ],
-    )
-    def test_blocked_keywords(self, keyword):
-        """Test that dangerous keywords are blocked."""
-        sql = f"SELECT * FROM users; {keyword} TABLE users"
-        result = validate_sql_read_only(sql)
-        assert result["valid"] is False
-        assert keyword in result["error"]
-
-    def test_keyword_in_column_name_allowed(self):
-        """Test that keywords in column names are allowed."""
-        sql = "SELECT updates_column, delete_flag FROM users"
-        result = validate_sql_read_only(sql)
-        assert result["valid"] is True
-        assert result["error"] is None
-
-    def test_case_insensitive_keyword_detection(self):
-        """Test that keyword detection is case insensitive."""
-        sql = "select * from users; drop table users"
-        result = validate_sql_read_only(sql)
-        assert result["valid"] is False
-        assert "DROP" in result["error"]
-
-
 class TestValidatePantherDatabaseName:
     """Test the validate_panther_database_name function."""
 
@@ -307,9 +254,7 @@ class TestValidateSqlComprehensive:
     def test_valid_comprehensive_basic(self):
         """Test basic valid SQL passes all validations."""
         sql = "SELECT * FROM users WHERE p_occurs_since('1 d')"
-        result = validate_sql_comprehensive(
-            sql, require_time_filter=True, read_only=True
-        )
+        result = validate_sql_comprehensive(sql, require_time_filter=True)
         assert result["valid"] is True
         assert result["error"] is None
         assert "processed_sql" in result
@@ -317,20 +262,9 @@ class TestValidateSqlComprehensive:
     def test_comprehensive_time_filter_required(self):
         """Test that time filter requirement works."""
         sql = "SELECT * FROM users WHERE active = true"
-        result = validate_sql_comprehensive(
-            sql, require_time_filter=True, read_only=True
-        )
+        result = validate_sql_comprehensive(sql, require_time_filter=True)
         assert result["valid"] is False
         assert "time filter" in result["error"]
-
-    def test_comprehensive_read_only_enforcement(self):
-        """Test that read-only enforcement works."""
-        sql = "DROP TABLE users WHERE p_occurs_since('1 d')"
-        result = validate_sql_comprehensive(
-            sql, require_time_filter=True, read_only=True
-        )
-        assert result["valid"] is False
-        assert "DROP" in result["error"]
 
     def test_comprehensive_database_validation(self):
         """Test that database name validation works."""
@@ -338,7 +272,6 @@ class TestValidateSqlComprehensive:
         result = validate_sql_comprehensive(
             sql,
             require_time_filter=True,
-            read_only=True,
             database_name="invalid.database",
         )
         assert result["valid"] is False
@@ -350,7 +283,6 @@ class TestValidateSqlComprehensive:
         result = validate_sql_comprehensive(
             sql,
             require_time_filter=True,
-            read_only=True,
             database_name="panther_logs.public",
         )
         assert result["valid"] is True
@@ -359,9 +291,9 @@ class TestValidateSqlComprehensive:
 
     def test_comprehensive_optional_validations(self):
         """Test that optional validations can be disabled."""
-        sql = "DROP TABLE users"  # No time filter, dangerous operation
+        sql = "SELECT * FROM users WHERE eventName = 'CreateUser'"  # No time filter, contains DDL keyword
         result = validate_sql_comprehensive(
-            sql, require_time_filter=False, read_only=False, database_name=None
+            sql, require_time_filter=False, database_name=None
         )
         assert result["valid"] is True
         assert result["error"] is None

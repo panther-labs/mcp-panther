@@ -37,11 +37,10 @@ def _validate_sql_query(v: str) -> str:
         raise ValueError("SQL query cannot be empty")
 
     # Use comprehensive validation for saved queries
-    # Always require time filter and enforce read-only operations
+    # Always require time filter for saved queries (performance)
     sql_validation = validate_sql_comprehensive(
         sql=v.strip(),
         require_time_filter=True,
-        read_only=True,
         database_name=None,  # Will be validated at query execution time
     )
     if not sql_validation["valid"]:

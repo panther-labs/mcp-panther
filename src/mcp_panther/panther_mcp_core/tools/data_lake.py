@@ -259,7 +259,6 @@ async def query_data_lake(
     validation_result = validate_sql_comprehensive(
         sql=sql,
         require_time_filter=bool(uses_panther_tables),
-        read_only=True,
         database_name=db_name_to_validate,
     )
 

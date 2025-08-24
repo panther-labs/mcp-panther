@@ -70,25 +70,6 @@ SNOWFLAKE_RESERVED_WORDS = {
     "WITH",
 }
 
-# Dangerous keywords for read-only contexts
-READ_ONLY_BLOCKED_KEYWORDS = {
-    "DROP",
-    "DELETE",
-    "INSERT",
-    "UPDATE",
-    "CREATE",
-    "ALTER",
-    "TRUNCATE",
-    "REPLACE",
-    "MERGE",
-    "UPSERT",
-    "GRANT",
-    "REVOKE",
-    "COMMIT",
-    "ROLLBACK",
-    "SAVEPOINT",
-}
-
 
 def validate_sql_basic(sql: str) -> dict[str, Any]:
     """
@@ -119,31 +100,6 @@ def validate_sql_basic(sql: str) -> dict[str, Any]:
             return {"valid": False, "error": "Invalid SQL query"}
     except Exception:
         return {"valid": False, "error": "Failed to parse SQL query"}
-
-    return {"valid": True, "error": None}
-
-
-def validate_sql_read_only(sql: str) -> dict[str, Any]:
-    """
-    Validate that SQL contains only read-only operations.
-
-    Args:
-        sql: SQL query string to validate
-
-    Returns:
-        Dict with validation results:
-        - valid: Boolean indicating if validation passed
-        - error: Error message if validation failed
-    """
-    sql_upper = sql.upper()
-
-    for keyword in READ_ONLY_BLOCKED_KEYWORDS:
-        # Use word boundaries to avoid false positives (e.g., "UPDATES" column name)
-        if re.search(rf"\b{keyword}\b", sql_upper):
-            return {
-                "valid": False,
-                "error": f"Query contains blocked keyword '{keyword}'. Only read-only operations are allowed",
-            }
 
     return {"valid": True, "error": None}
 
@@ -275,7 +231,6 @@ def wrap_reserved_words(sql: str) -> str:
 def validate_sql_comprehensive(
     sql: str,
     require_time_filter: bool = False,
-    read_only: bool = True,
     database_name: str | None = None,
 ) -> dict[str, Any]:
     """
@@ -284,7 +239,6 @@ def validate_sql_comprehensive(
     Args:
         sql: SQL query string to validate
         require_time_filter: Whether to require p_event_time filter
-        read_only: Whether to enforce read-only operations
         database_name: Database name to validate (optional)
 
     Returns:
@@ -297,12 +251,6 @@ def validate_sql_comprehensive(
     basic_result = validate_sql_basic(sql)
     if not basic_result["valid"]:
         return basic_result
-
-    # Read-only validation
-    if read_only:
-        readonly_result = validate_sql_read_only(sql)
-        if not readonly_result["valid"]:
-            return readonly_result
 
     # Time filter validation
     if require_time_filter:
