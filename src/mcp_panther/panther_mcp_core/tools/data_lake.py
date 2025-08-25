@@ -283,10 +283,10 @@ async def query_data_lake(
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(
-                EXECUTE_DATA_LAKE_QUERY, variable_values=variables
-            )
+        panther_client = await _create_panther_client()
+        result = await panther_client.execute_async(
+            EXECUTE_DATA_LAKE_QUERY, variable_values=variables
+        )
 
         # Get query ID from result
         query_id = result.get("executeDataLakeQuery", {}).get("id")
@@ -373,10 +373,10 @@ async def _get_data_lake_query_results(
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(
-                GET_DATA_LAKE_QUERY, variable_values=variables
-            )
+        panther_client = await _create_panther_client()
+        result = await panther_client.execute_async(
+            GET_DATA_LAKE_QUERY, variable_values=variables
+        )
 
         # Get query data
         query_data = result.get("dataLakeQuery", {})
@@ -506,8 +506,8 @@ async def list_databases() -> Dict[str, Any]:
 
     try:
         # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(LIST_DATABASES_QUERY)
+        panther_client = await _create_panther_client()
+        result = await panther_client.execute_async(LIST_DATABASES_QUERY)
 
         # Get query data
         databases = result.get("dataLakeDatabases", [])
@@ -584,10 +584,10 @@ async def list_database_tables(
             logger.debug(f"Query variables: {variables}")
 
             # Execute the query asynchronously
-            async with await _create_panther_client() as session:
-                result = await session.execute(
-                    LIST_TABLES_QUERY, variable_values=variables
-                )
+            panther_client = await _create_panther_client()
+            result = await panther_client.execute_async(
+                LIST_TABLES_QUERY, variable_values=variables
+            )
 
             # Get query data
             result = result.get("dataLakeDatabaseTables", {})
@@ -674,10 +674,10 @@ async def get_table_schema(
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(
-                GET_COLUMNS_FOR_TABLE_QUERY, variable_values=variables
-            )
+        panther_client = await _create_panther_client()
+        result = await panther_client.execute_async(
+            GET_COLUMNS_FOR_TABLE_QUERY, variable_values=variables
+        )
 
         # Get query data
         query_data = result.get("dataLakeDatabaseTable", {})
@@ -749,10 +749,9 @@ async def _cancel_data_lake_query(
         variables = {"input": {"id": query_id}}
 
         # Execute the cancellation
-        async with client as session:
-            result = await session.execute(
-                CANCEL_DATA_LAKE_QUERY, variable_values=variables
-            )
+        result = await client.execute_async(
+            CANCEL_DATA_LAKE_QUERY, variable_values=variables
+        )
 
         # Parse results
         cancellation_data = result.get("cancelDataLakeQuery", {})

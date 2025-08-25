@@ -16,8 +16,9 @@ from uuid import UUID
 
 from pydantic import BeforeValidator, Field
 
-from ..client import get_rest_client
+from ..client import _create_panther_client, get_rest_client
 from ..permissions import Permission, all_perms
+from ..queries import LIST_DATA_LAKE_QUERIES
 from ..utils.sql_validation import validate_sql_comprehensive
 from .registry import mcp_tool
 
@@ -364,4 +365,126 @@ async def get_saved_query(
         return {
             "success": False,
             "message": f"Failed to fetch saved query: {str(e)}",
+        }
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
+        "readOnlyHint": True,
+    }
+)
+async def list_query_history(
+    cursor: Annotated[
+        str | None,
+        Field(description="Optional cursor for pagination from a previous query"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(
+            description="Maximum number of results to return (1-100)",
+            ge=1,
+            le=100,
+        ),
+    ] = 10,
+) -> Dict[str, Any]:
+    """List query execution history from your Panther instance.
+
+    This tool provides visibility into the execution history of both scheduled and on-demand queries,
+    making it valuable for:
+
+    - **Troubleshooting**: Debug past query errors and identify failure patterns
+    - **Monitoring**: Verify that scheduled queries are running as expected
+    - **Performance Analysis**: Review query execution times and identify slow queries
+    - **Audit Trail**: Track query usage patterns and execution frequency
+    - **Capacity Planning**: Understand query load and resource utilization over time
+
+    The history includes execution details like start/end times, status, error messages,
+    rows returned, and execution duration for comprehensive operational insights.
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if the request was successful
+        - executions: List of query executions if successful, each containing:
+            - id: Execution ID
+            - sql: The SQL query that was executed
+            - status: Execution status (succeeded, failed, running, cancelled)
+            - startedAt: When execution began (ISO 8601 format)
+            - completedAt: When execution completed (ISO 8601 format, if finished)
+            - message: Status message or error details
+            - name: Name of the query (if it was a saved query)
+            - isScheduled: Whether this was a scheduled query execution
+            - issuedBy: User or API token that triggered the execution
+            - bytesScanned: Amount of data scanned during execution (bytes)
+            - executionTime: Query execution time (milliseconds)
+            - rowCount: Number of rows returned
+        - total_executions: Number of executions returned
+        - has_next_page: Boolean indicating if more results are available
+        - next_cursor: Cursor for fetching the next page of results
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Listing query execution history (limit: {limit})")
+
+    try:
+        # Prepare variables
+        variables = {"input": {"pageSize": limit}}
+        if cursor:
+            variables["input"]["cursor"] = cursor
+
+        logger.debug(f"Query history variables: {variables}")
+
+        # Execute the GraphQL query using the existing pattern
+        panther_client = await _create_panther_client()
+        response_data = await panther_client.execute_async(
+            LIST_DATA_LAKE_QUERIES, variable_values=variables
+        )
+
+        # Extract data from GraphQL response
+        data_lake_queries = response_data.get("dataLakeQueries", {})
+        edges = data_lake_queries.get("edges", [])
+        page_info = data_lake_queries.get("pageInfo", {})
+
+        # Transform the data to match our expected format
+        executions = []
+        for edge in edges:
+            node = edge.get("node", {})
+
+            # Extract stats if available
+            stats = {}
+            results = node.get("results")
+            if results:
+                stats = results.get("stats", {})
+
+            # Format the execution data
+            execution = {
+                "id": node.get("id"),
+                "sql": node.get("sql"),
+                "status": node.get("status"),
+                "startedAt": node.get("startedAt"),
+                "completedAt": node.get("completedAt"),
+                "message": node.get("message"),
+                "name": node.get("name"),
+                "isScheduled": node.get("isScheduled", False),
+                "issuedBy": node.get("issuedBy"),
+                "bytesScanned": stats.get("bytesScanned"),
+                "executionTime": stats.get("executionTime"),
+                "rowCount": stats.get("rowCount"),
+            }
+            executions.append(execution)
+
+        logger.info(f"Successfully retrieved {len(executions)} query executions")
+
+        # Format the response
+        return {
+            "success": True,
+            "executions": executions,
+            "total_executions": len(executions),
+            "has_next_page": page_info.get("hasNextPage", False),
+            "next_cursor": page_info.get("endCursor"),
+        }
+    except Exception as e:
+        logger.error(f"Failed to list query history: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to list query history: {str(e)}",
         }

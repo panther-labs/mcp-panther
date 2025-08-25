@@ -18,7 +18,7 @@ MOCK_QUERY_ID = "query-123456789"
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
 async def test_query_data_lake_success(mock_graphql_client):
     """Test successful execution of a data lake query."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
     sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
@@ -40,8 +40,8 @@ async def test_query_data_lake_success(mock_graphql_client):
     assert result["status"] == "succeeded"
     assert result["query_id"] == MOCK_QUERY_ID
 
-    mock_graphql_client.execute.assert_called_once()
-    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    mock_graphql_client.execute_async.assert_called_once()
+    call_args = mock_graphql_client.execute_async.call_args[1]["variable_values"]
     assert call_args["input"]["sql"] == sql
     assert call_args["input"]["databaseName"] == "panther_logs.public"
 
@@ -50,7 +50,7 @@ async def test_query_data_lake_success(mock_graphql_client):
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
 async def test_query_data_lake_custom_database(mock_graphql_client):
     """Test executing a data lake query with a custom database."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
     sql = "SELECT * FROM my_custom_table WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
@@ -73,7 +73,7 @@ async def test_query_data_lake_custom_database(mock_graphql_client):
     assert result["status"] == "succeeded"
     assert result["query_id"] == MOCK_QUERY_ID
 
-    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    call_args = mock_graphql_client.execute_async.call_args[1]["variable_values"]
     assert call_args["input"]["databaseName"] == custom_db
 
 
@@ -81,7 +81,7 @@ async def test_query_data_lake_custom_database(mock_graphql_client):
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
 async def test_query_data_lake_error(mock_graphql_client):
     """Test handling of errors when executing a data lake query."""
-    mock_graphql_client.execute.side_effect = Exception("Test error")
+    mock_graphql_client.execute_async.side_effect = Exception("Test error")
 
     sql = "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
     result = await query_data_lake(sql)
@@ -106,14 +106,14 @@ async def test_query_data_lake_missing_event_time(mock_graphql_client):
         in result["message"]
     )
     assert result["query_id"] is None  # No query_id when validation fails
-    mock_graphql_client.execute.assert_not_called()
+    mock_graphql_client.execute_async.assert_not_called()
 
 
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
 async def test_query_data_lake_with_event_time(mock_graphql_client):
     """Test that queries with p_event_time filter are accepted."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
@@ -152,15 +152,15 @@ async def test_query_data_lake_with_event_time(mock_graphql_client):
             assert result["success"] is True, f"Query failed: {sql}"
             assert result["status"] == "succeeded"
             assert result["query_id"] == MOCK_QUERY_ID
-            mock_graphql_client.execute.assert_called_once()
-            mock_graphql_client.execute.reset_mock()
+            mock_graphql_client.execute_async.assert_called_once()
+            mock_graphql_client.execute_async.reset_mock()
 
 
 @pytest.mark.asyncio
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
 async def test_query_data_lake_invalid_event_time_usage(mock_graphql_client):
     """Test that queries with invalid p_event_time usage are rejected."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
@@ -187,7 +187,7 @@ async def test_query_data_lake_invalid_event_time_usage(mock_graphql_client):
             in result["message"]
         )
         assert result["query_id"] is None  # No query_id when validation fails
-        mock_graphql_client.execute.assert_not_called()
+        mock_graphql_client.execute_async.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -195,7 +195,7 @@ async def test_query_data_lake_invalid_event_time_usage(mock_graphql_client):
 async def test_cancel_data_lake_query_success(mock_graphql_client):
     """Test successful cancellation of a data lake query."""
     mock_response = {"cancelDataLakeQuery": {"id": "query123"}}
-    mock_graphql_client.execute.return_value = mock_response
+    mock_graphql_client.execute_async.return_value = mock_response
 
     result = await _cancel_data_lake_query("query123")
 
@@ -204,7 +204,7 @@ async def test_cancel_data_lake_query_success(mock_graphql_client):
     assert "Successfully cancelled" in result["message"]
 
     # Verify correct GraphQL call
-    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    call_args = mock_graphql_client.execute_async.call_args[1]["variable_values"]
     assert call_args["input"]["id"] == "query123"
 
 
@@ -212,7 +212,7 @@ async def test_cancel_data_lake_query_success(mock_graphql_client):
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
 async def test_cancel_data_lake_query_not_found(mock_graphql_client):
     """Test cancellation of a non-existent query."""
-    mock_graphql_client.execute.side_effect = Exception("Query not found")
+    mock_graphql_client.execute_async.side_effect = Exception("Query not found")
 
     result = await _cancel_data_lake_query("nonexistent")
 
@@ -225,7 +225,9 @@ async def test_cancel_data_lake_query_not_found(mock_graphql_client):
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
 async def test_cancel_data_lake_query_cannot_cancel(mock_graphql_client):
     """Test cancellation of a query that cannot be cancelled."""
-    mock_graphql_client.execute.side_effect = Exception("Query cannot be cancelled")
+    mock_graphql_client.execute_async.side_effect = Exception(
+        "Query cannot be cancelled"
+    )
 
     result = await _cancel_data_lake_query("completed_query")
 
@@ -238,7 +240,7 @@ async def test_cancel_data_lake_query_cannot_cancel(mock_graphql_client):
 @patch_graphql_client(DATA_LAKE_MODULE_PATH)
 async def test_cancel_data_lake_query_permission_error(mock_graphql_client):
     """Test cancellation with permission error."""
-    mock_graphql_client.execute.side_effect = Exception("Permission denied")
+    mock_graphql_client.execute_async.side_effect = Exception("Permission denied")
 
     result = await _cancel_data_lake_query("query123")
 
@@ -251,7 +253,7 @@ async def test_cancel_data_lake_query_permission_error(mock_graphql_client):
 async def test_cancel_data_lake_query_no_id_returned(mock_graphql_client):
     """Test cancellation when no ID is returned."""
     mock_response = {"cancelDataLakeQuery": {}}
-    mock_graphql_client.execute.return_value = mock_response
+    mock_graphql_client.execute_async.return_value = mock_response
 
     result = await _cancel_data_lake_query("query123")
 
@@ -330,7 +332,7 @@ async def test_query_data_lake_with_reserved_words_processing(
     mock_graphql_client,
 ):
     """Test that query_data_lake processes reserved words."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
@@ -360,7 +362,7 @@ async def test_query_data_lake_with_reserved_words_processing(
     assert result["query_id"] == MOCK_QUERY_ID
 
     # Verify the SQL was processed for reserved words
-    call_args = mock_graphql_client.execute.call_args[1]["variable_values"]
+    call_args = mock_graphql_client.execute_async.call_args[1]["variable_values"]
     processed_sql = call_args["input"]["sql"]
 
     # Assert the exact transformed SQL
@@ -373,7 +375,7 @@ async def test_query_data_lake_with_cursor_pagination(
     mock_graphql_client,
 ):
     """Test that query_data_lake supports cursor-based pagination."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
@@ -418,7 +420,7 @@ async def test_query_data_lake_first_page_without_cursor(
     mock_graphql_client,
 ):
     """Test that query_data_lake works without cursor for first page."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
@@ -462,7 +464,7 @@ async def test_query_data_lake_pagination_complete_workflow(
     mock_graphql_client,
 ):
     """Test complete pagination workflow from first page to last page."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
@@ -523,7 +525,7 @@ async def test_query_data_lake_legacy_truncation_behavior(
     mock_graphql_client,
 ):
     """Test legacy truncation behavior for non-paginated requests."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
@@ -562,7 +564,7 @@ async def test_query_data_lake_pagination_with_empty_results(
     mock_graphql_client,
 ):
     """Test pagination behavior when query returns no results."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
@@ -600,7 +602,7 @@ async def test_query_data_lake_max_rows_parameter_limits(
     mock_graphql_client,
 ):
     """Test that max_rows parameter respects limits and defaults."""
-    mock_graphql_client.execute.return_value = {
+    mock_graphql_client.execute_async.return_value = {
         "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
     }
 
