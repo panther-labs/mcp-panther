@@ -43,12 +43,13 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 </details>
 
 <details>
-<summary><strong>Scheduled Queries</strong></summary>
+<summary><strong>Saved Queries</strong></summary>
 
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
-| `list_scheduled_queries` | List all scheduled queries with pagination support | "Show me all scheduled queries" / "List the first 25 scheduled queries" |
-| `get_scheduled_query` | Get detailed information about a specific scheduled query by ID | "Get details for scheduled query 'weekly-security-report'" |
+| `create_saved_query` | Create a new saved query for on-demand execution or scheduling | "Save this query as 'Failed Login Analysis': SELECT * FROM..." / "Create a scheduled query that runs every Monday at 9 AM" |
+| `list_saved_queries` | List all saved queries (both scheduled and on-demand) with pagination support | "Show me all saved queries" / "List the first 25 saved queries" |
+| `get_saved_query` | Get detailed information about a specific saved query by ID | "Get details for saved query 'weekly-security-report'" |
 
 </details>
 
