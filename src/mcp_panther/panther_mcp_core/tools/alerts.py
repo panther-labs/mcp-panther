@@ -2,16 +2,22 @@
 Tools for interacting with Panther alerts.
 """
 
+import asyncio
 import logging
 from typing import Annotated, Any
 
 from pydantic import BeforeValidator, Field
 
 from ..client import (
+    _execute_query,
     _get_today_date_range,
     get_rest_client,
 )
 from ..permissions import Permission, all_perms
+from ..queries import (
+    AI_INFERENCE_STREAM_QUERY,
+    AI_SUMMARIZE_ALERT_MUTATION,
+)
 from ..validators import (
     _validate_alert_api_types,
     _validate_alert_status,
@@ -935,4 +941,207 @@ async def bulk_update_alerts(
         return {
             "success": False,
             "message": f"Failed to bulk update alerts: {str(e)}",
+        }
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RUN_PANTHER_AI),
+        "readOnlyHint": True,
+    }
+)
+async def get_ai_alert_summary(
+    alert_id: Annotated[
+        str,
+        Field(
+            min_length=1, description="The ID of the alert to generate AI summary for"
+        ),
+    ],
+    output_length: Annotated[
+        str,
+        Field(
+            description="The desired length of the AI summary output",
+            examples=["xsmall", "small", "medium", "large", "xlarge", "largest"],
+        ),
+    ] = "medium",
+    prompt: Annotated[
+        str | None,
+        Field(
+            min_length=1,
+            description="Optional additional prompt to provide context for the AI summary",
+        ),
+    ] = None,
+    # Note: Skip options (skipAlert, skipAlertComments, skipAlertEvents) are
+    # commented out due to potential GraphQL schema compatibility issues.
+    # They can be re-enabled once schema support is confirmed.
+    # skip_alert: Annotated[
+    #     bool,
+    #     Field(
+    #         description="If true, do not include alert metadata in the AI analysis prompt"
+    #     ),
+    # ] = False,
+    # skip_alert_comments: Annotated[
+    #     bool,
+    #     Field(
+    #         description="If true, do not include alert comments in the AI analysis prompt"
+    #     ),
+    # ] = False,
+    # skip_alert_events: Annotated[
+    #     bool,
+    #     Field(
+    #         description="If true, do not include alert events in the AI analysis prompt"
+    #     ),
+    # ] = False,
+    timeout_seconds: Annotated[
+        int,
+        Field(
+            description="Timeout in seconds to wait for AI summary completion",
+            ge=10,
+            le=300,
+        ),
+    ] = 60,
+) -> dict[str, Any]:
+    """Generate an AI-powered triage summary for a Panther alert.
+
+    This tool uses Panther's AI capabilities to analyze an alert and provide
+    intelligent insights about the security event, potential impact, and
+    recommended next steps for investigation.
+
+    The AI summary includes analysis of:
+    - Alert metadata (severity, detection rule, timestamps)
+    - Related events and logs (if available)
+    - Comments from previous investigations
+    - Contextual security analysis and recommendations
+
+    Args:
+        alert_id: The ID of the alert to analyze
+        output_length: Desired length of the summary (xsmall to largest)
+        prompt: Optional additional context or specific questions for the AI
+        timeout_seconds: How long to wait for the AI analysis to complete
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if summary was generated successfully
+        - summary: The AI-generated triage summary text
+        - stream_id: The stream ID used for this analysis
+        - metadata: Information about the analysis request
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Generating AI summary for alert {alert_id}")
+
+    try:
+        # Validate output length
+        valid_lengths = {"xsmall", "small", "medium", "large", "xlarge", "largest"}
+        if output_length not in valid_lengths:
+            return {
+                "success": False,
+                "message": f"Invalid output_length '{output_length}'. Must be one of: {', '.join(sorted(valid_lengths))}",
+            }
+
+        # Prepare the AI summarize request with minimal required fields
+        request_input = {
+            "alertId": alert_id,
+            "outputLength": output_length,
+        }
+
+        # Add optional prompt if provided
+        if prompt:
+            request_input["prompt"] = prompt
+
+        variables = {"input": request_input}
+
+        if prompt:
+            logger.info(f"Using additional prompt: {prompt[:100]}...")
+
+        logger.info(f"Initiating AI summary with output_length={output_length}")
+
+        # Step 1: Start the AI summarization
+        result = await _execute_query(AI_SUMMARIZE_ALERT_MUTATION, variables)
+
+        if not result or "aiSummarizeAlert" not in result:
+            logger.error("Failed to initiate AI summarization")
+            return {
+                "success": False,
+                "message": "Failed to initiate AI summarization",
+            }
+
+        stream_id = result["aiSummarizeAlert"]["streamId"]
+        logger.info(f"AI summarization started with stream ID: {stream_id}")
+
+        # Step 2: Poll for results with timeout
+        start_time = asyncio.get_event_loop().time()
+        poll_interval = 2.0  # Start with 2 second intervals
+        max_poll_interval = 10.0  # Maximum 10 second intervals
+
+        accumulated_response = ""
+
+        while True:
+            current_time = asyncio.get_event_loop().time()
+            elapsed = current_time - start_time
+
+            if elapsed > timeout_seconds:
+                logger.warning(f"AI summary timed out after {timeout_seconds} seconds")
+                return {
+                    "success": False,
+                    "message": f"AI summary generation timed out after {timeout_seconds} seconds",
+                    "stream_id": stream_id,
+                    "partial_summary": accumulated_response
+                    if accumulated_response
+                    else None,
+                }
+
+            # Poll the inference stream
+            stream_variables = {"streamId": stream_id}
+            stream_result = await _execute_query(
+                AI_INFERENCE_STREAM_QUERY, stream_variables
+            )
+
+            if not stream_result or "aiInferenceStream" not in stream_result:
+                logger.error("Failed to poll AI inference stream")
+                await asyncio.sleep(poll_interval)
+                continue
+
+            inference_data = stream_result["aiInferenceStream"]
+
+            # Check for errors
+            if inference_data.get("error"):
+                logger.error(f"AI inference error: {inference_data['error']}")
+                return {
+                    "success": False,
+                    "message": f"AI inference failed: {inference_data['error']}",
+                    "stream_id": stream_id,
+                }
+
+            # Get the latest response text (AI streams the full response each time)
+            response_text = inference_data.get("responseText", "")
+            if response_text:
+                accumulated_response = response_text
+
+            # Check if finished
+            if inference_data.get("finished", False):
+                logger.info(f"AI summary completed after {elapsed:.1f} seconds")
+                break
+
+            # Wait before next poll, with exponential backoff
+            await asyncio.sleep(poll_interval)
+            poll_interval = min(poll_interval * 1.2, max_poll_interval)
+
+        # Return the completed summary
+        return {
+            "success": True,
+            "summary": accumulated_response,
+            "stream_id": stream_id,
+            "metadata": {
+                "alert_id": alert_id,
+                "output_length": output_length,
+                "generation_time_seconds": round(elapsed, 1),
+                "prompt_included": prompt is not None,
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to generate AI alert summary: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to generate AI alert summary: {str(e)}",
         }
