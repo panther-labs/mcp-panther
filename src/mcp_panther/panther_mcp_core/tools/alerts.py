@@ -999,7 +999,7 @@ async def get_ai_alert_summary(
             ge=10,
             le=300,
         ),
-    ] = 60,
+    ] = 120,
 ) -> dict[str, Any]:
     """Generate an AI-powered triage summary for a Panther alert.
 
@@ -1042,6 +1042,9 @@ async def get_ai_alert_summary(
         request_input = {
             "alertId": alert_id,
             "outputLength": output_length,
+            "metadata": {
+                "kind": "alert"  # Required: tells AI this is an alert analysis
+            },
         }
 
         # Add optional prompt if provided
