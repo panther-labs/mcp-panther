@@ -158,7 +158,7 @@ async def list_detections(
         Field(
             description="Filter by state - 'enabled' or 'disabled'", default="enabled"
         ),
-    ] = "enabled",
+    ] = "",
     severity: Annotated[
         list[str],
         Field(
@@ -168,7 +168,7 @@ async def list_detections(
                 ["INFO", "LOW"],
             ],
         ),
-    ] = ["MEDIUM", "HIGH", "CRITICAL"],
+    ] = [],
     tag: Annotated[
         list[str],
         Field(
