@@ -55,7 +55,7 @@ async def list_alerts(
             description="Optional list of severities to filter by",
             examples=[["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]],
         ),
-    ] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+    ] = [],
     statuses: Annotated[
         list[str],
         BeforeValidator(_validate_statuses),
@@ -67,7 +67,7 @@ async def list_alerts(
                 ["OPEN", "TRIAGED"],
             ],
         ),
-    ] = ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"],
+    ] = [],
     cursor: Annotated[
         str | None,
         Field(
@@ -138,7 +138,7 @@ async def list_alerts(
                 ],  # When alert_type=DETECTION_ERROR
             ],
         ),
-    ] = ["RULE", "SCHEDULED_RULE"],
+    ] = [],
     alert_type: Annotated[
         str,
         BeforeValidator(_validate_alert_api_types),
