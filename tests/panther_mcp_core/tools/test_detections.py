@@ -763,6 +763,12 @@ async def test_list_detections_with_default_params(mock_rest_client):
     params = kwargs["params"]
     assert "severity" not in params
     assert "state" not in params 
+    assert "tag" not in params
+    assert "log-type" not in params
+    assert "created_by" not in params
+    assert "last_modified_by" not in params
+    assert params["limit"] == 100
+    assert "name_contains" not in params
     
 
 @pytest.mark.asyncio

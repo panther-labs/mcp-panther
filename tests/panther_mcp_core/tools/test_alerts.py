@@ -97,7 +97,18 @@ async def test_list_alerts_with_default_params(mock_rest_client):
     assert "severity" not in params
     assert "status" not in params 
     assert "subtypes" not in params
+    assert "log_sources" not in params
+    assert "log_types" not in params
+    assert "resource_types" not in params
+    assert "name_contains" not in params
+    assert "event_count_min" not in params
+    assert "event_count_max" not in params
+    assert "detection_id" not in params
+    assert "assignee" not in params
+    assert params["limit"] == 25
     assert params["type"] == "ALERT"
+    assert params["sort-dir"] == "desc"
+
 
 
 
