@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.detections import (
@@ -748,6 +749,27 @@ async def test_list_detections_with_detection_type_specific_params():
         "compliance_status parameter is only valid for 'policies'" in result["message"]
     )
 
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_with_default_params(mock_rest_client):
+    """Test that default parameters are correctly set."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+    
+    await list_detections(["rules"])
+    
+    mock_rest_client.get.assert_called_once()
+    args, kwargs = mock_rest_client.get.call_args
+    params = kwargs["params"]
+    assert "severity" not in params
+    assert "state" not in params 
+    assert "tag" not in params
+    assert "log-type" not in params
+    assert "created_by" not in params
+    assert "last_modified_by" not in params
+    assert params["limit"] == 100
+    assert "name_contains" not in params
+    
 
 @pytest.mark.asyncio
 @patch_rest_client(RULES_MODULE_PATH)
