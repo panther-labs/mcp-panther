@@ -8,7 +8,7 @@ from typing import Annotated, Any
 from pydantic import BeforeValidator, Field
 
 from ..client import (
-    _get_today_date_range,
+    _get_week_date_range,
     get_rest_client,
 )
 from ..permissions import Permission, all_perms
@@ -79,7 +79,7 @@ async def list_alerts(
         str | None,
         Field(
             min_length=1,
-            description="Optional detection ID to filter alerts by; if provided, the date range is not required",
+            description="Optional detection ID to filter alerts by; if not provided, default date range (7days) is applied",
         ),
     ] = None,
     event_count_max: Annotated[
@@ -156,7 +156,7 @@ async def list_alerts(
         severities: Optional list of severities to filter by (e.g. ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"])
         statuses: Optional list of statuses to filter by (e.g. ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"])
         cursor: Optional cursor for pagination from a previous query
-        detection_id: Optional detection ID to filter alerts by. If provided, date range is not required.
+        detection_id: Optional detection ID to filter alerts by. If not provided, default date range (7days) is applied.
         event_count_max: Optional maximum number of events that returned alerts must have
         event_count_min: Optional minimum number of events that returned alerts must have
         log_sources: Optional list of log source IDs to filter alerts by
@@ -220,15 +220,14 @@ async def list_alerts(
         if detection_id:
             params["detection-id"] = detection_id
             logger.info(f"Filtering by detection ID: {detection_id}")
-        else:
-            # If no detection_id, we must have a date range
-            default_start_date, default_end_date = _get_today_date_range()
-            if not start_date:
-                start_date = default_start_date
-            if not end_date:
-                end_date = default_end_date
+        
+        # Add a default date filter (7days) if no detection_id
+        if not detection_id and not(start_date or end_date):
+            start_date, end_date = _get_week_date_range()
 
+        if start_date:
             params["created-after"] = start_date
+        if end_date:
             params["created-before"] = end_date
 
         # Add optional filters
