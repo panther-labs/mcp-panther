@@ -10,7 +10,7 @@ from pydantic import BeforeValidator, Field
 
 from ..client import (
     _execute_query,
-    _get_today_date_range,
+    _get_week_date_range,
     get_rest_client,
 )
 from ..permissions import Permission, all_perms
