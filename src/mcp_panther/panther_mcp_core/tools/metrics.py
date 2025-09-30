@@ -10,6 +10,7 @@ from pydantic import BeforeValidator, Field
 from ..client import (
     _execute_query,
     _get_today_date_range,
+    _get_week_date_range
 )
 from ..permissions import Permission, all_perms
 from ..queries import (
@@ -56,7 +57,7 @@ async def get_severity_alert_metrics(
             description="The specific Panther alert types to get metrics for.",
             examples=[["Rule"], ["Policy"], ["Rule", "Policy"]],
         ),
-    ] = ["Rule"],
+    ] = ["Rule", "Policy"],
     severities: Annotated[
         list[str],
         BeforeValidator(_validate_severities),
@@ -91,7 +92,7 @@ async def get_severity_alert_metrics(
     try:
         # If start or end date is missing, use today's date range
         if not start_date or not end_date:
-            default_start_date, default_end_date = _get_today_date_range()
+            default_start_date, default_end_date = _get_week_date_range()
             if not start_date:
                 start_date = default_start_date
             if not end_date:
