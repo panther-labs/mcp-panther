@@ -5,11 +5,11 @@ import pytest
 from mcp_panther.panther_mcp_core.tools.alerts import (
     add_alert_comment,
     bulk_update_alerts,
-    get_ai_alert_summary,
     get_alert,
     get_alert_events,
     list_alert_comments,
     list_alerts,
+    start_ai_alert_triage,
     update_alert_assignee,
     update_alert_status,
 )
@@ -846,7 +846,7 @@ async def test_bulk_update_alerts_comment_exception(mock_rest_client):
 # AI Alert Summary Tests
 @pytest.mark.asyncio
 @patch_execute_query(ALERTS_MODULE_PATH)
-async def test_get_ai_alert_summary_success(mock_execute_query):
+async def test_start_ai_alert_triage_success(mock_execute_query):
     """Test successful AI alert summary generation."""
     # Mock the AI summarization initiation
     mock_execute_query.side_effect = [
@@ -872,7 +872,7 @@ async def test_get_ai_alert_summary_success(mock_execute_query):
         },
     ]
 
-    result = await get_ai_alert_summary("alert-123")
+    result = await start_ai_alert_triage("alert-123")
 
     assert result["success"] is True
     assert "security incident" in result["summary"]
@@ -893,7 +893,7 @@ async def test_get_ai_alert_summary_success(mock_execute_query):
 
 @pytest.mark.asyncio
 @patch_execute_query(ALERTS_MODULE_PATH)
-async def test_get_ai_alert_summary_with_custom_params(mock_execute_query):
+async def test_start_ai_alert_triage_with_custom_params(mock_execute_query):
     """Test AI alert summary with custom parameters."""
     mock_execute_query.side_effect = [
         {"aiSummarizeAlert": {"streamId": "stream-456"}},
@@ -907,7 +907,7 @@ async def test_get_ai_alert_summary_with_custom_params(mock_execute_query):
         },
     ]
 
-    result = await get_ai_alert_summary(
+    result = await start_ai_alert_triage(
         alert_id="alert-456",
         output_length="large",
         prompt="Focus on the network traffic patterns",
@@ -927,9 +927,9 @@ async def test_get_ai_alert_summary_with_custom_params(mock_execute_query):
 
 
 @pytest.mark.asyncio
-async def test_get_ai_alert_summary_invalid_output_length():
+async def test_start_ai_alert_triage_invalid_output_length():
     """Test AI alert summary with invalid output length."""
-    result = await get_ai_alert_summary("alert-123", output_length="invalid")
+    result = await start_ai_alert_triage("alert-123", output_length="invalid")
 
     assert result["success"] is False
     assert "Invalid output_length" in result["message"]
@@ -938,19 +938,19 @@ async def test_get_ai_alert_summary_invalid_output_length():
 
 @pytest.mark.asyncio
 @patch_execute_query(ALERTS_MODULE_PATH)
-async def test_get_ai_alert_summary_initiation_failure(mock_execute_query):
-    """Test AI alert summary when initiation fails."""
+async def test_start_ai_alert_triage_initiation_failure(mock_execute_query):
+    """Test AI alert triage when initiation fails."""
     mock_execute_query.return_value = {}  # Empty response
 
-    result = await get_ai_alert_summary("alert-123")
+    result = await start_ai_alert_triage("alert-123")
 
     assert result["success"] is False
-    assert "Failed to initiate AI summarization" in result["message"]
+    assert "Failed to initiate AI triage" in result["message"]
 
 
 @pytest.mark.asyncio
 @patch_execute_query(ALERTS_MODULE_PATH)
-async def test_get_ai_alert_summary_inference_error(mock_execute_query):
+async def test_start_ai_alert_triage_inference_error(mock_execute_query):
     """Test AI alert summary when inference returns an error."""
     mock_execute_query.side_effect = [
         {"aiSummarizeAlert": {"streamId": "stream-error"}},
@@ -964,7 +964,7 @@ async def test_get_ai_alert_summary_inference_error(mock_execute_query):
         },
     ]
 
-    result = await get_ai_alert_summary("alert-123")
+    result = await start_ai_alert_triage("alert-123")
 
     assert result["success"] is False
     assert "AI inference failed" in result["message"]
@@ -974,7 +974,7 @@ async def test_get_ai_alert_summary_inference_error(mock_execute_query):
 
 @pytest.mark.asyncio
 @patch_execute_query(ALERTS_MODULE_PATH)
-async def test_get_ai_alert_summary_timeout(mock_execute_query):
+async def test_start_ai_alert_triage_timeout(mock_execute_query):
     """Test AI alert summary timeout handling."""
 
     mock_execute_query.side_effect = [
@@ -1000,7 +1000,7 @@ async def test_get_ai_alert_summary_timeout(mock_execute_query):
         # First call returns 0 (start), second call returns 0.5 (gets response), third call returns 2 (timeout)
         mock_loop.return_value.time.side_effect = [0, 0.5, 2]
 
-        result = await get_ai_alert_summary("alert-123", timeout_seconds=1)
+        result = await start_ai_alert_triage("alert-123", timeout_seconds=1)
 
     assert result["success"] is False
     assert "timed out" in result["message"]
@@ -1010,7 +1010,7 @@ async def test_get_ai_alert_summary_timeout(mock_execute_query):
 
 @pytest.mark.asyncio
 @patch_execute_query(ALERTS_MODULE_PATH)
-async def test_get_ai_alert_summary_stream_poll_failure(mock_execute_query):
+async def test_start_ai_alert_triage_stream_poll_failure(mock_execute_query):
     """Test AI alert summary when stream polling fails."""
     mock_execute_query.side_effect = [
         {"aiSummarizeAlert": {"streamId": "stream-123"}},
@@ -1025,7 +1025,7 @@ async def test_get_ai_alert_summary_stream_poll_failure(mock_execute_query):
         },
     ]
 
-    result = await get_ai_alert_summary("alert-123")
+    result = await start_ai_alert_triage("alert-123")
 
     # Should eventually succeed after the failed poll
     assert result["success"] is True
@@ -1034,20 +1034,20 @@ async def test_get_ai_alert_summary_stream_poll_failure(mock_execute_query):
 
 @pytest.mark.asyncio
 @patch_execute_query(ALERTS_MODULE_PATH)
-async def test_get_ai_alert_summary_exception_handling(mock_execute_query):
-    """Test AI alert summary exception handling."""
+async def test_start_ai_alert_triage_exception_handling(mock_execute_query):
+    """Test AI alert triage exception handling."""
     mock_execute_query.side_effect = Exception("GraphQL connection error")
 
-    result = await get_ai_alert_summary("alert-123")
+    result = await start_ai_alert_triage("alert-123")
 
     assert result["success"] is False
-    assert "Failed to generate AI alert summary" in result["message"]
+    assert "Failed to start AI alert triage" in result["message"]
     assert "GraphQL connection error" in result["message"]
 
 
 @pytest.mark.asyncio
 @patch_execute_query(ALERTS_MODULE_PATH)
-async def test_get_ai_alert_summary_streaming_response_text(mock_execute_query):
+async def test_start_ai_alert_triage_streaming_response_text(mock_execute_query):
     """Test that AI alert summary properly handles streaming response text."""
     mock_execute_query.side_effect = [
         {"aiSummarizeAlert": {"streamId": "stream-streaming"}},
@@ -1080,7 +1080,7 @@ async def test_get_ai_alert_summary_streaming_response_text(mock_execute_query):
         },
     ]
 
-    result = await get_ai_alert_summary("alert-123")
+    result = await start_ai_alert_triage("alert-123")
 
     assert result["success"] is True
     assert (
@@ -1092,7 +1092,7 @@ async def test_get_ai_alert_summary_streaming_response_text(mock_execute_query):
 
 @pytest.mark.asyncio
 @patch_execute_query(ALERTS_MODULE_PATH)
-async def test_get_ai_alert_summary_basic_functionality(mock_execute_query):
+async def test_start_ai_alert_triage_basic_functionality(mock_execute_query):
     """Test AI alert summary basic functionality without advanced options."""
     mock_execute_query.side_effect = [
         {"aiSummarizeAlert": {"streamId": "stream-basic"}},
@@ -1106,7 +1106,7 @@ async def test_get_ai_alert_summary_basic_functionality(mock_execute_query):
         },
     ]
 
-    result = await get_ai_alert_summary(alert_id="alert-123")
+    result = await start_ai_alert_triage(alert_id="alert-123")
 
     assert result["success"] is True
     assert result["summary"] == "Basic analysis of the security event."

@@ -301,3 +301,15 @@ query AIInferenceStream($streamId: String!) {
     }
 }
 """)
+
+AI_INFERENCE_STREAMS_METADATA_QUERY = gql("""
+query AIInferenceStreamsMetadata($input: AIInferenceStreamsMetadataInput!) {
+    aiInferenceStreamsMetadata(input: $input) {
+        edges {
+            node {
+                streamId
+            }
+        }
+    }
+}
+""")

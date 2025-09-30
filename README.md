@@ -20,7 +20,8 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | Tool Name | Description | Sample Prompt |
 |-----------|-------------|---------------|
 | `add_alert_comment` | Add a comment to a Panther alert | "Add comment 'Looks pretty bad' to alert abc123" |
-| `get_ai_alert_summary` | Generate an AI-powered triage summary for a Panther alert with intelligent insights and recommendations | "Generate an AI summary for alert abc123" / "Create a detailed AI analysis of alert def456" |
+| `start_ai_alert_triage` | Start an AI-powered triage analysis for a Panther alert with intelligent insights and recommendations | "Start AI triage for alert abc123" / "Generate a detailed AI analysis of alert def456" |
+| `get_ai_alert_triage_summary` | Retrieve the latest AI triage summary previously generated for a specific alert | "Get the AI triage summary for alert abc123" / "Show me the AI analysis for alert def456" |
 | `get_alert` | Get detailed information about a specific alert | "What's the status of alert 8def456?" |
 | `get_alert_events` | Get a small sampling of events for a given alert | "Show me events associated with alert 8def456" |
 | `list_alerts` | List alerts with comprehensive filtering options (date range, severity, status, etc.) | "Show me all high severity alerts from the last 24 hours" |
