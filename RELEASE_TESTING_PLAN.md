@@ -45,7 +45,7 @@ This document outlines the comprehensive testing procedures that must be complet
 - [ ] `add_alert_comment` - Add comments to alerts
 - [ ] `list_alert_comments` - Retrieve alert comments
 - [ ] `get_alert_events` - Get events for specific alerts
-- [ ] `summarize_alert_events` - Cross-alert event analysis
+- [ ] `get_alert_event_stats` - Cross-alert event analysis
 
 #### Detection Management Tools
 
