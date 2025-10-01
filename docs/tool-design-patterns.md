@@ -843,7 +843,7 @@ Detailed function documentation:
 
 ```python
 @mcp.tool
-async def summarize_alert_events(
+async def get_alert_event_stats(
     alert_ids: list[str],
     start_date: str | None = None,
     end_date: str | None = None,
@@ -851,33 +851,33 @@ async def summarize_alert_events(
 ) -> dict[str, Any]:
     """
     Analyze patterns and relationships across multiple alerts by aggregating their event data.
-    
-    For each time window (configurable from 1-60 minutes), the tool collects unique entities 
-    (IPs, emails, usernames, trace IDs) and alert metadata (IDs, rules, severities) to help 
+
+    For each time window (configurable from 1-60 minutes), the tool collects unique entities
+    (IPs, emails, usernames, trace IDs) and alert metadata (IDs, rules, severities) to help
     identify related activities.
-    
-    Results are ordered chronologically with the most recent first, helping analysts identify 
+
+    Results are ordered chronologically with the most recent first, helping analysts identify
     temporal patterns, common entities, and potential incident scope.
-    
+
     Args:
         alert_ids: List of alert IDs to analyze (maximum 50 alerts)
         start_date: Optional start date in ISO 8601 format. Defaults to start of today UTC
-        end_date: Optional end date in ISO 8601 format. Defaults to end of today UTC  
+        end_date: Optional end date in ISO 8601 format. Defaults to end of today UTC
         time_window: Time window in minutes to group events by (1-60, default: 30)
-        
+
     Returns:
         Dict containing:
         - success: Boolean indicating if analysis completed
         - results: List of time-grouped analysis results
         - summary: Overview statistics
         - error: Error message if unsuccessful
-        
+
     Raises:
         ValueError: If alert_ids is empty or time_window is invalid
         PermissionError: If user lacks required permissions
-        
+
     Example:
-        >>> result = await summarize_alert_events(
+        >>> result = await get_alert_event_stats(
         ...     alert_ids=["alert-123", "alert-456"],
         ...     time_window=15
         ... )
