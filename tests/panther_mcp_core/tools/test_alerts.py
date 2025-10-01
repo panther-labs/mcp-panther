@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 import datetime
 
@@ -8,10 +10,12 @@ from mcp_panther.panther_mcp_core.tools.alerts import (
     get_alert_events,
     list_alert_comments,
     list_alerts,
+    start_ai_alert_triage,
     update_alert_assignee,
     update_alert_status,
 )
 from tests.utils.helpers import (
+    patch_execute_query,
     patch_rest_client,
 )
 
@@ -631,11 +635,11 @@ async def test_bulk_update_alerts_validation_too_many_alerts():
 async def test_bulk_update_alerts_validation_max_allowed_alerts(mock_rest_client):
     """Test that exactly 25 alerts (the maximum) works correctly."""
     mock_rest_client.patch.return_value = ({}, 204)
-    
+
     # Create exactly 25 alert IDs (at the limit)
     alert_ids = [f"alert-{i}" for i in range(25)]
     result = await bulk_update_alerts(alert_ids, status="TRIAGED")
-    
+
     assert result["success"] is True
     assert result["results"]["status_updates"] == alert_ids
     assert result["summary"]["total_alerts"] == 25
@@ -874,3 +878,279 @@ async def test_bulk_update_alerts_comment_exception(mock_rest_client):
     assert len(result["results"]["failed_operations"]) == 1
     assert result["results"]["failed_operations"][0]["operation"] == "add_comment"
     assert "Comment error" in result["results"]["failed_operations"][0]["error"]
+
+
+# AI Alert Summary Tests
+@pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
+async def test_start_ai_alert_triage_success(mock_execute_query):
+    """Test successful AI alert summary generation."""
+    # Mock the AI summarization initiation
+    mock_execute_query.side_effect = [
+        # First call: aiSummarizeAlert mutation
+        {"aiSummarizeAlert": {"streamId": "stream-123"}},
+        # Second call: aiInferenceStream query (in progress)
+        {
+            "aiInferenceStream": {
+                "error": None,
+                "finished": False,
+                "responseText": "This alert indicates",
+                "streamId": "stream-123",
+            }
+        },
+        # Third call: aiInferenceStream query (finished)
+        {
+            "aiInferenceStream": {
+                "error": None,
+                "finished": True,
+                "responseText": "This alert indicates a potential security incident involving suspicious login activity. The user Derek Brooks accessed the system outside normal hours, which could suggest unauthorized access or compromised credentials. Recommended next steps: 1) Verify the user's identity, 2) Check for additional suspicious activities, 3) Consider password reset if necessary.",
+                "streamId": "stream-123",
+            }
+        },
+    ]
+
+    result = await start_ai_alert_triage("alert-123")
+
+    assert result["success"] is True
+    assert "security incident" in result["summary"]
+    assert result["stream_id"] == "stream-123"
+    assert result["metadata"]["alert_id"] == "alert-123"
+    assert result["metadata"]["output_length"] == "medium"
+    assert isinstance(result["metadata"]["generation_time_seconds"], float)
+
+    # Verify the GraphQL calls were made correctly
+    assert mock_execute_query.call_count == 3
+
+    # Check the AI summarization mutation call
+    first_call_args = mock_execute_query.call_args_list[0]
+    variables = first_call_args[0][1]
+    assert variables["input"]["alertId"] == "alert-123"
+    assert variables["input"]["outputLength"] == "medium"
+
+
+@pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
+async def test_start_ai_alert_triage_with_custom_params(mock_execute_query):
+    """Test AI alert summary with custom parameters."""
+    mock_execute_query.side_effect = [
+        {"aiSummarizeAlert": {"streamId": "stream-456"}},
+        {
+            "aiInferenceStream": {
+                "error": None,
+                "finished": True,
+                "responseText": "Detailed analysis of the security event.",
+                "streamId": "stream-456",
+            }
+        },
+    ]
+
+    result = await start_ai_alert_triage(
+        alert_id="alert-456",
+        output_length="large",
+        prompt="Focus on the network traffic patterns",
+        timeout_seconds=120,
+    )
+
+    assert result["success"] is True
+    assert result["summary"] == "Detailed analysis of the security event."
+    assert result["metadata"]["output_length"] == "large"
+    assert result["metadata"]["prompt_included"] is True
+
+    # Check the mutation call had the custom parameters
+    first_call_args = mock_execute_query.call_args_list[0]
+    variables = first_call_args[0][1]
+    assert variables["input"]["outputLength"] == "large"
+    assert variables["input"]["prompt"] == "Focus on the network traffic patterns"
+
+
+@pytest.mark.asyncio
+async def test_start_ai_alert_triage_invalid_output_length():
+    """Test AI alert summary with invalid output length."""
+    result = await start_ai_alert_triage("alert-123", output_length="invalid")
+
+    assert result["success"] is False
+    assert "Invalid output_length" in result["message"]
+    assert "Must be one of" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
+async def test_start_ai_alert_triage_initiation_failure(mock_execute_query):
+    """Test AI alert triage when initiation fails."""
+    mock_execute_query.return_value = {}  # Empty response
+
+    result = await start_ai_alert_triage("alert-123")
+
+    assert result["success"] is False
+    assert "Failed to initiate AI triage" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
+async def test_start_ai_alert_triage_inference_error(mock_execute_query):
+    """Test AI alert summary when inference returns an error."""
+    mock_execute_query.side_effect = [
+        {"aiSummarizeAlert": {"streamId": "stream-error"}},
+        {
+            "aiInferenceStream": {
+                "error": "AI service temporarily unavailable",
+                "finished": False,
+                "responseText": "",
+                "streamId": "stream-error",
+            }
+        },
+    ]
+
+    result = await start_ai_alert_triage("alert-123")
+
+    assert result["success"] is False
+    assert "AI inference failed" in result["message"]
+    assert "AI service temporarily unavailable" in result["message"]
+    assert result["stream_id"] == "stream-error"
+
+
+@pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
+async def test_start_ai_alert_triage_timeout(mock_execute_query):
+    """Test AI alert summary timeout handling."""
+
+    mock_execute_query.side_effect = [
+        {"aiSummarizeAlert": {"streamId": "stream-timeout"}},
+        # Simulate never finishing
+        {
+            "aiInferenceStream": {
+                "error": None,
+                "finished": False,
+                "responseText": "Partial analysis...",
+                "streamId": "stream-timeout",
+            }
+        },
+    ]
+
+    # Mock time.time to simulate timeout by making elapsed time exceed timeout
+    with (
+        patch(
+            "mcp_panther.panther_mcp_core.tools.alerts.asyncio.get_event_loop"
+        ) as mock_loop,
+        patch("mcp_panther.panther_mcp_core.tools.alerts.asyncio.sleep"),
+    ):
+        # First call returns 0 (start), second call returns 0.5 (gets response), third call returns 2 (timeout)
+        mock_loop.return_value.time.side_effect = [0, 0.5, 2]
+
+        result = await start_ai_alert_triage("alert-123", timeout_seconds=1)
+
+    assert result["success"] is False
+    assert "timed out" in result["message"]
+    assert result["stream_id"] == "stream-timeout"
+    assert result["partial_summary"] == "Partial analysis..."
+
+
+@pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
+async def test_start_ai_alert_triage_stream_poll_failure(mock_execute_query):
+    """Test AI alert summary when stream polling fails."""
+    mock_execute_query.side_effect = [
+        {"aiSummarizeAlert": {"streamId": "stream-123"}},
+        {},  # Empty response from stream query
+        {
+            "aiInferenceStream": {
+                "error": None,
+                "finished": True,
+                "responseText": "Final analysis",
+                "streamId": "stream-123",
+            }
+        },
+    ]
+
+    result = await start_ai_alert_triage("alert-123")
+
+    # Should eventually succeed after the failed poll
+    assert result["success"] is True
+    assert result["summary"] == "Final analysis"
+
+
+@pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
+async def test_start_ai_alert_triage_exception_handling(mock_execute_query):
+    """Test AI alert triage exception handling."""
+    mock_execute_query.side_effect = Exception("GraphQL connection error")
+
+    result = await start_ai_alert_triage("alert-123")
+
+    assert result["success"] is False
+    assert "Failed to start AI alert triage" in result["message"]
+    assert "GraphQL connection error" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
+async def test_start_ai_alert_triage_streaming_response_text(mock_execute_query):
+    """Test that AI alert summary properly handles streaming response text."""
+    mock_execute_query.side_effect = [
+        {"aiSummarizeAlert": {"streamId": "stream-streaming"}},
+        # First stream response - partial
+        {
+            "aiInferenceStream": {
+                "error": None,
+                "finished": False,
+                "responseText": "This alert shows ",
+                "streamId": "stream-streaming",
+            }
+        },
+        # Second stream response - more complete
+        {
+            "aiInferenceStream": {
+                "error": None,
+                "finished": False,
+                "responseText": "This alert shows suspicious activity ",
+                "streamId": "stream-streaming",
+            }
+        },
+        # Final response - complete
+        {
+            "aiInferenceStream": {
+                "error": None,
+                "finished": True,
+                "responseText": "This alert shows suspicious activity that requires immediate investigation.",
+                "streamId": "stream-streaming",
+            }
+        },
+    ]
+
+    result = await start_ai_alert_triage("alert-123")
+
+    assert result["success"] is True
+    assert (
+        result["summary"]
+        == "This alert shows suspicious activity that requires immediate investigation."
+    )
+    assert result["stream_id"] == "stream-streaming"
+
+
+@pytest.mark.asyncio
+@patch_execute_query(ALERTS_MODULE_PATH)
+async def test_start_ai_alert_triage_basic_functionality(mock_execute_query):
+    """Test AI alert summary basic functionality without advanced options."""
+    mock_execute_query.side_effect = [
+        {"aiSummarizeAlert": {"streamId": "stream-basic"}},
+        {
+            "aiInferenceStream": {
+                "error": None,
+                "finished": True,
+                "responseText": "Basic analysis of the security event.",
+                "streamId": "stream-basic",
+            }
+        },
+    ]
+
+    result = await start_ai_alert_triage(alert_id="alert-123")
+
+    assert result["success"] is True
+    assert result["summary"] == "Basic analysis of the security event."
+    assert result["stream_id"] == "stream-basic"
+
+    # Verify basic parameters were passed correctly
+    first_call_args = mock_execute_query.call_args_list[0]
+    variables = first_call_args[0][1]
+    assert variables["input"]["alertId"] == "alert-123"
+    assert variables["input"]["outputLength"] == "medium"

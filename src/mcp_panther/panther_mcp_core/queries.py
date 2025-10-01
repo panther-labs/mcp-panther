@@ -281,3 +281,35 @@ mutation CancelDataLakeQuery($input: CancelDataLakeQueryInput!) {
     }
 }
 """)
+
+# AI Inference Queries
+AI_SUMMARIZE_ALERT_MUTATION = gql("""
+mutation AISummarizeAlert($input: AISummarizeAlertInput!) {
+    aiSummarizeAlert(input: $input) {
+        streamId
+    }
+}
+""")
+
+AI_INFERENCE_STREAM_QUERY = gql("""
+query AIInferenceStream($streamId: String!) {
+    aiInferenceStream(streamId: $streamId) {
+        error
+        finished
+        responseText
+        streamId
+    }
+}
+""")
+
+AI_INFERENCE_STREAMS_METADATA_QUERY = gql("""
+query AIInferenceStreamsMetadata($input: AIInferenceStreamsMetadataInput!) {
+    aiInferenceStreamsMetadata(input: $input) {
+        edges {
+            node {
+                streamId
+            }
+        }
+    }
+}
+""")
