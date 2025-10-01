@@ -11,10 +11,12 @@ from mcp_panther.panther_mcp_core.tools.alerts import (
     list_alert_comments,
     list_alerts,
     start_ai_alert_triage,
+    start_ai_alert_triage,
     update_alert_assignee,
     update_alert_status,
 )
 from tests.utils.helpers import (
+    patch_execute_query,
     patch_execute_query,
     patch_rest_client,
 )
