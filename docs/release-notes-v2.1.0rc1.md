@@ -48,6 +48,10 @@
 
 ### 🔧 Improvements
 
+- **Alert Management**:
+  - `list_alerts` default timeframe expanded from "today" to "last 7 days" for better alert visibility and discovery
+  - Improves user experience by showing recent alerts without requiring explicit date parameters
+
 - **Documentation**:
   - Added comprehensive test scenarios for all new tools in release testing guide
   - Updated README.md with all new tools and sample prompts
@@ -94,14 +98,22 @@ Special thanks to all contributors who made this release possible:
    ```python
    # Old behavior (v2.0) - automatically filtered
    result = await client.call_tool("list_alerts", {})
-   # Returned only CRITICAL/HIGH/MEDIUM/LOW alerts with OPEN/TRIAGED/RESOLVED/CLOSED status
+   # Returned only CRITICAL/HIGH/MEDIUM/LOW alerts with OPEN/TRIAGED/RESOLVED/CLOSED status from TODAY
 
-   # New behavior (v2.1) - returns all alerts unless explicitly filtered
+   # New behavior (v2.1) - returns all alerts from LAST 7 DAYS unless explicitly filtered
+   result = await client.call_tool("list_alerts", {})
+   # Returns all alerts from last 7 days with all severities and statuses
+
+   # To replicate v2.0 behavior with explicit filters:
    result = await client.call_tool("list_alerts", {
+       "start_date": "2025-10-01T00:00:00Z",  # Today
+       "end_date": "2025-10-01T23:59:59Z",
        "severities": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
        "statuses": ["OPEN", "TRIAGED", "RESOLVED", "CLOSED"]
    })
    ```
+
+   **Note**: The default timeframe has expanded from "today" to "last 7 days" for better alert discovery.
 
 3. **Use pagination for large data lake queries**: Take advantage of new context window protection:
 
