@@ -92,14 +92,14 @@ async def test_list_alerts_with_invalid_page_size(mock_rest_client):
 async def test_list_alerts_with_default_params(mock_rest_client):
     """Test that default parameters are correctly set."""
     mock_rest_client.get.return_value = (MOCK_ALERTS_RESPONSE, 200)
-    
+
     await list_alerts()
-    
+
     mock_rest_client.get.assert_called_once()
     args, kwargs = mock_rest_client.get.call_args
     params = kwargs["params"]
     assert "severity" not in params
-    assert "status" not in params 
+    assert "status" not in params
     assert "subtypes" not in params
     assert "log_sources" not in params
     assert "log_types" not in params
@@ -112,8 +112,6 @@ async def test_list_alerts_with_default_params(mock_rest_client):
     assert params["limit"] == 25
     assert params["type"] == "ALERT"
     assert params["sort-dir"] == "desc"
-
-
 
 
 @pytest.mark.asyncio
