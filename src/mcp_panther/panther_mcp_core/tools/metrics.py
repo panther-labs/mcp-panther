@@ -7,11 +7,7 @@ from typing import Annotated, Any
 
 from pydantic import BeforeValidator, Field
 
-from ..client import (
-    _execute_query,
-    _get_today_date_range,
-    _get_week_date_range
-)
+from ..client import _execute_query, _get_today_date_range, _get_week_date_range
 from ..permissions import Permission, all_perms
 from ..queries import (
     METRICS_ALERTS_PER_RULE_QUERY,

@@ -3,7 +3,6 @@ import pytest
 from unittest.mock import patch
 
 
-
 from mcp_panther.panther_mcp_core.tools.alerts import (
     add_alert_comment,
     bulk_update_alerts,
