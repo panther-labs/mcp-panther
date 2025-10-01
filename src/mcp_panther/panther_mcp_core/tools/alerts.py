@@ -227,9 +227,9 @@ async def list_alerts(
         if detection_id:
             params["detection-id"] = detection_id
             logger.info(f"Filtering by detection ID: {detection_id}")
-        
+
         # Add a default date filter (7days) if no detection_id
-        if not detection_id and not(start_date or end_date):
+        if not detection_id and not (start_date or end_date):
             start_date, end_date = _get_week_date_range()
 
         if start_date:

@@ -1,7 +1,8 @@
+import datetime
+import pytest
 from unittest.mock import patch
 
-import pytest
-import datetime
+
 
 from mcp_panther.panther_mcp_core.tools.alerts import (
     add_alert_comment,
@@ -11,17 +12,13 @@ from mcp_panther.panther_mcp_core.tools.alerts import (
     list_alert_comments,
     list_alerts,
     start_ai_alert_triage,
-    start_ai_alert_triage,
     update_alert_assignee,
     update_alert_status,
 )
 from tests.utils.helpers import (
     patch_execute_query,
-    patch_execute_query,
     patch_rest_client,
 )
-
-from unittest.mock import AsyncMock, patch
 
 MOCK_ALERT = {
     "id": "df1eb66cede030f1a6d29362ba437178",
@@ -94,7 +91,7 @@ async def test_list_alerts_with_invalid_page_size(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ALERTS_MODULE_PATH)
-@patch("mcp_panther.panther_mcp_core.client.datetime") 
+@patch("mcp_panther.panther_mcp_core.client.datetime")
 async def test_list_alerts_with_default_params(mock_rest_client, mock_datetime):
     # Mock the current time to be a specific date
     fixed_time = datetime.datetime(2025, 8, 20, 12, 30, 0, tzinfo=datetime.timezone.utc)
@@ -103,7 +100,7 @@ async def test_list_alerts_with_default_params(mock_rest_client, mock_datetime):
 
     mock_rest_client.get.return_value = (MOCK_ALERTS_RESPONSE, 200)
     await list_alerts()
-    
+
     # Test that we called the API with the correct default parameters
     mock_rest_client.get.assert_called_once()
     call_args = mock_rest_client.get.call_args[1]["params"]
