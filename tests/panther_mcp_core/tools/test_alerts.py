@@ -1,7 +1,7 @@
 import datetime
-import pytest
 from unittest.mock import patch
 
+import pytest
 
 from mcp_panther.panther_mcp_core.tools.alerts import (
     add_alert_comment,
