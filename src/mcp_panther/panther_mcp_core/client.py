@@ -227,6 +227,31 @@ def _get_today_date_range() -> Tuple[str, str]:
     return start_date, end_date
 
 
+def _get_week_date_range() -> Tuple[str, str]:
+    """Get date range for the last 7 days (UTC) from current time"""
+    utc_now = datetime.datetime.now(datetime.timezone.utc)
+
+    # Get 7 days ago, rounded down to start of hour for consistent inputs
+    created_after = utc_now - datetime.timedelta(days=7)
+    created_after = created_after.replace(minute=0, second=0, microsecond=0)
+
+    # Get current time rounded up to end of hour
+    created_before = utc_now.replace(minute=59, second=59, microsecond=0)
+
+    # Format for GraphQL query (ISO 8601 with milliseconds and Z suffix)
+    created_after = created_after.isoformat(timespec="milliseconds").replace(
+        "+00:00", "Z"
+    )
+    created_before = created_before.isoformat(timespec="milliseconds").replace(
+        "+00:00", "Z"
+    )
+
+    logger.debug(
+        f"Calculated week range - Start: {created_after}, End: {created_before}"
+    )
+    return created_after, created_before
+
+
 async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any]:
     """Execute a GraphQL query with the given variables.
 

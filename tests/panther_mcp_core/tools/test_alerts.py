@@ -1,3 +1,4 @@
+import datetime
 from unittest.mock import patch
 
 import pytest
@@ -89,31 +90,36 @@ async def test_list_alerts_with_invalid_page_size(mock_rest_client):
 
 @pytest.mark.asyncio
 @patch_rest_client(ALERTS_MODULE_PATH)
-async def test_list_alerts_with_default_params(mock_rest_client):
-    """Test that default parameters are correctly set."""
+@patch("mcp_panther.panther_mcp_core.client.datetime")
+async def test_list_alerts_with_default_params(mock_rest_client, mock_datetime):
+    # Mock the current time to be a specific date
+    fixed_time = datetime.datetime(2025, 8, 20, 12, 30, 0, tzinfo=datetime.timezone.utc)
+    mock_datetime.datetime.now.return_value = fixed_time
+    mock_datetime.timedelta = datetime.timedelta
+
     mock_rest_client.get.return_value = (MOCK_ALERTS_RESPONSE, 200)
-    
     await list_alerts()
-    
+
+    # Test that we called the API with the correct default parameters
     mock_rest_client.get.assert_called_once()
-    args, kwargs = mock_rest_client.get.call_args
-    params = kwargs["params"]
-    assert "severity" not in params
-    assert "status" not in params 
-    assert "subtypes" not in params
-    assert "log_sources" not in params
-    assert "log_types" not in params
-    assert "resource_types" not in params
-    assert "name_contains" not in params
-    assert "event_count_min" not in params
-    assert "event_count_max" not in params
-    assert "detection_id" not in params
-    assert "assignee" not in params
-    assert params["limit"] == 25
-    assert params["type"] == "ALERT"
-    assert params["sort-dir"] == "desc"
-
-
+    call_args = mock_rest_client.get.call_args[1]["params"]
+    assert "severity" not in call_args
+    assert "status" not in call_args
+    assert "subtypes" not in call_args
+    assert "log_sources" not in call_args
+    assert "log_types" not in call_args
+    assert "resource_types" not in call_args
+    assert "name_contains" not in call_args
+    assert "event_count_min" not in call_args
+    assert "event_count_max" not in call_args
+    assert "detection_id" not in call_args
+    assert "assignee" not in call_args
+    assert call_args["limit"] == 25
+    assert call_args["type"] == "ALERT"
+    assert call_args["sort-dir"] == "desc"
+    # Should default to past 7 days of alerts
+    assert call_args["created-after"] == "2025-08-13T12:00:00.000Z"
+    assert call_args["created-before"] == "2025-08-20T12:59:59.000Z"
 
 
 @pytest.mark.asyncio
