@@ -2,16 +2,23 @@
 Tools for interacting with Panther alerts.
 """
 
+import asyncio
 import logging
 from typing import Annotated, Any
 
 from pydantic import BeforeValidator, Field
 
 from ..client import (
+    _execute_query,
     _get_today_date_range,
     get_rest_client,
 )
 from ..permissions import Permission, all_perms
+from ..queries import (
+    AI_INFERENCE_STREAM_QUERY,
+    AI_INFERENCE_STREAMS_METADATA_QUERY,
+    AI_SUMMARIZE_ALERT_MUTATION,
+)
 from ..validators import (
     _validate_alert_api_types,
     _validate_alert_status,
@@ -935,4 +942,285 @@ async def bulk_update_alerts(
         return {
             "success": False,
             "message": f"Failed to bulk update alerts: {str(e)}",
+        }
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RUN_PANTHER_AI),
+        "readOnlyHint": True,
+    }
+)
+async def start_ai_alert_triage(
+    alert_id: Annotated[
+        str,
+        Field(min_length=1, description="The ID of the alert to start AI triage for"),
+    ],
+    output_length: Annotated[
+        str,
+        Field(
+            description="The desired length of the AI triage output",
+            examples=["xsmall", "small", "medium", "large", "xlarge", "largest"],
+        ),
+    ] = "medium",
+    prompt: Annotated[
+        str | None,
+        Field(
+            min_length=1,
+            description="Optional additional prompt to provide context for the AI triage",
+        ),
+    ] = None,
+    timeout_seconds: Annotated[
+        int,
+        Field(
+            description="Timeout in seconds to wait for AI triage completion",
+            ge=30,
+            le=300,
+        ),
+    ] = 120,
+) -> dict[str, Any]:
+    """Start an AI-powered triage analysis for a Panther alert.
+
+    This tool initiates Panther's embedded AI agent to triage an alert and provide
+    an intelligent report about the events, risk level, potential impact, and
+    recommended next steps for investigation.
+
+    The AI triage includes analysis of:
+    - Alert metadata (severity, detection rule, timestamps)
+    - Related events and logs (if available)
+    - Comments from previous investigations
+    - Contextual security analysis and recommendations
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if triage was generated successfully
+        - summary: The AI-generated triage summary text
+        - stream_id: The stream ID used for this analysis
+        - metadata: Information about the analysis request
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Starting AI triage for alert {alert_id}")
+
+    try:
+        # Validate output length
+        valid_lengths = {"xsmall", "small", "medium", "large", "xlarge", "largest"}
+        if output_length not in valid_lengths:
+            return {
+                "success": False,
+                "message": f"Invalid output_length '{output_length}'. Must be one of: {', '.join(sorted(valid_lengths))}",
+            }
+
+        # Prepare the AI summarize request with minimal required fields
+        request_input = {
+            "alertId": alert_id,
+            "outputLength": output_length,
+            "metadata": {
+                "kind": "alert"  # Required: tells AI this is an alert analysis
+            },
+        }
+
+        # Add optional prompt if provided
+        if prompt:
+            request_input["prompt"] = prompt
+
+        variables = {"input": request_input}
+
+        if prompt:
+            logger.info(f"Using additional prompt: {prompt[:100]}...")
+
+        logger.info(f"Initiating AI triage with output_length={output_length}")
+
+        # Step 1: Start the AI triage
+        result = await _execute_query(AI_SUMMARIZE_ALERT_MUTATION, variables)
+
+        if not result or "aiSummarizeAlert" not in result:
+            logger.error("Failed to initiate AI triage")
+            return {
+                "success": False,
+                "message": "Failed to initiate AI triage",
+            }
+
+        stream_id = result["aiSummarizeAlert"]["streamId"]
+        logger.info(f"AI triage started with stream ID: {stream_id}")
+
+        # Step 2: Poll for results with timeout
+        start_time = asyncio.get_event_loop().time()
+        poll_interval = 2.0  # Start with 2 second intervals
+        max_poll_interval = 10.0  # Maximum 10 second intervals
+
+        accumulated_response = ""
+
+        while True:
+            current_time = asyncio.get_event_loop().time()
+            elapsed = current_time - start_time
+
+            if elapsed > timeout_seconds:
+                logger.warning(f"AI triage timed out after {timeout_seconds} seconds")
+                return {
+                    "success": False,
+                    "message": f"AI triage generation timed out after {timeout_seconds} seconds",
+                    "stream_id": stream_id,
+                    "partial_summary": accumulated_response
+                    if accumulated_response
+                    else None,
+                }
+
+            # Poll the inference stream
+            stream_variables = {"streamId": stream_id}
+            stream_result = await _execute_query(
+                AI_INFERENCE_STREAM_QUERY, stream_variables
+            )
+
+            if not stream_result or "aiInferenceStream" not in stream_result:
+                logger.error("Failed to poll AI inference stream")
+                await asyncio.sleep(poll_interval)
+                continue
+
+            inference_data = stream_result["aiInferenceStream"]
+
+            # Check for errors
+            if inference_data.get("error"):
+                logger.error(f"AI inference error: {inference_data['error']}")
+                return {
+                    "success": False,
+                    "message": f"AI inference failed: {inference_data['error']}",
+                    "stream_id": stream_id,
+                }
+
+            # Get the latest response text (AI streams the full response each time)
+            response_text = inference_data.get("responseText", "")
+            if response_text:
+                accumulated_response = response_text
+
+            # Check if finished
+            if inference_data.get("finished", False):
+                logger.info(f"AI triage completed after {elapsed:.1f} seconds")
+                break
+
+            # Wait before next poll, with exponential backoff
+            await asyncio.sleep(poll_interval)
+            poll_interval = min(poll_interval * 1.2, max_poll_interval)
+
+        # Return the completed triage
+        return {
+            "success": True,
+            "summary": accumulated_response,
+            "stream_id": stream_id,
+            "metadata": {
+                "alert_id": alert_id,
+                "output_length": output_length,
+                "generation_time_seconds": round(elapsed, 1),
+                "prompt_included": prompt is not None,
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to start AI alert triage: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to start AI alert triage: {str(e)}",
+        }
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.RUN_PANTHER_AI),
+        "readOnlyHint": True,
+    }
+)
+async def get_ai_alert_triage_summary(
+    alert_id: Annotated[
+        str,
+        Field(
+            min_length=1,
+            description="The ID of the alert to retrieve the latest AI triage summary for",
+        ),
+    ],
+) -> dict[str, Any]:
+    """Retrieve the latest AI triage summary for a specific Panther alert.
+
+    This tool retrieves the most recently generated AI triage analysis for an alert.
+    It fetches the list of AI inference stream IDs associated with the alert,
+    then retrieves the response text for the latest stream.
+
+    Returns:
+        Dict containing:
+        - success: Boolean indicating if retrieval was successful
+        - summary: The latest AI triage summary containing:
+            - stream_id: The unique stream identifier
+            - response_text: The AI-generated triage summary
+            - finished: Whether the triage generation completed
+            - error: Any error message if present
+        - message: Error message if unsuccessful
+    """
+    logger.info(f"Retrieving latest AI triage summary for alert {alert_id}")
+
+    try:
+        # Step 1: Get all stream IDs for this alert
+        metadata_variables = {"input": {"alias": alert_id}}
+        metadata_result = await _execute_query(
+            AI_INFERENCE_STREAMS_METADATA_QUERY, metadata_variables
+        )
+
+        if not metadata_result or "aiInferenceStreamsMetadata" not in metadata_result:
+            logger.error("Failed to retrieve AI inference streams metadata")
+            return {
+                "success": False,
+                "message": "Failed to retrieve AI inference streams metadata",
+            }
+
+        edges = metadata_result["aiInferenceStreamsMetadata"].get("edges", [])
+        stream_ids = [edge["node"]["streamId"] for edge in edges]
+
+        if not stream_ids:
+            logger.info(f"No AI triage summary found for alert {alert_id}")
+            return {
+                "success": False,
+                "message": "No AI triage summary found for this alert",
+            }
+
+        # Get the latest stream ID (last in the list)
+        latest_stream_id = stream_ids[-1]
+        logger.info(
+            f"Found {len(stream_ids)} AI triage summary/summaries, retrieving latest: {latest_stream_id}"
+        )
+
+        # Step 2: Fetch response text for the latest stream ID
+        stream_variables = {"streamId": latest_stream_id}
+        stream_result = await _execute_query(
+            AI_INFERENCE_STREAM_QUERY, stream_variables
+        )
+
+        if not stream_result or "aiInferenceStream" not in stream_result:
+            logger.error(f"Failed to retrieve stream {latest_stream_id}")
+            return {
+                "success": False,
+                "message": f"Failed to retrieve stream data for {latest_stream_id}",
+            }
+
+        inference_data = stream_result["aiInferenceStream"]
+        response_text = inference_data.get("responseText", "")
+        error = inference_data.get("error")
+
+        summary = {
+            "stream_id": latest_stream_id,
+            "response_text": response_text,
+            "finished": inference_data.get("finished", False),
+            "error": error,
+        }
+
+        logger.info(
+            f"Successfully retrieved latest AI triage summary for alert {alert_id}"
+        )
+
+        return {
+            "success": True,
+            "summary": summary,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve AI alert triage summaries: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to retrieve AI alert triage summaries: {str(e)}",
         }
