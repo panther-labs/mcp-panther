@@ -85,11 +85,38 @@ Expected Result: Alerts filtered correctly and assignee updated in bulk
 Validation: Date range filtering and bulk assignment work properly
 ```
 
+**Test Scenario 6: Bulk Alert Updates with Multiple Operations**
+
+```
+Prompt: "Update alerts [ALERT_ID_1], [ALERT_ID_2], and [ALERT_ID_3] to resolved status, assign to [USER_EMAIL], and add comment 'Investigated and resolved'"
+Expected Tools: bulk_update_alerts
+Expected Result: All three operations (status, assignee, comment) applied to all alerts
+Validation: Check successful_operations count, verify no failed_operations
+```
+
+**Test Scenario 7: AI Alert Triage Analysis**
+
+```
+Prompt: "Start an AI triage analysis for alert [ALERT_ID] to help investigate this incident"
+Expected Tools: start_ai_alert_triage
+Expected Result: AI-generated triage summary with risk assessment, context, and recommendations
+Validation: Triage summary includes analysis of events, entities, and suggested next steps
+```
+
+**Test Scenario 8: Retrieve AI Triage Summary**
+
+```
+Prompt: "Get the AI triage summary for alert [ALERT_ID] that was previously analyzed"
+Expected Tools: get_ai_alert_triage_summary
+Expected Result: Previously generated AI triage summary retrieved successfully
+Validation: Summary contains stream_id, response_text, and completion status
+```
+
 ### Detection Management Tools
 
 #### Detection Discovery and Analysis
 
-**Test Scenario 6: Rule Discovery**
+**Test Scenario 9: Rule Discovery**
 
 ```
 Prompt: "Show me all enabled AWS-related detection rules with high severity"
@@ -98,7 +125,7 @@ Expected Result: Filtered list of AWS detection rules
 Validation: Check detection_types=["rules"], severity filtering, and state="enabled"
 ```
 
-**Test Scenario 7: Detection Details**
+**Test Scenario 10: Detection Details**
 
 ```
 Prompt: "Get the complete code and configuration for detection rule [RULE_ID]"
@@ -107,7 +134,7 @@ Expected Result: Complete rule details including Python code, tests, metadata
 Validation: Verify rule body and test cases are included
 ```
 
-**Test Scenario 8: Policy Analysis**
+**Test Scenario 11: Policy Analysis**
 
 ```
 Prompt: "List all cloud security policies that check S3 bucket configurations"
@@ -116,7 +143,7 @@ Expected Result: Policies filtered by resource type and detection type
 Validation: Check detection_types=["policies"] and resource_types filtering
 ```
 
-**Test Scenario 9: Detection State Management**
+**Test Scenario 12: Detection State Management**
 
 ```
 Prompt: "Disable the detection rule [RULE_ID] temporarily"
@@ -129,7 +156,7 @@ Validation: Operation completes successfully with proper permissions
 
 #### Query Execution and Analysis
 
-**Test Scenario 10: Basic Log Querying**
+**Test Scenario 13: Basic Log Querying**
 
 ```
 Prompt: "Query AWS CloudTrail logs for failed login attempts in the last day"
@@ -138,7 +165,7 @@ Expected Result: SQL query with proper p_event_time filter and CloudTrail table
 Validation: Query includes time filter and targets correct table
 ```
 
-**Test Scenario 11: Schema Discovery**
+**Test Scenario 14: Schema Discovery**
 
 ```
 Prompt: "Show me the schema for AWS CloudTrail logs so I can write better queries"
@@ -147,7 +174,7 @@ Expected Result: Complete table schema with column names and types
 Validation: Schema includes all expected CloudTrail fields
 ```
 
-**Test Scenario 12: Database Structure**
+**Test Scenario 15: Database Structure**
 
 ```
 Prompt: "List all available databases and tables in the data lake"
@@ -156,11 +183,11 @@ Expected Result: Complete database and table listing
 Validation: Shows panther_logs.public and other available databases
 ```
 
-**Test Scenario 13: Alert Event Correlation**
+**Test Scenario 16: Alert Event Correlation**
 
 ```
 Prompt: "Analyze events across alerts [ALERT_ID_1] and [ALERT_ID_2] to find common patterns"
-Expected Tools: summarize_alert_events
+Expected Tools: get_alert_event_stats
 Expected Result: Time-grouped analysis showing common entities and patterns
 Validation: Results show temporal patterns and shared indicators
 ```
@@ -169,7 +196,7 @@ Validation: Results show temporal patterns and shared indicators
 
 #### Log Source Management
 
-**Test Scenario 14: Source Health Check**
+**Test Scenario 17: Source Health Check**
 
 ```
 Prompt: "Show me all log sources and their health status"
@@ -178,7 +205,7 @@ Expected Result: Complete list of log sources with health indicators
 Validation: Health status is clearly indicated for each source
 ```
 
-**Test Scenario 15: HTTP Source Configuration**
+**Test Scenario 18: HTTP Source Configuration**
 
 ```
 Prompt: "Get detailed configuration for HTTP log source [SOURCE_ID]"
@@ -187,7 +214,7 @@ Expected Result: Complete HTTP source configuration including auth settings
 Validation: All configuration details are present and properly formatted
 ```
 
-**Test Scenario 16: Schema Management**
+**Test Scenario 19: Schema Management**
 
 ```
 Prompt: "List all available log type schemas for AWS services"
@@ -196,7 +223,7 @@ Expected Result: Filtered list of AWS-related schemas
 Validation: Contains filtering and shows relevant AWS log types
 ```
 
-**Test Scenario 17: Detailed Schema Analysis**
+**Test Scenario 20: Detailed Schema Analysis**
 
 ```
 Prompt: "Get detailed schema information for AWS.CloudTrail and AWS.VPCFlow"
@@ -209,16 +236,17 @@ Validation: Full schema details with field mappings and transformations
 
 #### Alert Metrics Analysis
 
-**Test Scenario 18: Severity Distribution**
+**Test Scenario 21: Severity Distribution**
 
 ```
 Prompt: "Show me alert counts by severity for the last week"
 Expected Tools: get_severity_alert_metrics
 Expected Result: Alert metrics grouped by severity with time range
 Validation: Date range covers last week and includes all severity levels
+Note: Use alert_types=["Rule", "Policy"] (not "ALERT") for proper validation
 ```
 
-**Test Scenario 19: Rule Performance Analysis**
+**Test Scenario 22: Rule Performance Analysis**
 
 ```
 Prompt: "Identify the top 10 detection rules generating the most alerts this month"
@@ -227,7 +255,7 @@ Expected Result: Rules ranked by alert count with proper date filtering
 Validation: Time range covers current month and shows top alerting rules
 ```
 
-**Test Scenario 20: Data Ingestion Monitoring**
+**Test Scenario 23: Data Ingestion Monitoring**
 
 ```
 Prompt: "Show me data ingestion volume by log type for today"
@@ -240,7 +268,7 @@ Validation: Current day data with proper breakdown
 
 #### User Information Management
 
-**Test Scenario 21: User Directory**
+**Test Scenario 24: User Directory**
 
 ```
 Prompt: "List all active users in the Panther instance"
@@ -249,7 +277,7 @@ Expected Result: Complete user listing with basic information
 Validation: Shows user emails, names, and status information
 ```
 
-**Test Scenario 22: User Details**
+**Test Scenario 25: User Details**
 
 ```
 Prompt: "Get detailed information about user [USER_EMAIL]"
@@ -258,7 +286,7 @@ Expected Result: Complete user profile including roles and permissions
 Validation: All user details properly displayed
 ```
 
-**Test Scenario 23: Role Analysis**
+**Test Scenario 26: Role Analysis**
 
 ```
 Prompt: "Show me all available roles and their permissions"
@@ -271,7 +299,7 @@ Validation: All roles shown with comprehensive permission details
 
 #### Code Management Tools
 
-**Test Scenario 24: Helper Function Discovery**
+**Test Scenario 27: Helper Function Discovery**
 
 ```
 Prompt: "List all global helper functions related to AWS"
@@ -280,7 +308,7 @@ Expected Result: AWS-related helper functions with descriptions
 Validation: Proper filtering and relevant results
 ```
 
-**Test Scenario 25: Helper Code Analysis**
+**Test Scenario 28: Helper Code Analysis**
 
 ```
 Prompt: "Get the complete code for global helper [HELPER_ID]"
@@ -289,7 +317,7 @@ Expected Result: Complete Python code and documentation for the helper
 Validation: Full code with proper formatting and documentation
 ```
 
-**Test Scenario 26: Data Model Management**
+**Test Scenario 29: Data Model Management**
 
 ```
 Prompt: "Show me all available data models and get details for the user data model"
@@ -302,7 +330,7 @@ Validation: Complete data model information with field mappings
 
 #### Query Management
 
-**Test Scenario 27: Scheduled Query Discovery**
+**Test Scenario 30: Scheduled Query Discovery**
 
 ```
 Prompt: "List all scheduled queries and show me details for any security-related ones"
@@ -315,7 +343,7 @@ Validation: Schedule information and complete SQL provided
 
 ### Cross-Tool Workflows
 
-**Test Scenario 28: Alert Investigation Workflow**
+**Test Scenario 31: Alert Investigation Workflow**
 
 ```
 Prompt: "I need to investigate a suspicious login alert. First show me recent authentication-related alerts, then get details on the highest priority one, analyze its events, and check if we have any related detection rules."
@@ -330,7 +358,7 @@ Expected Flow:
 Validation: Seamless workflow with contextual tool selection
 ```
 
-**Test Scenario 29: Rule Performance Analysis Workflow**
+**Test Scenario 32: Rule Performance Analysis Workflow**
 
 ```
 Prompt: "Help me analyze rule performance issues. Show me which rules are generating the most alerts this week, get details on the top alerting rule, and check if we can optimize it by looking at recent alerts it generated."
@@ -345,7 +373,7 @@ Expected Flow:
 Validation: Data-driven analysis with proper tool chaining
 ```
 
-**Test Scenario 30: Data Pipeline Health Check**
+**Test Scenario 33: Data Pipeline Health Check**
 
 ```
 Prompt: "Perform a complete health check of our data pipeline. Check log source status, look for any system errors, analyze ingestion volumes, and identify any classification issues."
@@ -364,7 +392,7 @@ Validation: Comprehensive pipeline analysis
 
 ### Input Validation Testing
 
-**Test Scenario 31: Invalid Parameters**
+**Test Scenario 34: Invalid Parameters**
 
 ```
 Test each tool category with invalid parameters:
@@ -378,7 +406,7 @@ Expected Result: Clear error messages with specific validation feedback
 Validation: Errors are informative and help correct the input
 ```
 
-**Test Scenario 32: Permission Boundary Testing**
+**Test Scenario 35: Permission Boundary Testing**
 
 ```
 Test operations that require elevated permissions:
@@ -390,7 +418,7 @@ Expected Result: Clear permission denied messages when appropriate
 Validation: Error messages indicate required permissions
 ```
 
-**Test Scenario 33: Resource Not Found Handling**
+**Test Scenario 36: Resource Not Found Handling**
 
 ```
 Test with non-existent resources:
@@ -406,7 +434,7 @@ Validation: Clear messaging about resource availability
 
 ### Response Time Validation
 
-**Test Scenario 34: Large Query Handling**
+**Test Scenario 37: Large Query Handling**
 
 ```
 Prompt: "Query the last 7 days of AWS CloudTrail logs and count events by user"
@@ -415,7 +443,7 @@ Expected Result: Query completes within reasonable time or provides timeout feed
 Validation: Performance is acceptable or timeout is handled gracefully
 ```
 
-**Test Scenario 35: Bulk Operations**
+**Test Scenario 38: Bulk Operations**
 
 ```
 Prompt: "Get alert metrics for the last 30 days with 15-minute intervals"
@@ -424,7 +452,7 @@ Expected Result: Large dataset handled efficiently
 Validation: Response time is reasonable for data volume
 ```
 
-**Test Scenario 36: Pagination Testing**
+**Test Scenario 39: Pagination Testing**
 
 ```
 Prompt: "List all detection rules in the system, handling pagination as needed"
