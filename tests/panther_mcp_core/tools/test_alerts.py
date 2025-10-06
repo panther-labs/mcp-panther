@@ -944,31 +944,20 @@ async def test_start_ai_alert_triage_with_custom_params(mock_execute_query):
 
     result = await start_ai_alert_triage(
         alert_id="alert-456",
-        output_length="large",
         prompt="Focus on the network traffic patterns",
         timeout_seconds=120,
     )
 
     assert result["success"] is True
     assert result["summary"] == "Detailed analysis of the security event."
-    assert result["metadata"]["output_length"] == "large"
+    assert result["metadata"]["output_length"] == "medium"  # Always medium now
     assert result["metadata"]["prompt_included"] is True
 
     # Check the mutation call had the custom parameters
     first_call_args = mock_execute_query.call_args_list[0]
     variables = first_call_args[0][1]
-    assert variables["input"]["outputLength"] == "large"
+    assert variables["input"]["outputLength"] == "medium"  # Hardcoded to medium
     assert variables["input"]["prompt"] == "Focus on the network traffic patterns"
-
-
-@pytest.mark.asyncio
-async def test_start_ai_alert_triage_invalid_output_length():
-    """Test AI alert summary with invalid output length."""
-    result = await start_ai_alert_triage("alert-123", output_length="invalid")
-
-    assert result["success"] is False
-    assert "Invalid output_length" in result["message"]
-    assert "Must be one of" in result["message"]
 
 
 @pytest.mark.asyncio

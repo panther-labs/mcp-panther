@@ -955,13 +955,6 @@ async def start_ai_alert_triage(
         str,
         Field(min_length=1, description="The ID of the alert to start AI triage for"),
     ],
-    output_length: Annotated[
-        str,
-        Field(
-            description="The desired length of the AI triage output",
-            examples=["xsmall", "small", "medium", "large", "xlarge", "largest"],
-        ),
-    ] = "medium",
     prompt: Annotated[
         str | None,
         Field(
@@ -973,12 +966,12 @@ async def start_ai_alert_triage(
         int,
         Field(
             description="Timeout in seconds to wait for AI triage completion",
-            ge=30,
+            ge=120,
             le=300,
         ),
-    ] = 120,
+    ] = 180,
 ) -> dict[str, Any]:
-    """Start an AI-powered triage analysis for a Panther alert.
+    """Start an AI-powered triage analysis for a Panther alert with intelligent insights and recommendations.
 
     This tool initiates Panther's embedded AI agent to triage an alert and provide
     an intelligent report about the events, risk level, potential impact, and
@@ -1001,13 +994,8 @@ async def start_ai_alert_triage(
     logger.info(f"Starting AI triage for alert {alert_id}")
 
     try:
-        # Validate output length
-        valid_lengths = {"xsmall", "small", "medium", "large", "xlarge", "largest"}
-        if output_length not in valid_lengths:
-            return {
-                "success": False,
-                "message": f"Invalid output_length '{output_length}'. Must be one of: {', '.join(sorted(valid_lengths))}",
-            }
+        # Set output length to medium (fixed, not configurable by AI)
+        output_length = "medium"
 
         # Prepare the AI summarize request with minimal required fields
         request_input = {
