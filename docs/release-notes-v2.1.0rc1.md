@@ -5,7 +5,9 @@
 - **Data Lake Tools**: `summarize_alert_events` has been renamed to `get_alert_event_stats` to better reflect its statistical aggregation functionality and avoid confusion with the new AI-powered analysis tools
 
 - **Default Filters Removed**: `list_alerts` and `list_detections` now return all items by default instead of applying filters to improve discoverability:
-  - `list_alerts`: No longer filters by severity, status, or subtypes by default (previously filtered to `["CRITICAL", "HIGH", "MEDIUM", "LOW"]` severities and `["OPEN", "TRIAGED", "RESOLVED", "CLOSED"]` statuses)
+  - `list_alerts`:
+    - No longer filters by severity, status, or subtypes by default (previously filtered to `["CRITICAL", "HIGH", "MEDIUM", "LOW"]` severities and `["OPEN", "TRIAGED", "RESOLVED", "CLOSED"]` statuses)
+    - Default timeframe expanded from "today" (calendar day) to "last 7 days" (rolling 7-day window from current time)
   - `list_detections`: No longer filters by state or severity by default (previously filtered to `"enabled"` state and `["MEDIUM", "HIGH", "CRITICAL"]` severities)
 
 ## Tools
@@ -49,7 +51,9 @@
 ### 🔧 Improvements
 
 - **Alert Management**:
-  - `list_alerts` default timeframe expanded from "today" to "last 7 days" for better alert visibility and discovery
+  - `list_alerts` default timeframe expanded from "today" to "last 7 days" (rolling window from current time) for better alert visibility and discovery
+  - Default 7-day timeframe is automatically applied when no `detection_id`, `start_date`, or `end_date` parameters are provided
+  - When filtering by `detection_id`, date range is no longer required but can still be optionally specified
   - Improves user experience by showing recent alerts without requiring explicit date parameters
 
 - **Documentation**:
@@ -102,9 +106,9 @@ Special thanks to all contributors who made this release possible:
 
    # New behavior (v2.1) - returns all alerts from LAST 7 DAYS unless explicitly filtered
    result = await client.call_tool("list_alerts", {})
-   # Returns all alerts from last 7 days with all severities and statuses
+   # Returns all alerts from last 7 days (rolling window) with all severities and statuses
 
-   # To replicate v2.0 behavior with explicit filters:
+   # To replicate v2.0 behavior (today only with explicit filters):
    result = await client.call_tool("list_alerts", {
        "start_date": "2025-10-01T00:00:00Z",  # Today
        "end_date": "2025-10-01T23:59:59Z",
@@ -113,7 +117,7 @@ Special thanks to all contributors who made this release possible:
    })
    ```
 
-   **Note**: The default timeframe has expanded from "today" to "last 7 days" for better alert discovery.
+   **Note**: The default timeframe has expanded from "today" (calendar day) to "last 7 days" (rolling 7-day window from current time) for better alert discovery. The 7-day default is only applied when no `detection_id`, `start_date`, or `end_date` are provided.
 
 3. **Use pagination for large data lake queries**: Take advantage of new context window protection:
 
