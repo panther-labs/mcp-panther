@@ -507,24 +507,24 @@ Provide clear, comprehensive docstrings for all tools:
 
 ```python
 @mcp.tool
-async def summarize_alert_events(
+async def get_alert_event_stats(
     alert_ids: list[str],
     time_window: int = 30,
 ) -> dict[str, Any]:
     """
     Analyze patterns and relationships across multiple alerts by aggregating their event data.
-    
-    For each time window (configurable from 1-60 minutes), the tool collects unique entities 
-    (IPs, emails, usernames, trace IDs) and alert metadata (IDs, rules, severities) to help 
+
+    For each time window (configurable from 1-60 minutes), the tool collects unique entities
+    (IPs, emails, usernames, trace IDs) and alert metadata (IDs, rules, severities) to help
     identify related activities.
-    
-    Results are ordered chronologically with the most recent first, helping analysts identify 
+
+    Results are ordered chronologically with the most recent first, helping analysts identify
     temporal patterns, common entities, and potential incident scope.
-    
+
     Args:
         alert_ids: List of alert IDs to analyze
         time_window: Time window in minutes to group events by (1-60)
-        
+
     Returns:
         Dict containing analysis results with temporal patterns and common entities
     """
