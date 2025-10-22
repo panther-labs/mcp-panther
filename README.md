@@ -25,6 +25,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `get_alert` | Get detailed information about a specific alert | "What's the status of alert 8def456?" |
 | `get_alert_events` | Get a small sampling of events for a given alert | "Show me events associated with alert 8def456" |
 | `list_alerts` | List alerts with comprehensive filtering options (date range, severity, status, etc.) | "Show me all high severity alerts from the last 24 hours" |
+| `bulk_update_alerts` | Bulk update multiple alerts with status, assignee, and/or comment changes | "Update alerts abc123, def456, and ghi789 to resolved status and add comment 'Fixed'" |
 | `update_alert_assignee` | Update the assignee of one or more alerts | "Assign alerts abc123 and def456 to John" |
 | `update_alert_status` | Update the status of one or more alerts | "Mark alerts abc123 and def456 as resolved" |
 | `list_alert_comments` | List all comments for a specific alert | "Show me all comments for alert abc123" |
@@ -40,7 +41,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 | `get_table_schema` | Get schema information for a specific table | "Show me the schema for the AWS_CLOUDTRAIL table" |
 | `list_databases` | List all available data lake databases in Panther | "List all available databases" |
 | `list_database_tables` | List all available tables for a specific database in Panther's data lake | "What tables are in the panther_logs database" |
-| `summarize_alert_events` | Analyze patterns and relationships across multiple alerts by aggregating their event data | "Show me patterns in events from alerts abc123 and def456" |
+| `get_alert_event_stats` | Analyze patterns and relationships across multiple alerts by aggregating their event data into time-based statistics | "Show me patterns in events from alerts abc123 and def456" |
 
 </details>
 

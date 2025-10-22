@@ -145,7 +145,7 @@ class QueryStatus(str, Enum):
         "readOnlyHint": True,
     }
 )
-async def summarize_alert_events(
+async def get_alert_event_stats(
     alert_ids: Annotated[
         List[str],
         Field(
@@ -249,7 +249,7 @@ ORDER BY
     time_{time_window}_minute DESC,
     alert_count DESC
 """
-    return await query_data_lake(query, "panther_signals.public", max_rows=1000)
+    return await query_data_lake(query, "panther_signals.public", max_rows=100)
 
 
 @mcp_tool(
