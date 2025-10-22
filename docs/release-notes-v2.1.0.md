@@ -1,4 +1,4 @@
-# MCP Panther v2.1.0-rc1
+# MCP Panther v2.1.0
 
 ## 🚨 Breaking Changes
 
