@@ -202,8 +202,20 @@ async def list_detections(
     last_modified_by: Annotated[
         str | None, Field(description="Filter by last modifier user ID or actor ID")
     ] = None,
+    output_ids: Annotated[
+        list[str],
+        Field(
+            description="Client-side filter by destination output IDs. Filters results after fetching from API to include only detections with at least one matching outputID.",
+            examples=[["destination-id-123"], ["prod-slack", "prod-pagerduty"]],
+        ),
+    ] = [],
 ) -> dict[str, Any]:
-    """List detections from your Panther instance with support for multiple detection types and filtering."""
+    """List detections from your Panther instance with support for multiple detection types and filtering.
+
+    Note: The output_ids filter is applied client-side after fetching all results from the API,
+    as the Panther REST API does not support server-side filtering by outputID. For more efficient
+    API-level filtering, consider using the 'tag' parameter if your detections are tagged by environment.
+    """
     # Validate detection types
     validation_error = validate_detection_types(detection_types)
     if validation_error:
@@ -317,6 +329,7 @@ async def list_detections(
                         "tags": item.get("tags", []),
                         "reports": item.get("reports", {}),
                         "managed": item.get("managed", False),
+                        "outputIDs": item.get("outputIDs", []),
                         "createdBy": item.get("createdBy"),
                         "createdAt": item.get("createdAt"),
                         "lastModified": item.get("lastModified"),
@@ -335,6 +348,7 @@ async def list_detections(
                         "tags": item.get("tags", []),
                         "reports": item.get("reports", {}),
                         "managed": item.get("managed", False),
+                        "outputIDs": item.get("outputIDs", []),
                         "threshold": item.get("threshold"),
                         "dedupPeriodMinutes": item.get("dedupPeriodMinutes"),
                         "createdBy": item.get("createdBy"),
@@ -355,6 +369,7 @@ async def list_detections(
                         "tags": item.get("tags"),
                         "reports": item.get("reports", {}),
                         "managed": item.get("managed"),
+                        "outputIDs": item.get("outputIDs", []),
                         "threshold": item.get("threshold"),
                         "dedupPeriodMinutes": item.get("dedupPeriodMinutes"),
                         "createdBy": item.get("createdBy"),
@@ -363,6 +378,20 @@ async def list_detections(
                     }
                     for item in detections
                 ]
+
+            # Apply client-side output_ids filtering if requested
+            if output_ids:
+                filtered_metadata = [
+                    item
+                    for item in filtered_metadata
+                    if any(
+                        output_id in item.get("outputIDs", [])
+                        for output_id in output_ids
+                    )
+                ]
+                logger.info(
+                    f"Applied client-side output_ids filter for {detection_type}: {len(filtered_metadata)} results matched"
+                )
 
             # Add to response
             response_data[field_map[detection_type]] = filtered_metadata

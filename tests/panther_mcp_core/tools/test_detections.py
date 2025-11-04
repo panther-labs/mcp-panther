@@ -16,6 +16,7 @@ MOCK_RULE = {
     "enabled": True,
     "logTypes": ["Panther.Audit"],
     "managed": False,
+    "outputIDs": ["prod-slack", "prod-pagerduty"],
     "runbook": "",
     "severity": "MEDIUM",
     "threshold": 1,
@@ -45,6 +46,7 @@ MOCK_RULE_HIGH_SEVERITY = {
     "id": "High.severity",
     "displayName": "Another rule with high severity",
     "severity": "HIGH",
+    "outputIDs": ["dev-slack"],
 }
 
 MOCK_RULES_RESPONSE = {
@@ -77,6 +79,7 @@ async def test_list_detections_rules_success(mock_rest_client):
     assert first_rule["threshold"] == MOCK_RULE["threshold"]
     assert first_rule["dedupPeriodMinutes"] == MOCK_RULE["dedupPeriodMinutes"]
     assert first_rule["createdBy"] == MOCK_RULE["createdBy"]
+    assert first_rule["outputIDs"] == MOCK_RULE["outputIDs"]
 
 
 @pytest.mark.asyncio
@@ -104,6 +107,41 @@ async def test_list_detections_rules_error(mock_rest_client):
 
     assert result["success"] is False
     assert "Failed" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(RULES_MODULE_PATH)
+async def test_list_detections_with_output_ids_filter(mock_rest_client):
+    """Test client-side filtering by output_ids."""
+    mock_rest_client.get.return_value = (MOCK_RULES_RESPONSE, 200)
+
+    # Filter for prod-slack (only in MOCK_RULE, not in MOCK_RULE_HIGH_SEVERITY)
+    result = await list_detections(["rules"], output_ids=["prod-slack"])
+
+    assert result["success"] is True
+    assert len(result["rules"]) == 1
+    assert result["rules"][0]["id"] == MOCK_RULE["id"]
+    assert "prod-slack" in result["rules"][0]["outputIDs"]
+
+    # Filter for dev-slack (only in MOCK_RULE_HIGH_SEVERITY)
+    result = await list_detections(["rules"], output_ids=["dev-slack"])
+
+    assert result["success"] is True
+    assert len(result["rules"]) == 1
+    assert result["rules"][0]["id"] == MOCK_RULE_HIGH_SEVERITY["id"]
+    assert "dev-slack" in result["rules"][0]["outputIDs"]
+
+    # Filter for both (should return both rules)
+    result = await list_detections(["rules"], output_ids=["prod-slack", "dev-slack"])
+
+    assert result["success"] is True
+    assert len(result["rules"]) == 2
+
+    # Filter for non-existent output ID (should return no results)
+    result = await list_detections(["rules"], output_ids=["nonexistent-output"])
+
+    assert result["success"] is True
+    assert len(result["rules"]) == 0
 
 
 @pytest.mark.asyncio
