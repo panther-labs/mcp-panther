@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.metrics import (
-    get_bytes_processed_per_log_type_and_source,
+    get_bytes_processed_metrics,
     get_rule_alert_metrics,
     get_severity_alert_metrics,
 )
@@ -473,8 +473,8 @@ class TestGetMetricsAlertsPerSeverity:
 
 
 @pytest.mark.asyncio
-class TestGetBytesProcessedPerLogTypeAndSource:
-    """Test suite for get_bytes_processed_per_log_type_and_source function."""
+class TestGetBytesProcessedMetrics:
+    """Test suite for get_bytes_processed_metrics function."""
 
     @pytest.fixture(autouse=True)
     def setup_mocks(self, mock_execute_query, mock_get_week_date_range):
@@ -507,7 +507,7 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with default parameters."""
-        result = await get_bytes_processed_per_log_type_and_source()
+        result = await get_bytes_processed_metrics()
 
         assert result["success"] is True
         assert len(result["bytes_processed"]) == 2
@@ -535,7 +535,7 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         start_date = "2024-03-19T00:00:00.000Z"
         end_date = "2024-03-19T23:59:59.000Z"
 
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date=start_date, end_date=end_date
         )
 
@@ -550,7 +550,7 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         """Test function with only one date provided."""
         start_date = "2024-03-19T00:00:00.000Z"
 
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date=start_date
         )
 
@@ -565,7 +565,7 @@ class TestGetBytesProcessedPerLogTypeAndSource:
     ):
         """Test function with different interval options."""
         # Test with 1h interval
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date="2024-03-01T00:00:00.000Z",
             end_date="2024-03-01T01:00:00.000Z",
             interval_in_minutes=60,
@@ -575,7 +575,7 @@ class TestGetBytesProcessedPerLogTypeAndSource:
 
         # Test with 12h interval
         mock_execute_query.reset_mock()
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date="2024-03-01T00:00:00.000Z",
             end_date="2024-03-01T12:00:00.000Z",
             interval_in_minutes=720,
@@ -587,7 +587,7 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         """Test error handling when query fails."""
         mock_execute_query.side_effect = Exception("GraphQL error")
 
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date="2024-03-01T00:00:00.000Z",
             end_date="2024-03-02T00:00:00.000Z",
         )
@@ -600,7 +600,7 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         """Test handling of empty metrics response."""
         mock_execute_query.return_value = {"metrics": {"bytesProcessedPerSource": []}}
 
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date="2024-03-01T00:00:00.000Z",
             end_date="2024-03-02T00:00:00.000Z",
         )

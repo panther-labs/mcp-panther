@@ -253,7 +253,7 @@ async def get_rule_alert_metrics(
         "readOnlyHint": True,
     }
 )
-async def get_bytes_processed_per_log_type_and_source(
+async def get_bytes_processed_metrics(
     start_date: Annotated[
         str | None,
         Field(

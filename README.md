@@ -113,7 +113,7 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 |-----------|-------------|---------------|
 | `get_rule_alert_metrics` | Get metrics about alerts grouped by rule | "Show top 10 rules by alert count" |
 | `get_severity_alert_metrics` | Get metrics about alerts grouped by severity | "Show alert counts by severity for the last week" |
-| `get_bytes_processed_per_log_type_and_source` | Get data ingestion metrics by log type and source | "Show me data ingestion volume by log type" |
+| `get_bytes_processed_metrics` | Get data ingestion metrics by log type and source | "Show me data ingestion volume by log type" |
 
 </details>
 

@@ -97,7 +97,7 @@ This document outlines the comprehensive testing procedures that must be complet
 
 - [ ] `get_rule_alert_metrics` - Get alert metrics by rule
 - [ ] `get_severity_alert_metrics` - Get alert metrics by severity
-- [ ] `get_bytes_processed_per_log_type_and_source` - Get ingestion metrics
+- [ ] `get_bytes_processed_metrics` - Get ingestion metrics
 
 ### 6. Resource Testing
 
