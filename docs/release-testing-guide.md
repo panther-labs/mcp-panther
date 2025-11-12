@@ -259,7 +259,7 @@ Validation: Time range covers current month and shows top alerting rules
 
 ```
 Prompt: "Show me data ingestion volume by log type for today"
-Expected Tools: get_bytes_processed_per_log_type_and_source
+Expected Tools: get_bytes_processed_metrics
 Expected Result: Bytes processed metrics broken down by log type and source
 Validation: Current day data with proper breakdown
 ```
@@ -378,7 +378,7 @@ Validation: Data-driven analysis with proper tool chaining
 ```
 Prompt: "Perform a complete health check of our data pipeline. Check log source status, look for any system errors, analyze ingestion volumes, and identify any classification issues."
 
-Expected Tools: list_log_sources → list_alerts (system errors) → get_bytes_processed_per_log_type_and_source → query_data_lake (classification failures)
+Expected Tools: list_log_sources → list_alerts (system errors) → get_bytes_processed_metrics → query_data_lake (classification failures)
 Expected Flow:
 1. Check all log source health
 2. Look for system error alerts

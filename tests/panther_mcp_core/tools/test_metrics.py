@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.metrics import (
-    get_bytes_processed_per_log_type_and_source,
+    get_bytes_processed_metrics,
     get_rule_alert_metrics,
     get_severity_alert_metrics,
 )
@@ -60,14 +60,14 @@ def mock_execute_query():
 
 
 @pytest.fixture
-def mock_get_today_date_range():
-    """Fixture to mock the _get_today_date_range function."""
+def mock_get_week_date_range():
+    """Fixture to mock the _get_week_date_range function."""
     with patch(
-        "mcp_panther.panther_mcp_core.tools.metrics._get_today_date_range"
+        "mcp_panther.panther_mcp_core.tools.metrics._get_week_date_range"
     ) as mock:
-        # Return pre-formatted strings as _get_today_date_range does
+        # Return pre-formatted strings as _get_week_date_range does
         start_date = "2024-03-20T00:00:00.000Z"
-        end_date = "2024-03-20T23:59:59.000Z"
+        end_date = "2024-03-27T00:59:59.000Z"
         mock.return_value = (start_date, end_date)
         yield mock
 
@@ -77,7 +77,7 @@ class TestGetMetricsAlertsPerRule:
     """Test cases for get_rule_alert_metrics function."""
 
     @pytest.fixture(autouse=True)
-    def setup_mocks(self, mock_execute_query, mock_get_today_date_range):
+    def setup_mocks(self, mock_execute_query, mock_get_week_date_range):
         """Set up common mock responses."""
         # Default mock response for successful query
         mock_execute_query.return_value = {
@@ -128,14 +128,14 @@ class TestGetMetricsAlertsPerRule:
             }
         }
 
-        # Default mock for today's date range
-        mock_get_today_date_range.return_value = (
+        # Default mock for week's date range
+        mock_get_week_date_range.return_value = (
             "2024-03-20T00:00:00.000Z",
-            "2024-03-20T23:59:59.000Z",
+            "2024-03-27T00:59:59.000Z",
         )
 
     async def test_default_parameters(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with default parameters."""
         result = await get_rule_alert_metrics()
@@ -144,11 +144,11 @@ class TestGetMetricsAlertsPerRule:
         assert "alerts_per_rule" in result
         assert len(result["alerts_per_rule"]) == 8
         assert result["start_date"] == "2024-03-20T00:00:00.000Z"
-        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["end_date"] == "2024-03-27T00:59:59.000Z"
         assert result["interval_in_minutes"] == 15
 
         # Verify mock calls
-        mock_get_today_date_range.assert_called_once()
+        mock_get_week_date_range.assert_called_once()
         mock_execute_query.assert_called_once()
 
     async def test_get_rule_alert_metrics_with_custom_date_range(
@@ -170,7 +170,7 @@ class TestGetMetricsAlertsPerRule:
         mock_execute_query.assert_called_once()
 
     async def test_get_rule_alert_metrics_with_partial_date_range(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with only one date provided."""
         start_date = "2024-03-19T00:00:00.000Z"
@@ -181,13 +181,13 @@ class TestGetMetricsAlertsPerRule:
         assert "alerts_per_rule" in result
         assert len(result["alerts_per_rule"]) == 8
         assert result["start_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["end_date"] == "2024-03-27T00:59:59.000Z"
 
         # Verify mock calls
-        mock_get_today_date_range.assert_called_once()
+        mock_get_week_date_range.assert_called_once()
         mock_execute_query.assert_called_once()
 
-    async def test_custom_interval(self, mock_execute_query, mock_get_today_date_range):
+    async def test_custom_interval(self, mock_execute_query, mock_get_week_date_range):
         """Test function with custom interval."""
         result = await get_rule_alert_metrics(interval_in_minutes=60)
 
@@ -197,11 +197,11 @@ class TestGetMetricsAlertsPerRule:
         assert result["interval_in_minutes"] == 60
 
         # Verify mock calls
-        mock_get_today_date_range.assert_called_once()
+        mock_get_week_date_range.assert_called_once()
         mock_execute_query.assert_called_once()
 
     async def test_filter_by_rule_ids(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with rule ID filtering."""
         result = await get_rule_alert_metrics(rule_ids=["AWS.EC2.RouteTableModified"])
@@ -212,10 +212,10 @@ class TestGetMetricsAlertsPerRule:
         assert result["rule_ids"] == ["AWS.EC2.RouteTableModified"]
 
         # Verify mock calls
-        mock_get_today_date_range.assert_called_once()
+        mock_get_week_date_range.assert_called_once()
         mock_execute_query.assert_called_once()
 
-    async def test_error_handling(self, mock_execute_query, mock_get_today_date_range):
+    async def test_error_handling(self, mock_execute_query, mock_get_week_date_range):
         """Test error handling when query fails."""
         mock_execute_query.side_effect = Exception("Query failed")
 
@@ -226,14 +226,14 @@ class TestGetMetricsAlertsPerRule:
         assert "Failed to fetch rule alert metrics" in result["message"]
 
         # Verify mock calls
-        mock_get_today_date_range.assert_called_once()
+        mock_get_week_date_range.assert_called_once()
         mock_execute_query.assert_called_once()
 
 
 class TestGetMetricsAlertsPerSeverity:
     """Test suite for get_severity_alert_metrics function."""
 
-    def setup_mocks(self, mock_execute_query, mock_get_today_date_range):
+    def setup_mocks(self, mock_execute_query, mock_get_week_date_range):
         """Set up common mock responses."""
         # Default mock response for successful query
         mock_execute_query.return_value = {
@@ -266,17 +266,17 @@ class TestGetMetricsAlertsPerSeverity:
             }
         }
 
-        # Default mock for today's date range
-        mock_get_today_date_range.return_value = (
+        # Default mock for week's date range
+        mock_get_week_date_range.return_value = (
             "2024-03-20T00:00:00.000Z",
-            "2024-03-20T23:59:59.000Z",
+            "2024-03-27T00:59:59.000Z",
         )
 
     async def test_default_parameters(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with default parameters."""
-        self.setup_mocks(mock_execute_query, mock_get_today_date_range)
+        self.setup_mocks(mock_execute_query, mock_get_week_date_range)
         result = await get_severity_alert_metrics()
 
         assert result["success"] is True
@@ -284,7 +284,7 @@ class TestGetMetricsAlertsPerSeverity:
         assert result["total_alerts"] == 200
         assert result["interval_in_minutes"] == 1440
         assert result["start_date"] == "2024-03-20T00:00:00.000Z"
-        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["end_date"] == "2024-03-27T00:59:59.000Z"
 
         # Verify severity data structure
         severity = result["alerts_per_severity"][0]
@@ -296,10 +296,10 @@ class TestGetMetricsAlertsPerSeverity:
         assert all(value == 20 for value in severity["breakdown"].values())
 
     async def test_get_severity_alert_metrics_with_custom_date_range(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with custom date range."""
-        self.setup_mocks(mock_execute_query, mock_get_today_date_range)
+        self.setup_mocks(mock_execute_query, mock_get_week_date_range)
         start_date = "2024-03-19T00:00:00.000Z"
         end_date = "2024-03-19T23:59:59.000Z"
 
@@ -313,22 +313,22 @@ class TestGetMetricsAlertsPerSeverity:
         mock_execute_query.assert_called_once()
 
     async def test_get_severity_alert_metrics_with_partial_date_range(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with only one date provided."""
-        self.setup_mocks(mock_execute_query, mock_get_today_date_range)
+        self.setup_mocks(mock_execute_query, mock_get_week_date_range)
         start_date = "2024-03-19T00:00:00.000Z"
 
         result = await get_severity_alert_metrics(start_date=start_date)
 
         assert result["success"] is True
         assert result["start_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["end_date"] == "2024-03-27T00:59:59.000Z"
         mock_execute_query.assert_called_once()
-        mock_get_today_date_range.assert_called_once()
+        mock_get_week_date_range.assert_called_once()
 
     async def test_custom_alert_types(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with custom alert types."""
         # Update mock response for this test
@@ -359,7 +359,7 @@ class TestGetMetricsAlertsPerSeverity:
         mock_execute_query.assert_called_once()
 
     async def test_custom_severities(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with custom severities."""
         # Update mock response for this test
@@ -389,9 +389,9 @@ class TestGetMetricsAlertsPerSeverity:
         assert result["alerts_per_severity"][0]["label"] == "Rule CRITICAL"
         mock_execute_query.assert_called_once()
 
-    async def test_error_handling(self, mock_execute_query, mock_get_today_date_range):
+    async def test_error_handling(self, mock_execute_query, mock_get_week_date_range):
         """Test error handling when query fails."""
-        self.setup_mocks(mock_execute_query, mock_get_today_date_range)
+        self.setup_mocks(mock_execute_query, mock_get_week_date_range)
         mock_execute_query.side_effect = Exception("API Error")
 
         result = await get_severity_alert_metrics()
@@ -400,7 +400,7 @@ class TestGetMetricsAlertsPerSeverity:
         assert "Failed to fetch alerts per severity metrics" in result["message"]
 
     async def test_empty_alert_types(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with empty alert types list."""
         # Update mock response for this test
@@ -416,9 +416,7 @@ class TestGetMetricsAlertsPerSeverity:
         assert len(result["alerts_per_severity"]) == 0
         mock_execute_query.assert_called_once()
 
-    async def test_empty_severities(
-        self, mock_execute_query, mock_get_today_date_range
-    ):
+    async def test_empty_severities(self, mock_execute_query, mock_get_week_date_range):
         """Test function with empty severities list."""
         # Update mock response for this test
         mock_execute_query.return_value = {
@@ -434,10 +432,10 @@ class TestGetMetricsAlertsPerSeverity:
         mock_execute_query.assert_called_once()
 
     async def test_combination_of_parameters(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with combination of custom parameters."""
-        self.setup_mocks(mock_execute_query, mock_get_today_date_range)
+        self.setup_mocks(mock_execute_query, mock_get_week_date_range)
         start_date = "2024-03-19T00:00:00.000Z"
         end_date = "2024-03-19T23:59:59.000Z"
 
@@ -475,11 +473,11 @@ class TestGetMetricsAlertsPerSeverity:
 
 
 @pytest.mark.asyncio
-class TestGetBytesProcessedPerLogTypeAndSource:
-    """Test suite for get_bytes_processed_per_log_type_and_source function."""
+class TestGetBytesProcessedMetrics:
+    """Test suite for get_bytes_processed_metrics function."""
 
     @pytest.fixture(autouse=True)
-    def setup_mocks(self, mock_execute_query, mock_get_today_date_range):
+    def setup_mocks(self, mock_execute_query, mock_get_week_date_range):
         """Set up common mock responses."""
         # Default mock response for successful query
         mock_execute_query.return_value = {
@@ -499,24 +497,24 @@ class TestGetBytesProcessedPerLogTypeAndSource:
             }
         }
 
-        # Default mock for today's date range
-        mock_get_today_date_range.return_value = (
+        # Default mock for week's date range
+        mock_get_week_date_range.return_value = (
             "2024-03-20T00:00:00.000Z",
-            "2024-03-20T23:59:59.000Z",
+            "2024-03-27T00:59:59.000Z",
         )
 
     async def test_default_parameters(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with default parameters."""
-        result = await get_bytes_processed_per_log_type_and_source()
+        result = await get_bytes_processed_metrics()
 
         assert result["success"] is True
         assert len(result["bytes_processed"]) == 2
         assert result["total_bytes"] == 3000000
         assert result["interval_in_minutes"] == 1440
         assert result["start_date"] == "2024-03-20T00:00:00.000Z"
-        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["end_date"] == "2024-03-27T00:59:59.000Z"
 
         # Verify first series
         first_series = result["bytes_processed"][0]
@@ -531,13 +529,13 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         assert second_series["breakdown"] == {"source3": 1000000, "source4": 1000000}
 
     async def test_custom_date_range(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with custom date range."""
         start_date = "2024-03-19T00:00:00.000Z"
         end_date = "2024-03-19T23:59:59.000Z"
 
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date=start_date, end_date=end_date
         )
 
@@ -547,27 +545,27 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         mock_execute_query.assert_called_once()
 
     async def test_partial_date_range(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with only one date provided."""
         start_date = "2024-03-19T00:00:00.000Z"
 
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date=start_date
         )
 
         assert result["success"] is True
         assert result["start_date"] == "2024-03-19T00:00:00.000Z"
-        assert result["end_date"] == "2024-03-20T23:59:59.000Z"
+        assert result["end_date"] == "2024-03-27T00:59:59.000Z"
         mock_execute_query.assert_called_once()
-        mock_get_today_date_range.assert_called_once()
+        mock_get_week_date_range.assert_called_once()
 
     async def test_different_intervals(
-        self, mock_execute_query, mock_get_today_date_range
+        self, mock_execute_query, mock_get_week_date_range
     ):
         """Test function with different interval options."""
         # Test with 1h interval
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date="2024-03-01T00:00:00.000Z",
             end_date="2024-03-01T01:00:00.000Z",
             interval_in_minutes=60,
@@ -577,7 +575,7 @@ class TestGetBytesProcessedPerLogTypeAndSource:
 
         # Test with 12h interval
         mock_execute_query.reset_mock()
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date="2024-03-01T00:00:00.000Z",
             end_date="2024-03-01T12:00:00.000Z",
             interval_in_minutes=720,
@@ -585,11 +583,11 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         assert result["success"] is True
         assert result["interval_in_minutes"] == 720
 
-    async def test_error_handling(self, mock_execute_query, mock_get_today_date_range):
+    async def test_error_handling(self, mock_execute_query, mock_get_week_date_range):
         """Test error handling when query fails."""
         mock_execute_query.side_effect = Exception("GraphQL error")
 
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date="2024-03-01T00:00:00.000Z",
             end_date="2024-03-02T00:00:00.000Z",
         )
@@ -598,11 +596,11 @@ class TestGetBytesProcessedPerLogTypeAndSource:
         assert "Failed to fetch bytes processed metrics" in result["message"]
         assert "GraphQL error" in result["message"]
 
-    async def test_empty_response(self, mock_execute_query, mock_get_today_date_range):
+    async def test_empty_response(self, mock_execute_query, mock_get_week_date_range):
         """Test handling of empty metrics response."""
         mock_execute_query.return_value = {"metrics": {"bytesProcessedPerSource": []}}
 
-        result = await get_bytes_processed_per_log_type_and_source(
+        result = await get_bytes_processed_metrics(
             start_date="2024-03-01T00:00:00.000Z",
             end_date="2024-03-02T00:00:00.000Z",
         )
