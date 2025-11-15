@@ -79,6 +79,7 @@ def patch_graphql_client(module_path):
             patch_obj = patch(f"{module_path}._create_panther_client")
             client = AsyncMock()
             client.execute = AsyncMock()
+            client.execute_async = AsyncMock()
             client.__aenter__.return_value = client
             client.__aexit__.return_value = None
 

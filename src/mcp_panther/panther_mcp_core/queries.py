@@ -262,6 +262,13 @@ query ListDataLakeQueries($input: DataLakeQueriesInput) {
                         name
                     }
                 }
+                results {
+                    stats {
+                        bytesScanned
+                        executionTime
+                        rowCount
+                    }
+                }
             }
         }
         pageInfo {
