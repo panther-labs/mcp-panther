@@ -1,6 +1,6 @@
 [project]
 name = "mcp-panther"
-version = "2.1.1"
+version = "2.1.2a1"
 description = "Panther Labs MCP Server"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -27,7 +27,8 @@ dependencies = [
     "aiohttp>=3.11.14,<4.0.0",
     "gql>=3.5.2,<4.0.0",
     "click>=8.1.0,<9.0.0",
-    "fastmcp>=2.10.0,<3.0.0",
+    "fastmcp~=2.10.0",
+    "pydantic>=2.0.0,<2.12.0",
     "sqlparse>=0.4.4,<1.0.0"
 ]
 
