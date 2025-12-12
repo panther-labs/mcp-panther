@@ -561,7 +561,7 @@ wheels = [
 
 [[package]]
 name = "mcp-panther"
-version = "2.1.2a1"
+version = "2.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
