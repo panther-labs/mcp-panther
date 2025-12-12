@@ -1,0 +1,10 @@
+{
+  "$schema": "https://gofastmcp.com/public/schemas/fastmcp.json/v1.json",
+  "source": {
+    "path": "server.py",
+    "entrypoint": "mcp"
+  },
+  "environment": {
+    "dependencies": ["gql[aiohttp]", "aiohttp"]
+  }
+}

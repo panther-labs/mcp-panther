@@ -62,14 +62,9 @@ except ImportError:
     from .panther_mcp_core.resources.registry import register_all_resources
     from .panther_mcp_core.tools.registry import register_all_tools
 
-# Server dependencies
-deps = [
-    "gql[aiohttp]",
-    "aiohttp",
-]
-
 # Create the MCP server
-mcp = FastMCP(MCP_SERVER_NAME, dependencies=deps)
+# Note: Dependencies are declared in fastmcp.json for FastMCP v2.14.0+
+mcp = FastMCP(MCP_SERVER_NAME)
 
 # Register all tools with MCP using the registry
 register_all_tools(mcp)
