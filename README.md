@@ -180,6 +180,14 @@ The easiest way to get started is using our pre-built Docker image:
 }
 ```
 
+**Version Pinning:** For production stability, pin to a specific version tag:
+
+```json
+"ghcr.io/panther-labs/mcp-panther:v2.2.0"
+```
+
+Available tags can be found on the [GitHub Container Registry](https://github.com/panther-labs/mcp-panther/pkgs/container/mcp-panther).
+
 ### UVX
 
 For Python users, you can run directly from PyPI using uvx:
@@ -203,6 +211,14 @@ For Python users, you can run directly from PyPI using uvx:
 }
 ```
 
+**Version Pinning:** For production stability, pin to a specific version:
+
+```json
+"args": ["mcp-panther==2.2.0"]
+```
+
+Available versions can be found on [PyPI](https://pypi.org/project/mcp-panther/).
+
 ## MCP Client Setup
 
 ### Cursor
@@ -218,6 +234,26 @@ Once configured, navigate to Cursor Settings > MCP to view the running server:
 - Be specific about where you want to generate new rules by using the `@` symbol and then typing a specific directory.
 - For more reliability during tool use, try selecting a specific model, like Claude 3.7 Sonnet.
 - If your MCP Client is failing to find any tools from the Panther MCP Server, try restarting the Client and ensuring the MCP server is running. In Cursor, refresh the MCP Server and start a new chat.
+
+### Claude Code
+
+[Claude Code](https://code.claude.com/docs) is Anthropic's official CLI tool. Add the Panther MCP server with a single command:
+
+```bash
+claude mcp add-json panther '{"command":"docker","args":["run","-i","-e","PANTHER_INSTANCE_URL","-e","PANTHER_API_TOKEN","--rm","ghcr.io/panther-labs/mcp-panther"],"env":{"PANTHER_INSTANCE_URL":"https://YOUR-PANTHER-INSTANCE.domain","PANTHER_API_TOKEN":"YOUR-API-TOKEN"}}'
+```
+
+Alternatively, using UVX:
+
+```bash
+claude mcp add-json panther '{"command":"uvx","args":["mcp-panther"],"env":{"PANTHER_INSTANCE_URL":"https://YOUR-PANTHER-INSTANCE.domain","PANTHER_API_TOKEN":"YOUR-API-TOKEN"}}'
+```
+
+After adding, verify the server is configured:
+
+```bash
+claude mcp list
+```
 
 ### Claude Desktop
 

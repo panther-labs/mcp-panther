@@ -550,9 +550,7 @@ class TestGetBytesProcessedMetrics:
         """Test function with only one date provided."""
         start_date = "2024-03-19T00:00:00.000Z"
 
-        result = await get_bytes_processed_metrics(
-            start_date=start_date
-        )
+        result = await get_bytes_processed_metrics(start_date=start_date)
 
         assert result["success"] is True
         assert result["start_date"] == "2024-03-19T00:00:00.000Z"

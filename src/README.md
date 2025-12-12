@@ -31,6 +31,32 @@ The project includes several key dependencies:
 - **Pydantic**: Data validation and serialization
 - **Uvicorn/Starlette**: ASGI server components
 
+### Development Installation
+
+1. Create a virtual environment using [uv](https://github.com/astral-sh/uv):
+
+```bash
+make venv
+```
+
+2. Activate the virtual environment:
+
+```bash
+source .venv/bin/activate
+```
+
+3. Install development dependencies:
+
+```bash
+make dev-deps
+```
+
+4. To synchronize dependencies with `pyproject.toml` (useful after pulling changes):
+
+```bash
+make sync
+```
+
 ## Testing Changes
 
 ### Manual Testing
