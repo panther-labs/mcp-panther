@@ -18,7 +18,7 @@ __all__ = [
     "global_helpers",
     "schemas",
     "permissions",
-    "scheduled_queries",
+    "saved_queries",
 ]
 
 # Import all tool modules to ensure decorators are processed
@@ -31,7 +31,7 @@ from . import (
     metrics,
     permissions,
     roles,
-    scheduled_queries,
+    saved_queries,
     schemas,
     sources,
     users,

@@ -9,7 +9,6 @@ import time
 from enum import Enum
 from typing import Annotated, Any, Dict, List
 
-import sqlparse
 from pydantic import Field
 
 from ..client import _create_panther_client, _get_today_date_range
@@ -22,112 +21,13 @@ from ..queries import (
     LIST_DATABASES_QUERY,
     LIST_TABLES_QUERY,
 )
+from ..utils.sql_validation import validate_sql_comprehensive
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
 
 INITIAL_QUERY_SLEEP_SECONDS = 1
 MAX_QUERY_SLEEP_SECONDS = 5
-
-
-# Snowflake reserved words that should be quoted when used as identifiers
-SNOWFLAKE_RESERVED_WORDS = {
-    "SELECT",
-    "FROM",
-    "WHERE",
-    "JOIN",
-    "LEFT",
-    "RIGHT",
-    "INNER",
-    "OUTER",
-    "ON",
-    "AS",
-    "ORDER",
-    "GROUP",
-    "BY",
-    "HAVING",
-    "UNION",
-    "ALL",
-    "DISTINCT",
-    "INSERT",
-    "UPDATE",
-    "DELETE",
-    "CREATE",
-    "ALTER",
-    "DROP",
-    "TABLE",
-    "VIEW",
-    "INDEX",
-    "COLUMN",
-    "PRIMARY",
-    "KEY",
-    "FOREIGN",
-    "UNIQUE",
-    "NOT",
-    "NULL",
-    "DEFAULT",
-    "CHECK",
-    "CONSTRAINT",
-    "REFERENCES",
-    "CASCADE",
-    "RESTRICT",
-    "SET",
-    "VALUES",
-    "INTO",
-    "CASE",
-    "WHEN",
-    "THEN",
-    "ELSE",
-    "END",
-    "IF",
-    "EXISTS",
-    "LIKE",
-    "BETWEEN",
-    "IN",
-    "IS",
-    "AND",
-    "OR",
-    "WITH",
-}
-
-
-def wrap_reserved_words(sql: str) -> str:
-    """
-    Simple function to wrap reserved words in SQL using sqlparse.
-
-    This function:
-    1. Parses the SQL using sqlparse
-    2. Identifies string literals that match reserved words
-    3. Converts single-quoted reserved words to double-quoted ones
-
-    Args:
-        sql: The SQL query string to process
-
-    Returns:
-        The SQL with reserved words properly quoted
-    """
-    try:
-        # Parse the SQL
-        parsed = sqlparse.parse(sql)[0]
-
-        # Convert the parsed SQL back to string, but process tokens
-        result = []
-        for token in parsed.flatten():
-            if token.ttype is sqlparse.tokens.Literal.String.Single:
-                # Remove quotes and check if it's a reserved word
-                value = token.value.strip("'")
-                if value.upper() in SNOWFLAKE_RESERVED_WORDS:
-                    # Convert to double-quoted identifier
-                    result.append(f'"{value}"')
-                else:
-                    result.append(token.value)
-            else:
-                result.append(token.value)
-
-        return "".join(result)
-    except Exception as e:
-        logger.warning(f"Failed to parse SQL for reserved words: {e}")
-        return sql
 
 
 class QueryStatus(str, Enum):
@@ -344,22 +244,26 @@ async def query_data_lake(
 
     start_time = time.time()
 
-    # Validate that the query includes a time filter (p_event_time or Panther macros)
+    # Check if query uses Panther tables that require time filters
     sql_lower = sql.lower().replace("\n", " ")
-    has_p_event_time = re.search(
-        r"\b(where|and)\s+.*?(?:[\w.]+\.)?p_event_time\s*(>=|<=|=|>|<|between)",
-        sql_lower,
-    )
-    has_panther_macros = re.search(
-        r"p_occurs_(since|between|around|after|before)\s*\(",
+    uses_panther_tables = re.search(
+        r"\Wpanther_(views|signals|rule_matches|rule_errors|monitor|logs|cloudsecurity)\.",
         sql_lower,
     )
 
-    if (not (has_p_event_time or has_panther_macros)) and re.search(
-        r"\Wpanther_(views|signals|rule_matches|rule_errors|monitor|logs|cloudsecurity)\.",
-        sql_lower,
-    ):
-        error_msg = "Query must include a time filter: either `p_event_time` condition or Panther macro (p_occurs_since, p_occurs_between, etc.)"
+    # Comprehensive SQL validation
+    # Only validate Panther database names, allow custom databases
+    db_name_to_validate = (
+        database_name if database_name.startswith("panther_") else None
+    )
+    validation_result = validate_sql_comprehensive(
+        sql=sql,
+        require_time_filter=bool(uses_panther_tables),
+        database_name=db_name_to_validate,
+    )
+
+    if not validation_result["valid"]:
+        error_msg = validation_result["error"]
         logger.error(error_msg)
         return {
             "success": False,
@@ -368,8 +272,8 @@ async def query_data_lake(
         }
 
     try:
-        # Process reserved words in the SQL
-        processed_sql = wrap_reserved_words(sql)
+        # Use the processed SQL from validation (with reserved words handled)
+        processed_sql = validation_result["processed_sql"]
         logger.debug(f"Original SQL: {sql}")
         logger.debug(f"Processed SQL: {processed_sql}")
 
@@ -379,10 +283,10 @@ async def query_data_lake(
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(
-                EXECUTE_DATA_LAKE_QUERY, variable_values=variables
-            )
+        panther_client = await _create_panther_client()
+        result = await panther_client.execute_async(
+            EXECUTE_DATA_LAKE_QUERY, variable_values=variables
+        )
 
         # Get query ID from result
         query_id = result.get("executeDataLakeQuery", {}).get("id")
@@ -469,10 +373,10 @@ async def _get_data_lake_query_results(
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(
-                GET_DATA_LAKE_QUERY, variable_values=variables
-            )
+        panther_client = await _create_panther_client()
+        result = await panther_client.execute_async(
+            GET_DATA_LAKE_QUERY, variable_values=variables
+        )
 
         # Get query data
         query_data = result.get("dataLakeQuery", {})
@@ -602,8 +506,8 @@ async def list_databases() -> Dict[str, Any]:
 
     try:
         # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(LIST_DATABASES_QUERY)
+        panther_client = await _create_panther_client()
+        result = await panther_client.execute_async(LIST_DATABASES_QUERY)
 
         # Get query data
         databases = result.get("dataLakeDatabases", [])
@@ -680,10 +584,10 @@ async def list_database_tables(
             logger.debug(f"Query variables: {variables}")
 
             # Execute the query asynchronously
-            async with await _create_panther_client() as session:
-                result = await session.execute(
-                    LIST_TABLES_QUERY, variable_values=variables
-                )
+            panther_client = await _create_panther_client()
+            result = await panther_client.execute_async(
+                LIST_TABLES_QUERY, variable_values=variables
+            )
 
             # Get query data
             result = result.get("dataLakeDatabaseTables", {})
@@ -770,10 +674,10 @@ async def get_table_schema(
         logger.debug(f"Query variables: {variables}")
 
         # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(
-                GET_COLUMNS_FOR_TABLE_QUERY, variable_values=variables
-            )
+        panther_client = await _create_panther_client()
+        result = await panther_client.execute_async(
+            GET_COLUMNS_FOR_TABLE_QUERY, variable_values=variables
+        )
 
         # Get query data
         query_data = result.get("dataLakeDatabaseTable", {})
@@ -845,10 +749,9 @@ async def _cancel_data_lake_query(
         variables = {"input": {"id": query_id}}
 
         # Execute the cancellation
-        async with client as session:
-            result = await session.execute(
-                CANCEL_DATA_LAKE_QUERY, variable_values=variables
-            )
+        result = await client.execute_async(
+            CANCEL_DATA_LAKE_QUERY, variable_values=variables
+        )
 
         # Parse results
         cancellation_data = result.get("cancelDataLakeQuery", {})

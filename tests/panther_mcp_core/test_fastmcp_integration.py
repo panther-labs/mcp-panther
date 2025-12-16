@@ -105,8 +105,8 @@ async def test_rule_alert_metrics_invalid_rule_ids():
 
 
 @pytest.mark.asyncio
-async def test_get_scheduled_query_uuid_validation_tool():
-    """Test that get_scheduled_query only accepts valid UUIDs for query_id at the tool interface level."""
+async def test_get_saved_query_uuid_validation_tool():
+    """Test that get_saved_query only accepts valid UUIDs for query_id at the tool interface level."""
     from fastmcp import Client
     from fastmcp.exceptions import ToolError
 
@@ -116,14 +116,14 @@ async def test_get_scheduled_query_uuid_validation_tool():
         # Valid UUID should work (should not raise)
         valid_uuid = "6c6574cb-fbf9-49fc-baad-1a99464ef09e"
         try:
-            await client.call_tool("get_scheduled_query", {"query_id": valid_uuid})
+            await client.call_tool("get_saved_query", {"query_id": valid_uuid})
         except ToolError as e:
             # If the query doesn't exist, that's fine, as long as it's not a validation error
             assert "validation error" not in str(e)
 
         # Invalid UUID should raise a ToolError
         with pytest.raises(ToolError) as exc_info:
-            await client.call_tool("get_scheduled_query", {"query_id": "not-a-uuid"})
+            await client.call_tool("get_saved_query", {"query_id": "not-a-uuid"})
         error_msg = str(exc_info.value)
         assert "validation error" in error_msg
 
