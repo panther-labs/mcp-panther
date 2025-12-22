@@ -100,7 +100,8 @@ async def get_instance_config() -> Optional[Dict[str, Any]]:
         try:
             info = await get_json_from_script_tag(instance_url, "__PANTHER_CONFIG__")
             instance_config = info
-        except UnexpectedResponseStatusError:
+        except (UnexpectedResponseStatusError, ValueError):
+            # Fallback: derive config from URL if script tag not found
             if "public/graphql" in instance_url:
                 instance_config = {
                     "rest": instance_url.replace("public/graphql", "").strip("/")
@@ -199,7 +200,7 @@ async def lifespan(mcp):
         mcp: The FastMCP server instance
 
     Yields:
-        dict: Shared resources (graphql_client, transport)
+        dict: Shared resources (graphql_client, transport, session)
     """
     global _graphql_client, _graphql_transport, _graphql_session
 
@@ -347,8 +348,8 @@ async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any
     if _graphql_session is None:
         raise RuntimeError(
             "GraphQL session not initialized. "
-            "Server must be started with lifespan context. "
-            "Ensure FastMCP is created with lifespan parameter."
+            "Server must be started with lifespan context and valid Panther credentials. "
+            "Set PANTHER_INSTANCE_URL and PANTHER_API_TOKEN environment variables."
         )
 
     try:

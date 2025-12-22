@@ -78,10 +78,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --cov=src/mcp_panther --cov-report=term-missing"
 pythonpath = ["src"]
-env = [
-    "PANTHER_INSTANCE_URL=https://example.com",
-    "PANTHER_API_TOKEN=test-token"
-]
+# Note: Integration tests require real PANTHER_INSTANCE_URL and PANTHER_API_TOKEN
+# to be set in the environment. Unit tests mock the API and don't need them.
 
 [build-system]
 requires = ["hatchling"]

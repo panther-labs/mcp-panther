@@ -203,19 +203,19 @@ async def test_parallel_calls():
     This simulates Claude Code making multiple parallel tool calls to test that
     the "Connector is closed" error has been fixed.
     """
-    print("🧪 Testing parallel tool calls with shared GraphQL client\n")
+    print("Testing parallel tool calls with shared GraphQL client\n")
 
     async with Client(mcp) as client:
-        print("✅ Connected to MCP server\n")
+        print("Connected to MCP server\n")
 
         # Test 1: List tools to verify connection
-        print("📋 Listing available tools...")
+        print("Listing available tools...")
         tools = await client.list_tools()
         print(f"   Found {len(tools)} tools\n")
         assert len(tools) > 0
 
         # Test 2: Make 10 parallel calls to a GraphQL-based tool
-        print("🔄 Making 10 parallel calls to list_log_sources...")
+        print("Making 10 parallel calls to list_log_sources...")
         start_time = time.time()
 
         tasks = [client.call_tool("list_log_sources", {}) for _ in range(10)]
@@ -227,21 +227,21 @@ async def test_parallel_calls():
         successes = sum(1 for r in results if not isinstance(r, Exception))
         failures = sum(1 for r in results if isinstance(r, Exception))
 
-        print(f"   ✅ Completed in {duration:.2f}s")
-        print(f"   ✅ Successes: {successes}/10")
+        print(f"   Completed in {duration:.2f}s")
+        print(f"   Successes: {successes}/10")
 
         if failures > 0:
-            print(f"   ❌ Failures: {failures}/10")
+            print(f"   Failures: {failures}/10")
             print("\n   Error details:")
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
                     print(f"      Request {i + 1}: {type(result).__name__}: {result}")
             pytest.fail(f"Failed {failures} out of 10 parallel calls")
 
-        print("\n✅ All parallel calls succeeded!\n")
+        print("\nAll parallel calls succeeded!\n")
 
         # Test 3: Make parallel calls to different tools
-        print("🔄 Making parallel calls to different GraphQL tools...")
+        print("Making parallel calls to different GraphQL tools...")
         start_time = time.time()
 
         tasks = [
@@ -258,11 +258,11 @@ async def test_parallel_calls():
         successes = sum(1 for r in results if not isinstance(r, Exception))
         failures = sum(1 for r in results if isinstance(r, Exception))
 
-        print(f"   ✅ Completed in {duration:.2f}s")
-        print(f"   ✅ Successes: {successes}/5")
+        print(f"   Completed in {duration:.2f}s")
+        print(f"   Successes: {successes}/5")
 
         if failures > 0:
-            print(f"   ❌ Failures: {failures}/5")
+            print(f"   Failures: {failures}/5")
             print("\n   Error details:")
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
@@ -276,4 +276,4 @@ async def test_parallel_calls():
                     print(f"      {tool_names[i]}: {type(result).__name__}: {result}")
             pytest.fail(f"Failed {failures} out of 5 mixed parallel calls")
 
-        print("\n✅ All mixed parallel calls succeeded!")
+        print("\nAll mixed parallel calls succeeded!")
