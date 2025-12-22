@@ -122,7 +122,7 @@ def patch_execute_query(module_path):
 
     def decorator(test_func):
         async def wrapper(*args, **kwargs):
-            with patch(f"{module_path}._execute_query") as mock:
+            with patch(f"{module_path}._execute_query", new_callable=AsyncMock) as mock:
                 return await test_func(mock, *args, **kwargs)
 
         return wrapper
