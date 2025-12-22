@@ -21,7 +21,6 @@ logger = logging.getLogger(PACKAGE_NAME)
 # Module-level client storage (managed by lifespan context)
 _graphql_client: Optional[Client] = None
 _graphql_transport: Optional[AIOHTTPTransport] = None
-_graphql_session: Optional[Any] = None  # Will hold the active GQL session
 _graphql_connector: Optional[aiohttp.TCPConnector] = None  # Shared connection pool
 
 
@@ -201,9 +200,9 @@ async def lifespan(mcp):
         mcp: The FastMCP server instance
 
     Yields:
-        dict: Shared resources (graphql_client, transport, session, connector)
+        dict: Shared resources (graphql_client, transport, connector)
     """
-    global _graphql_client, _graphql_transport, _graphql_session, _graphql_connector
+    global _graphql_client, _graphql_transport, _graphql_connector
 
     logger.info("Initializing shared GraphQL client for Panther API")
 
@@ -226,40 +225,37 @@ async def lifespan(mcp):
             timeout=60,  # 60 second timeout for queries
             client_session_args={
                 "connector": _graphql_connector,
-                "connector_owner": False,  # Keep connector alive across session lifecycle
+                "connector_owner": False,  # We manage connector lifecycle
             },
         )
 
-        # Create GraphQL client with shared transport
+        # Manually connect the transport to keep it alive for the server lifetime
+        # We don't use async with Client() because that would close/reopen connections
+        await _graphql_transport.connect()
+        logger.info("GraphQL transport connected")
+
+        # Create GraphQL client with the connected transport
         _graphql_client = Client(
             transport=_graphql_transport,
-            fetch_schema_from_transport=True,
+            fetch_schema_from_transport=False,  # Don't fetch on init to avoid issues
             execute_timeout=60,
         )
 
-        # Open a session that will last for the server's lifetime
-        # This prevents "Transport is already connected" errors during parallel requests
-        async with _graphql_client as session:
-            _graphql_session = session
-            logger.info("Shared GraphQL client session opened successfully")
+        logger.info("GraphQL client initialized and ready for parallel requests")
 
-            # Server runs here
-            yield {
-                "graphql_client": _graphql_client,
-                "transport": _graphql_transport,
-                "session": _graphql_session,
-                "connector": _graphql_connector,
-            }
+        # Server runs here - transport stays connected throughout
+        yield {
+            "graphql_client": _graphql_client,
+            "transport": _graphql_transport,
+            "connector": _graphql_connector,
+        }
 
-        # Session closes automatically when exiting the async with block
-        _graphql_session = None
-        logger.info("GraphQL client session closed successfully")
+        logger.info("Server shutdown - cleaning up GraphQL resources")
 
     finally:
         # Cleanup on shutdown
         logger.info("Shutting down shared GraphQL client")
 
-        _graphql_session = None
         _graphql_client = None
 
         if _graphql_transport:
@@ -347,12 +343,11 @@ def _get_week_date_range() -> Tuple[str, str]:
 
 
 async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute a GraphQL query using the shared session.
+    """Execute a GraphQL query using the shared client and transport.
 
-    This function uses the module-level shared GraphQL session that is initialized
-    during the server lifespan. Using a persistent session prevents both "Connector
-    is closed" and "Transport is already connected" errors that occur during parallel
-    tool calls.
+    This function uses the module-level shared GraphQL client that is initialized
+    during the server lifespan. The transport is manually connected once and stays
+    connected for the entire server lifetime, allowing safe concurrent query execution.
 
     Args:
         query: The GraphQL query to execute
@@ -362,21 +357,22 @@ async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any
         The query result as a dictionary
 
     Raises:
-        RuntimeError: If the shared GraphQL session is not initialized
+        RuntimeError: If the shared GraphQL client is not initialized
         TransportQueryError: If the GraphQL query fails
     """
-    global _graphql_session
+    global _graphql_client
 
-    if _graphql_session is None:
+    if _graphql_client is None:
         raise RuntimeError(
-            "GraphQL session not initialized. "
+            "GraphQL client not initialized. "
             "Server must be started with lifespan context and valid Panther credentials. "
             "Set PANTHER_INSTANCE_URL and PANTHER_API_TOKEN environment variables."
         )
 
     try:
-        # Use shared session - connection is already established and shared across all requests!
-        result = await _graphql_session.execute(query, variable_values=variables)
+        # Use the client directly with the persistent transport connection
+        # The transport was manually connected in lifespan and stays open
+        result = await _graphql_client.execute_async(query, variable_values=variables)
         return result
 
     except TransportQueryError as e:
@@ -387,7 +383,7 @@ async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any
         if "Connector is closed" in str(e):
             logger.error(
                 f"Connection pool error detected: {e}. "
-                f"This should not happen with shared session - please report this issue."
+                f"This should not happen with persistent transport - please report this issue."
             )
         raise
 
