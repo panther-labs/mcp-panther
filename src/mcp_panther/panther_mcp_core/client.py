@@ -22,6 +22,7 @@ logger = logging.getLogger(PACKAGE_NAME)
 _graphql_client: Optional[Client] = None
 _graphql_transport: Optional[AIOHTTPTransport] = None
 _graphql_session: Optional[Any] = None  # Will hold the active GQL session
+_graphql_connector: Optional[aiohttp.TCPConnector] = None  # Shared connection pool
 
 
 class UnexpectedResponseStatusError(ValueError):
@@ -200,16 +201,16 @@ async def lifespan(mcp):
         mcp: The FastMCP server instance
 
     Yields:
-        dict: Shared resources (graphql_client, transport, session)
+        dict: Shared resources (graphql_client, transport, session, connector)
     """
-    global _graphql_client, _graphql_transport, _graphql_session
+    global _graphql_client, _graphql_transport, _graphql_session, _graphql_connector
 
     logger.info("Initializing shared GraphQL client for Panther API")
 
     try:
         # Create GraphQL transport with proper connection pooling
         # Configure connector with higher limits for parallel requests from Claude Code
-        connector = aiohttp.TCPConnector(
+        _graphql_connector = aiohttp.TCPConnector(
             limit=100,  # Total connection pool size
             limit_per_host=50,  # Connections per host (Panther API)
             ttl_dns_cache=300,  # DNS cache TTL in seconds
@@ -223,7 +224,10 @@ async def lifespan(mcp):
             },
             ssl=True,  # Enable SSL verification
             timeout=60,  # 60 second timeout for queries
-            client_session_args={"connector": connector, "connector_owner": True},
+            client_session_args={
+                "connector": _graphql_connector,
+                "connector_owner": False,  # Keep connector alive across session lifecycle
+            },
         )
 
         # Create GraphQL client with shared transport
@@ -244,6 +248,7 @@ async def lifespan(mcp):
                 "graphql_client": _graphql_client,
                 "transport": _graphql_transport,
                 "session": _graphql_session,
+                "connector": _graphql_connector,
             }
 
         # Session closes automatically when exiting the async with block
@@ -267,6 +272,16 @@ async def lifespan(mcp):
                 logger.error(f"Error closing GraphQL transport: {e}")
             finally:
                 _graphql_transport = None
+
+        # Close the connector since we own it (connector_owner=False)
+        if _graphql_connector:
+            try:
+                await _graphql_connector.close()
+                logger.debug("GraphQL connector closed successfully")
+            except Exception as e:
+                logger.error(f"Error closing GraphQL connector: {e}")
+            finally:
+                _graphql_connector = None
 
         logger.info("GraphQL client shutdown complete")
 
