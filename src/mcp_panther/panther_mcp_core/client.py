@@ -208,7 +208,13 @@ async def lifespan(mcp):
 
     try:
         # Create GraphQL transport with proper connection pooling
-        # Note: AIOHTTPTransport manages its own aiohttp.ClientSession internally
+        # Configure connector with higher limits for parallel requests from Claude Code
+        connector = aiohttp.TCPConnector(
+            limit=100,  # Total connection pool size
+            limit_per_host=50,  # Connections per host (Panther API)
+            ttl_dns_cache=300,  # DNS cache TTL in seconds
+        )
+
         _graphql_transport = AIOHTTPTransport(
             url=await get_panther_gql_endpoint(),
             headers={
@@ -217,6 +223,7 @@ async def lifespan(mcp):
             },
             ssl=True,  # Enable SSL verification
             timeout=60,  # 60 second timeout for queries
+            client_session_args={"connector": connector, "connector_owner": True},
         )
 
         # Create GraphQL client with shared transport
