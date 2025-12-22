@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import Field
 from typing_extensions import Annotated
 
-from ..client import _create_panther_client, get_rest_client
+from ..client import _execute_query, get_rest_client
 from ..permissions import Permission, all_perms
 from ..queries import GET_SOURCES_QUERY
 from .registry import mcp_tool
@@ -67,8 +67,6 @@ async def list_log_sources(
     logger.info("Fetching log sources from Panther")
 
     try:
-        client = await _create_panther_client()
-
         # Prepare input variables
         variables = {"input": {}}
 
@@ -79,9 +77,8 @@ async def list_log_sources(
 
         logger.debug(f"Query variables: {variables}")
 
-        # Execute the query asynchronously
-        async with client as session:
-            result = await session.execute(GET_SOURCES_QUERY, variable_values=variables)
+        # Execute the query using shared client
+        result = await _execute_query(GET_SOURCES_QUERY, variables)
 
         # Log the raw result for debugging
         logger.debug(f"Raw query result: {result}")
