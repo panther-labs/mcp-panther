@@ -199,7 +199,7 @@ async def test_streaming_http_transport():
 @pytest.mark.asyncio
 async def test_parallel_calls():
     """Test multiple parallel tool calls to verify no connection issues.
-    
+
     This simulates Claude Code making multiple parallel tool calls to test that
     the "Connector is closed" error has been fixed.
     """
@@ -218,10 +218,7 @@ async def test_parallel_calls():
         print("🔄 Making 10 parallel calls to list_log_sources...")
         start_time = time.time()
 
-        tasks = [
-            client.call_tool("list_log_sources", {})
-            for _ in range(10)
-        ]
+        tasks = [client.call_tool("list_log_sources", {}) for _ in range(10)]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
         duration = time.time() - start_time
@@ -238,7 +235,7 @@ async def test_parallel_calls():
             print("\n   Error details:")
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    print(f"      Request {i+1}: {type(result).__name__}: {result}")
+                    print(f"      Request {i + 1}: {type(result).__name__}: {result}")
             pytest.fail(f"Failed {failures} out of 10 parallel calls")
 
         print("\n✅ All parallel calls succeeded!\n")
@@ -269,9 +266,13 @@ async def test_parallel_calls():
             print("\n   Error details:")
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    tool_names = ["list_log_sources", "list_databases",
-                                 "list_log_type_schemas", "get_severity_alert_metrics",
-                                 "get_rule_alert_metrics"]
+                    tool_names = [
+                        "list_log_sources",
+                        "list_databases",
+                        "list_log_type_schemas",
+                        "get_severity_alert_metrics",
+                        "get_rule_alert_metrics",
+                    ]
                     print(f"      {tool_names[i]}: {type(result).__name__}: {result}")
             pytest.fail(f"Failed {failures} out of 5 mixed parallel calls")
 

@@ -21,7 +21,7 @@ logger = logging.getLogger(PACKAGE_NAME)
 # Module-level client storage (managed by lifespan context)
 _graphql_client: Optional[Client] = None
 _graphql_transport: Optional[AIOHTTPTransport] = None
-_graphql_session = None  # Will hold the active session
+_graphql_session: Optional[Any] = None  # Will hold the active GQL session
 
 
 class UnexpectedResponseStatusError(ValueError):
@@ -261,19 +261,6 @@ async def lifespan(mcp):
                 _graphql_transport = None
 
         logger.info("GraphQL client shutdown complete")
-
-
-async def _create_panther_client() -> Client:
-    """Create a Panther GraphQL client with proper configuration"""
-    transport = AIOHTTPTransport(
-        url=await get_panther_gql_endpoint(),
-        headers={
-            "X-API-Key": get_panther_api_key(),
-            "User-Agent": _get_user_agent(),
-        },
-        ssl=True,  # Enable SSL verification
-    )
-    return Client(transport=transport, fetch_schema_from_transport=True)
 
 
 def graphql_date_format(input_date: datetime) -> str:

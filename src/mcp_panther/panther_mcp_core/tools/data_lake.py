@@ -447,7 +447,7 @@ async def _get_data_lake_query_results(
         - has_next_page: Boolean indicating if there are more results available
         - next_cursor: Cursor for fetching the next page of results, or null if no more pages
     """
-    logger.info(f"Fetching data lake queryresults for query ID: {query_id}")
+    logger.info(f"Fetching data lake query results for query ID: {query_id}")
 
     try:
         # Prepare input variables for pagination
