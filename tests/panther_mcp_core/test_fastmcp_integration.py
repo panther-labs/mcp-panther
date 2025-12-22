@@ -1,6 +1,7 @@
 import asyncio
 import os
 import threading
+import time
 
 import httpx
 import pytest
@@ -193,3 +194,85 @@ async def test_streaming_http_transport():
         pytest.fail(f"Test failed: {e}")
 
     # Server will be cleaned up when thread exits
+
+
+@pytest.mark.asyncio
+async def test_parallel_calls():
+    """Test multiple parallel tool calls to verify no connection issues.
+    
+    This simulates Claude Code making multiple parallel tool calls to test that
+    the "Connector is closed" error has been fixed.
+    """
+    print("🧪 Testing parallel tool calls with shared GraphQL client\n")
+
+    async with Client(mcp) as client:
+        print("✅ Connected to MCP server\n")
+
+        # Test 1: List tools to verify connection
+        print("📋 Listing available tools...")
+        tools = await client.list_tools()
+        print(f"   Found {len(tools)} tools\n")
+        assert len(tools) > 0
+
+        # Test 2: Make 10 parallel calls to a GraphQL-based tool
+        print("🔄 Making 10 parallel calls to list_log_sources...")
+        start_time = time.time()
+
+        tasks = [
+            client.call_tool("list_log_sources", {})
+            for _ in range(10)
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        duration = time.time() - start_time
+
+        # Check results
+        successes = sum(1 for r in results if not isinstance(r, Exception))
+        failures = sum(1 for r in results if isinstance(r, Exception))
+
+        print(f"   ✅ Completed in {duration:.2f}s")
+        print(f"   ✅ Successes: {successes}/10")
+
+        if failures > 0:
+            print(f"   ❌ Failures: {failures}/10")
+            print("\n   Error details:")
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    print(f"      Request {i+1}: {type(result).__name__}: {result}")
+            pytest.fail(f"Failed {failures} out of 10 parallel calls")
+
+        print("\n✅ All parallel calls succeeded!\n")
+
+        # Test 3: Make parallel calls to different tools
+        print("🔄 Making parallel calls to different GraphQL tools...")
+        start_time = time.time()
+
+        tasks = [
+            client.call_tool("list_log_sources", {}),
+            client.call_tool("list_databases", {}),
+            client.call_tool("list_log_type_schemas", {}),
+            client.call_tool("get_severity_alert_metrics", {}),
+            client.call_tool("get_rule_alert_metrics", {}),
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        duration = time.time() - start_time
+
+        successes = sum(1 for r in results if not isinstance(r, Exception))
+        failures = sum(1 for r in results if isinstance(r, Exception))
+
+        print(f"   ✅ Completed in {duration:.2f}s")
+        print(f"   ✅ Successes: {successes}/5")
+
+        if failures > 0:
+            print(f"   ❌ Failures: {failures}/5")
+            print("\n   Error details:")
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    tool_names = ["list_log_sources", "list_databases",
+                                 "list_log_type_schemas", "get_severity_alert_metrics",
+                                 "get_rule_alert_metrics"]
+                    print(f"      {tool_names[i]}: {type(result).__name__}: {result}")
+            pytest.fail(f"Failed {failures} out of 5 mixed parallel calls")
+
+        print("\n✅ All mixed parallel calls succeeded!")
