@@ -313,22 +313,86 @@ uv run python -m mcp_panther.server
 
 ### Streamable HTTP
 
-For running as a persistent web service:
+For running as a persistent web service, use the HTTP transport. This is ideal for:
+- Long-running server deployments
+- Multiple clients connecting to the same server
+- Testing and debugging with continuous log monitoring
+
+#### Using Docker Run (Detached)
 
 ```bash
-docker run \
-  -e PANTHER_INSTANCE_URL=https://instance.domain/ \
-  -e PANTHER_API_TOKEN= \
+docker run -d \
+  --name panther-mcp-server \
+  -p 8000:8000 \
+  -e PANTHER_INSTANCE_URL=https://YOUR-PANTHER-INSTANCE.domain \
+  -e PANTHER_API_TOKEN=YOUR-API-TOKEN \
   -e MCP_TRANSPORT=streamable-http \
   -e MCP_HOST=0.0.0.0 \
   -e MCP_PORT=8000 \
-  --rm -i -p 8000:8000 \
-  ghcr.io/panther-labs/mcp-panther
+  -e LOG_LEVEL=INFO \
+  --restart unless-stopped \
+  ghcr.io/panther-labs/mcp-panther:latest
 ```
 
-You can then connect to the server at `http://localhost:8000/mcp`.
+#### Using Docker Compose (Recommended)
 
-To test the connection using FastMCP client:
+Create a `docker-compose.yml` file:
+
+```yaml
+services:
+  panther-mcp:
+    image: ghcr.io/panther-labs/mcp-panther:latest
+    container_name: panther-mcp-server
+    ports:
+      - "8000:8000"
+    environment:
+      - PANTHER_INSTANCE_URL=https://YOUR-PANTHER-INSTANCE.domain
+      - PANTHER_API_TOKEN=YOUR-API-TOKEN
+      - MCP_TRANSPORT=streamable-http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+```
+
+Start the server:
+
+```bash
+# Start in detached mode
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the server
+docker-compose down
+```
+
+#### Connecting Claude Code to HTTP Server
+
+**Important:** The server runs on HTTP (not HTTPS). Configure Claude Code with the `http://` URL:
+
+```bash
+# Add the HTTP endpoint (note: http:// not https://)
+claude mcp add-json panther-http '{"url": "http://localhost:8000/mcp"}'
+
+# Verify configuration
+claude mcp list
+```
+
+#### Testing the Connection
+
+```bash
+# Test the HTTP endpoint
+curl http://localhost:8000/mcp
+
+# View server logs
+docker logs -f panther-mcp-server
+# Or with docker-compose:
+docker-compose logs -f
+```
+
+You can also test using the FastMCP client:
 
 ```python
 import asyncio
@@ -341,6 +405,33 @@ async def test_connection():
 
 asyncio.run(test_connection())
 ```
+
+#### Troubleshooting Streamable HTTP
+
+**Port Already in Use**
+
+If you see `Bind for 0.0.0.0:8000 failed: port is already allocated`:
+
+```bash
+# Check what's using the port
+lsof -i :8000
+
+# Stop conflicting containers
+docker ps | grep panther
+docker stop <container-id>
+
+# Or use a different port in docker-compose.yml:
+ports:
+  - "8080:8000"  # Map host port 8080 to container port 8000
+# Then connect to: http://localhost:8080/mcp
+```
+
+**Invalid HTTP Request Warnings**
+
+If you see `WARNING: Invalid HTTP request received` in the logs, this usually means:
+- Claude Code is trying to connect via HTTPS instead of HTTP
+- Check your configuration uses `http://` not `https://`
+- Verify with: `claude mcp list`
 
 ### Environment Variables
 
