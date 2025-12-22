@@ -21,7 +21,21 @@ logger = logging.getLogger(PACKAGE_NAME)
 # Module-level client storage (managed by lifespan context)
 _graphql_client: Optional[Client] = None
 _graphql_transport: Optional[AIOHTTPTransport] = None
-_graphql_connector: Optional[aiohttp.TCPConnector] = None  # Shared connection pool
+_graphql_connector: Optional[aiohttp.TCPConnector] = (
+    None  # Shared connection pool for GraphQL
+)
+_graphql_session: Optional[aiohttp.ClientSession] = (
+    None  # GQL session for concurrent GraphQL requests
+)
+
+# REST API client storage
+_rest_client: Optional["PantherRestClient"] = None
+_rest_session: Optional[aiohttp.ClientSession] = (
+    None  # Persistent session for REST API requests
+)
+_rest_connector: Optional[aiohttp.TCPConnector] = (
+    None  # Shared connection pool for REST
+)
 
 
 class UnexpectedResponseStatusError(ValueError):
@@ -202,19 +216,31 @@ async def lifespan(mcp):
     Yields:
         dict: Shared resources (graphql_client, transport, connector)
     """
-    global _graphql_client, _graphql_transport, _graphql_connector
+    global _graphql_client, _graphql_transport, _graphql_connector, _graphql_session
+    global _rest_session, _rest_connector
 
-    logger.info("Initializing shared GraphQL client for Panther API")
+    logger.info("Initializing shared HTTP clients for Panther API")
 
     try:
-        # Create GraphQL transport with proper connection pooling
-        # Configure connector with higher limits for parallel requests from Claude Code
+        # Create persistent connection pools for all requests
+        # High limits to support parallel requests from Claude Code
+
+        # GraphQL connection pool
         _graphql_connector = aiohttp.TCPConnector(
             limit=100,  # Total connection pool size
             limit_per_host=50,  # Connections per host (Panther API)
             ttl_dns_cache=300,  # DNS cache TTL in seconds
         )
 
+        # REST API connection pool
+        _rest_connector = aiohttp.TCPConnector(
+            limit=100,  # Total connection pool size
+            limit_per_host=50,  # Connections per host (Panther API)
+            ttl_dns_cache=300,  # DNS cache TTL in seconds
+        )
+
+        # Create GraphQL transport with connection pool
+        # Using client_session_args because that's what AIOHTTPTransport accepts
         _graphql_transport = AIOHTTPTransport(
             url=await get_panther_gql_endpoint(),
             headers={
@@ -229,57 +255,87 @@ async def lifespan(mcp):
             },
         )
 
-        # Manually connect the transport to keep it alive for the server lifetime
-        # We don't use async with Client() because that would close/reopen connections
-        await _graphql_transport.connect()
-        logger.info("GraphQL transport connected")
-
-        # Create GraphQL client with the connected transport
+        # Create GraphQL client with the transport
         _graphql_client = Client(
             transport=_graphql_transport,
-            fetch_schema_from_transport=False,  # Don't fetch on init to avoid issues
+            fetch_schema_from_transport=True,
             execute_timeout=60,
         )
 
-        logger.info("GraphQL client initialized and ready for parallel requests")
+        # Create a persistent GQL session for concurrent GraphQL requests
+        # This session stays open for the server lifetime
+        async with _graphql_client as _graphql_session:
+            logger.info("GraphQL session opened - ready for concurrent requests")
 
-        # Server runs here - transport stays connected throughout
-        yield {
-            "graphql_client": _graphql_client,
-            "transport": _graphql_transport,
-            "connector": _graphql_connector,
-        }
+            # Create persistent REST API session
+            _rest_session = aiohttp.ClientSession(
+                connector=_rest_connector,
+                connector_owner=False,  # We manage connector lifecycle
+            )
+            logger.info("REST session opened - ready for concurrent requests")
+
+            # Server runs here with persistent sessions
+            yield {
+                "graphql_client": _graphql_client,
+                "graphql_session": _graphql_session,
+                "graphql_transport": _graphql_transport,
+                "graphql_connector": _graphql_connector,
+                "rest_session": _rest_session,
+                "rest_connector": _rest_connector,
+            }
 
         logger.info("Server shutdown - cleaning up GraphQL resources")
 
     finally:
         # Cleanup on shutdown
-        logger.info("Shutting down shared GraphQL client")
+        # The GQL session is closed by the async context manager above
+        logger.info("Shutting down shared HTTP clients")
 
+        _graphql_session = None
         _graphql_client = None
 
+        # Close REST session
+        if _rest_session:
+            try:
+                await _rest_session.close()
+                logger.debug("REST session closed successfully")
+            except Exception as e:
+                logger.error(f"Error closing REST session: {e}")
+            finally:
+                _rest_session = None
+
+        # Close GraphQL transport
         if _graphql_transport:
             try:
                 await _graphql_transport.close()
-                # Give connections time to close gracefully
-                await asyncio.sleep(0.25)
                 logger.debug("GraphQL transport closed successfully")
             except Exception as e:
                 logger.error(f"Error closing GraphQL transport: {e}")
             finally:
                 _graphql_transport = None
 
-        # Close the connector since we own it (connector_owner=False)
+        # Close connectors since we own them (connector_owner=False)
+        if _rest_connector:
+            try:
+                await _rest_connector.close()
+                logger.debug("REST connector closed successfully")
+            except Exception as e:
+                logger.error(f"Error closing REST connector: {e}")
+            finally:
+                _rest_connector = None
+
         if _graphql_connector:
             try:
                 await _graphql_connector.close()
+                # Give connections time to close gracefully
+                await asyncio.sleep(0.25)
                 logger.debug("GraphQL connector closed successfully")
             except Exception as e:
                 logger.error(f"Error closing GraphQL connector: {e}")
             finally:
                 _graphql_connector = None
 
-        logger.info("GraphQL client shutdown complete")
+        logger.info("HTTP clients shutdown complete")
 
 
 def graphql_date_format(input_date: datetime) -> str:
@@ -343,11 +399,12 @@ def _get_week_date_range() -> Tuple[str, str]:
 
 
 async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute a GraphQL query using the shared client and transport.
+    """Execute a GraphQL query using the persistent GQL session.
 
-    This function uses the module-level shared GraphQL client that is initialized
-    during the server lifespan. The transport is manually connected once and stays
-    connected for the entire server lifetime, allowing safe concurrent query execution.
+    This function uses the module-level persistent GQL session that is created
+    during server lifespan and stays open for concurrent requests. Using the session
+    pattern (async with client as session) is the GQL library's recommended approach
+    for handling concurrent queries safely.
 
     Args:
         query: The GraphQL query to execute
@@ -357,22 +414,21 @@ async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any
         The query result as a dictionary
 
     Raises:
-        RuntimeError: If the shared GraphQL client is not initialized
+        RuntimeError: If the shared GraphQL session is not initialized
         TransportQueryError: If the GraphQL query fails
     """
-    global _graphql_client
+    global _graphql_session
 
-    if _graphql_client is None:
+    if _graphql_session is None:
         raise RuntimeError(
-            "GraphQL client not initialized. "
+            "GraphQL session not initialized. "
             "Server must be started with lifespan context and valid Panther credentials. "
             "Set PANTHER_INSTANCE_URL and PANTHER_API_TOKEN environment variables."
         )
 
     try:
-        # Use the client directly with the persistent transport connection
-        # The transport was manually connected in lifespan and stays open
-        result = await _graphql_client.execute_async(query, variable_values=variables)
+        # Use the persistent session which is safe for concurrent requests
+        result = await _graphql_session.execute(query, variable_values=variables)
         return result
 
     except TransportQueryError as e:
@@ -383,7 +439,7 @@ async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any
         if "Connector is closed" in str(e):
             logger.error(
                 f"Connection pool error detected: {e}. "
-                f"This should not happen with persistent transport - please report this issue."
+                f"This should not happen with persistent session - please report this issue."
             )
         raise
 
@@ -391,8 +447,8 @@ async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any
 class PantherRestClient:
     """A client for making REST API calls to Panther's API.
 
-    This client handles session management, URL construction, and default headers.
-    It uses aiohttp for making async HTTP requests.
+    This client uses the persistent session created in the lifespan context
+    to handle concurrent requests from Claude Code without "Connector is closed" errors.
     """
 
     def __init__(self):
@@ -401,22 +457,32 @@ class PantherRestClient:
         self._headers: Optional[Dict[str, str]] = None
 
     async def __aenter__(self) -> "PantherRestClient":
-        """Set up the client session when entering an async context."""
-        if not self._session:
-            self._session = aiohttp.ClientSession()
-            self._base_url = await get_panther_rest_api_base()
-            self._headers = {
-                "X-API-Key": get_panther_api_key(),
-                "Content-Type": "application/json",
-                "User-Agent": _get_user_agent(),
-            }
+        """Set up the client to use the persistent session."""
+        global _rest_session
+
+        if _rest_session is None:
+            raise RuntimeError(
+                "REST session not initialized. "
+                "Server must be started with lifespan context."
+            )
+
+        # Use the persistent session from lifespan
+        self._session = _rest_session
+        self._base_url = await get_panther_rest_api_base()
+        self._headers = {
+            "X-API-Key": get_panther_api_key(),
+            "Content-Type": "application/json",
+            "User-Agent": _get_user_agent(),
+        }
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Clean up the client session when exiting an async context."""
-        if self._session:
-            await self._session.close()
-            self._session = None
+        """Clean up without closing the persistent session."""
+        # Don't close the persistent session - it's managed by lifespan
+        # Just clear the reference
+        self._session = None
+        self._base_url = None
+        self._headers = None
 
     def _build_url(self, path: str) -> str:
         """Construct the full URL for a given path.
