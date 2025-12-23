@@ -6,6 +6,7 @@ from mcp_panther.panther_mcp_core.tools.sources import (
     get_http_log_source,
     list_log_sources,
 )
+from tests.utils.helpers import patch_execute_query
 
 SOURCES_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.sources"
 
@@ -66,12 +67,10 @@ def create_mock_rest_client():
 
 
 @pytest.mark.asyncio
-@patch(f"{SOURCES_MODULE_PATH}._create_panther_client")
-async def test_list_log_sources_success(mock_create_client):
+@patch_execute_query(SOURCES_MODULE_PATH)
+async def test_list_log_sources_success(mock_execute_query):
     """Test successful listing of log sources."""
-    mock_client = create_mock_graphql_client()
-    mock_client.execute.return_value = MOCK_SOURCES_QUERY_RESULT
-    mock_create_client.return_value = mock_client
+    mock_execute_query.return_value = MOCK_SOURCES_QUERY_RESULT
 
     result = await list_log_sources()
 
@@ -85,12 +84,10 @@ async def test_list_log_sources_success(mock_create_client):
 
 
 @pytest.mark.asyncio
-@patch(f"{SOURCES_MODULE_PATH}._create_panther_client")
-async def test_list_log_sources_with_filters(mock_create_client):
+@patch_execute_query(SOURCES_MODULE_PATH)
+async def test_list_log_sources_with_filters(mock_execute_query):
     """Test listing log sources with filters applied."""
-    mock_client = create_mock_graphql_client()
-    mock_client.execute.return_value = MOCK_SOURCES_QUERY_RESULT
-    mock_create_client.return_value = mock_client
+    mock_execute_query.return_value = MOCK_SOURCES_QUERY_RESULT
 
     result = await list_log_sources(
         log_types=["AWS.CloudTrail"], is_healthy=True, integration_type="aws-s3"
@@ -105,8 +102,8 @@ async def test_list_log_sources_with_filters(mock_create_client):
 
 
 @pytest.mark.asyncio
-@patch(f"{SOURCES_MODULE_PATH}._create_panther_client")
-async def test_list_log_sources_filtering_unhealthy(mock_create_client):
+@patch_execute_query(SOURCES_MODULE_PATH)
+async def test_list_log_sources_filtering_unhealthy(mock_execute_query):
     """Test filtering out unhealthy sources."""
     mock_unhealthy_source = MOCK_LOG_SOURCE.copy()
     mock_unhealthy_source["isHealthy"] = False
@@ -122,9 +119,7 @@ async def test_list_log_sources_filtering_unhealthy(mock_create_client):
         }
     }
 
-    mock_client = create_mock_graphql_client()
-    mock_client.execute.return_value = mock_result
-    mock_create_client.return_value = mock_client
+    mock_execute_query.return_value = mock_result
 
     # Request only healthy sources (default behavior)
     result = await list_log_sources(is_healthy=True)
@@ -134,30 +129,26 @@ async def test_list_log_sources_filtering_unhealthy(mock_create_client):
 
 
 @pytest.mark.asyncio
-@patch(f"{SOURCES_MODULE_PATH}._create_panther_client")
-async def test_list_log_sources_with_pagination(mock_create_client):
+@patch_execute_query(SOURCES_MODULE_PATH)
+async def test_list_log_sources_with_pagination(mock_execute_query):
     """Test listing log sources with pagination."""
-    mock_client = create_mock_graphql_client()
-    mock_client.execute.return_value = MOCK_SOURCES_QUERY_RESULT
-    mock_create_client.return_value = mock_client
+    mock_execute_query.return_value = MOCK_SOURCES_QUERY_RESULT
 
     result = await list_log_sources(cursor="test-cursor")
 
     assert result["success"] is True
     # Verify that cursor was passed in the query variables
-    mock_client.execute.assert_called_once()
-    call_args = mock_client.execute.call_args
-    variables = call_args[1]["variable_values"]
+    mock_execute_query.assert_called_once()
+    call_args = mock_execute_query.call_args
+    variables = call_args[0][1]  # Second positional arg is variables dict
     assert variables["input"]["cursor"] == "test-cursor"
 
 
 @pytest.mark.asyncio
-@patch(f"{SOURCES_MODULE_PATH}._create_panther_client")
-async def test_list_log_sources_error(mock_create_client):
+@patch_execute_query(SOURCES_MODULE_PATH)
+async def test_list_log_sources_error(mock_execute_query):
     """Test handling of errors when listing log sources."""
-    mock_client = create_mock_graphql_client()
-    mock_client.execute.side_effect = Exception("GraphQL Error")
-    mock_create_client.return_value = mock_client
+    mock_execute_query.side_effect = Exception("GraphQL Error")
 
     result = await list_log_sources()
 

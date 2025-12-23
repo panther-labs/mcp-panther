@@ -54,17 +54,19 @@ logger = logging.getLogger(MCP_SERVER_NAME)
 # 2. When running with MCP inspector: `uv run mcp dev src/mcp_panther/server.py`
 # 3. When installing: `uv run mcp install src/mcp_panther/server.py`
 try:
+    from panther_mcp_core.client import lifespan
     from panther_mcp_core.prompts.registry import register_all_prompts
     from panther_mcp_core.resources.registry import register_all_resources
     from panther_mcp_core.tools.registry import register_all_tools
 except ImportError:
+    from .panther_mcp_core.client import lifespan
     from .panther_mcp_core.prompts.registry import register_all_prompts
     from .panther_mcp_core.resources.registry import register_all_resources
     from .panther_mcp_core.tools.registry import register_all_tools
 
-# Create the MCP server
+# Create the MCP server with lifespan context for shared HTTP client management
 # Note: Dependencies are declared in fastmcp.json for FastMCP v2.14.0+
-mcp = FastMCP(MCP_SERVER_NAME)
+mcp = FastMCP(MCP_SERVER_NAME, lifespan=lifespan)
 
 # Register all tools with MCP using the registry
 register_all_tools(mcp)

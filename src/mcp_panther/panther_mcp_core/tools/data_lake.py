@@ -12,7 +12,7 @@ from typing import Annotated, Any, Dict, List
 import sqlparse
 from pydantic import Field
 
-from ..client import _create_panther_client, _get_today_date_range
+from ..client import _execute_query, _get_today_date_range
 from ..permissions import Permission, all_perms
 from ..queries import (
     CANCEL_DATA_LAKE_QUERY,
@@ -378,11 +378,8 @@ async def query_data_lake(
 
         logger.debug(f"Query variables: {variables}")
 
-        # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(
-                EXECUTE_DATA_LAKE_QUERY, variable_values=variables
-            )
+        # Execute the query using shared client
+        result = await _execute_query(EXECUTE_DATA_LAKE_QUERY, variables)
 
         # Get query ID from result
         query_id = result.get("executeDataLakeQuery", {}).get("id")
@@ -450,7 +447,7 @@ async def _get_data_lake_query_results(
         - has_next_page: Boolean indicating if there are more results available
         - next_cursor: Cursor for fetching the next page of results, or null if no more pages
     """
-    logger.info(f"Fetching data lake queryresults for query ID: {query_id}")
+    logger.info(f"Fetching data lake query results for query ID: {query_id}")
 
     try:
         # Prepare input variables for pagination
@@ -468,11 +465,8 @@ async def _get_data_lake_query_results(
 
         logger.debug(f"Query variables: {variables}")
 
-        # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(
-                GET_DATA_LAKE_QUERY, variable_values=variables
-            )
+        # Execute the query using shared client
+        result = await _execute_query(GET_DATA_LAKE_QUERY, variables)
 
         # Get query data
         query_data = result.get("dataLakeQuery", {})
@@ -601,9 +595,8 @@ async def list_databases() -> Dict[str, Any]:
     logger.info("Fetching datalake databases")
 
     try:
-        # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(LIST_DATABASES_QUERY)
+        # Execute the query using shared client
+        result = await _execute_query(LIST_DATABASES_QUERY, {})
 
         # Get query data
         databases = result.get("dataLakeDatabases", [])
@@ -679,11 +672,8 @@ async def list_database_tables(
 
             logger.debug(f"Query variables: {variables}")
 
-            # Execute the query asynchronously
-            async with await _create_panther_client() as session:
-                result = await session.execute(
-                    LIST_TABLES_QUERY, variable_values=variables
-                )
+            # Execute the query using shared client
+            result = await _execute_query(LIST_TABLES_QUERY, variables)
 
             # Get query data
             result = result.get("dataLakeDatabaseTables", {})
@@ -769,11 +759,8 @@ async def get_table_schema(
 
         logger.debug(f"Query variables: {variables}")
 
-        # Execute the query asynchronously
-        async with await _create_panther_client() as session:
-            result = await session.execute(
-                GET_COLUMNS_FOR_TABLE_QUERY, variable_values=variables
-            )
+        # Execute the query using shared client
+        result = await _execute_query(GET_COLUMNS_FOR_TABLE_QUERY, variables)
 
         # Get query data
         query_data = result.get("dataLakeDatabaseTable", {})
@@ -840,15 +827,10 @@ async def _cancel_data_lake_query(
     logger.info(f"Cancelling data lake query: {query_id}")
 
     try:
-        client = await _create_panther_client()
-
         variables = {"input": {"id": query_id}}
 
-        # Execute the cancellation
-        async with client as session:
-            result = await session.execute(
-                CANCEL_DATA_LAKE_QUERY, variable_values=variables
-            )
+        # Execute the cancellation using shared client
+        result = await _execute_query(CANCEL_DATA_LAKE_QUERY, variables)
 
         # Parse results
         cancellation_data = result.get("cancelDataLakeQuery", {})

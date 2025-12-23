@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import Field
 from typing_extensions import Annotated
 
-from ..client import _create_panther_client
+from ..client import _execute_query
 from ..permissions import Permission, all_perms
 from ..queries import GET_SCHEMA_DETAILS_QUERY, LIST_SCHEMAS_QUERY
 from .registry import mcp_tool
@@ -62,8 +62,6 @@ async def list_log_type_schemas(
     logger.info("Fetching available schemas")
 
     try:
-        client = await _create_panther_client()
-
         # Prepare input variables, only including non-default values
         input_vars = {}
         if contains is not None:
@@ -77,11 +75,8 @@ async def list_log_type_schemas(
 
         variables = {"input": input_vars}
 
-        # Execute the query asynchronously
-        async with client as session:
-            result = await session.execute(
-                LIST_SCHEMAS_QUERY, variable_values=variables
-            )
+        # Execute the query using shared client
+        result = await _execute_query(LIST_SCHEMAS_QUERY, variables)
 
         # Get schemas data and ensure we have the required structure
         schemas_data = result.get("schemas")
@@ -155,17 +150,14 @@ async def get_log_type_schema_details(
     logger.info(f"Fetching detailed schema information for: {', '.join(schema_names)}")
 
     try:
-        client = await _create_panther_client()
         all_schemas = []
 
         # Query each schema individually to ensure we get exact matches
         for name in schema_names:
             variables = {"name": name}  # Pass single name as string
 
-            async with client as session:
-                result = await session.execute(
-                    GET_SCHEMA_DETAILS_QUERY, variable_values=variables
-                )
+            # Execute the query using shared client
+            result = await _execute_query(GET_SCHEMA_DETAILS_QUERY, variables)
 
             schemas_data = result.get("schemas")
             if not schemas_data:

@@ -461,6 +461,32 @@ Expected Result: All rules retrieved through proper pagination
 Validation: Pagination works correctly for large result sets
 ```
 
+**Test Scenario 40: Parallel Tool Calls**
+
+```
+Prompt: "Give me a quick overview of my Panther instance: show me recent high severity alerts, current alert metrics by severity, and list log sources - all at once"
+Expected Tools: list_alerts, get_severity_alert_metrics, list_log_sources (called in parallel)
+Expected Result: All three tools execute concurrently and return results without errors
+Validation:
+- All tools complete successfully
+- No request conflicts or race conditions
+- Results are independent and correctly formatted
+- Server handles concurrent GraphQL requests properly
+```
+
+**Test Scenario 41: Parallel Tool Calls with Shared Dependencies**
+
+```
+Prompt: "I need to quickly assess detection coverage and alert volume. Show me all enabled HIGH severity rules, list policies for S3 resources, and get rule alert metrics for this week - run these in parallel"
+Expected Tools: list_detections (rules), list_detections (policies), get_rule_alert_metrics (called in parallel)
+Expected Result: All tool calls complete without HTTP connection errors or timeouts
+Validation:
+- Concurrent requests to same API endpoints work correctly
+- Connection pooling handles multiple simultaneous requests
+- No "Cannot open a client session outside of a context manager" errors
+- Results maintain data integrity
+```
+
 ## Release Validation Checklist
 
 ### Pre-Release Verification
@@ -486,6 +512,7 @@ Before marking a release as validated, verify:
 - [ ] Response times are acceptable for typical operations
 - [ ] Large queries handle timeouts gracefully
 - [ ] Bulk operations complete successfully
+- [ ] Parallel tool calls execute without connection errors
 
 #### Integration
 
