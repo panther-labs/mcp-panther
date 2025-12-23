@@ -12,6 +12,13 @@ pytestmark = pytest.mark.skipif(
     reason="Integration test only runs when FASTMCP_INTEGRATION_TEST=1",
 )
 
+# Marker for tests that need real Panther API credentials
+needs_credentials = pytest.mark.skipif(
+    not os.environ.get("PANTHER_INSTANCE_URL")
+    or not os.environ.get("PANTHER_API_TOKEN"),
+    reason="Test requires real Panther credentials (PANTHER_INSTANCE_URL and PANTHER_API_TOKEN)",
+)
+
 from fastmcp import Client
 
 from src.mcp_panther.server import mcp
@@ -136,6 +143,7 @@ TEST_TIMEOUT = 5.0
 STARTUP_DELAY = 2.0
 
 
+@needs_credentials
 @pytest.mark.asyncio
 async def test_streaming_http_transport():
     """Test streaming HTTP transport functionality."""
@@ -196,6 +204,7 @@ async def test_streaming_http_transport():
     # Server will be cleaned up when thread exits
 
 
+@needs_credentials
 @pytest.mark.asyncio
 async def test_parallel_calls():
     """Test multiple parallel tool calls to verify no connection issues.

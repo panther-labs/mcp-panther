@@ -221,6 +221,20 @@ async def lifespan(mcp):
 
     logger.info("Initializing shared HTTP clients for Panther API")
 
+    # Check if credentials are available - defer validation to API call time
+    instance_url = os.getenv("PANTHER_INSTANCE_URL")
+    api_token = os.getenv("PANTHER_API_TOKEN")
+
+    if not instance_url or not api_token:
+        logger.warning(
+            "Panther credentials not configured. "
+            "Set PANTHER_INSTANCE_URL and PANTHER_API_TOKEN environment variables. "
+            "Tools will fail when attempting API calls."
+        )
+        # Yield without initializing clients - tools will fail gracefully at call time
+        yield {}
+        return
+
     try:
         # Create persistent connection pools for all requests
         # High limits to support parallel requests from Claude Code
