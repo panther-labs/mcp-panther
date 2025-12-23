@@ -7,21 +7,13 @@ import httpx
 import pytest
 from fastmcp.exceptions import ToolError
 
-from tests.conftest import has_panther_credentials
+from tests.conftest import needs_credentials
 
-# Skip all tests in this module if either:
-# 1. FASTMCP_INTEGRATION_TEST != 1 (integration tests not explicitly enabled)
-# 2. Panther credentials are not available (PANTHER_INSTANCE_URL and PANTHER_API_TOKEN)
-pytestmark = [
-    pytest.mark.skipif(
-        os.environ.get("FASTMCP_INTEGRATION_TEST") != "1",
-        reason="Integration test only runs when FASTMCP_INTEGRATION_TEST=1",
-    ),
-    pytest.mark.skipif(
-        not has_panther_credentials(),
-        reason="Test requires PANTHER_INSTANCE_URL and PANTHER_API_TOKEN environment variables",
-    ),
-]
+# Skip all tests in this module unless integration tests are explicitly enabled
+pytestmark = pytest.mark.skipif(
+    os.environ.get("FASTMCP_INTEGRATION_TEST") != "1",
+    reason="Integration test only runs when FASTMCP_INTEGRATION_TEST=1",
+)
 
 from fastmcp import Client
 
@@ -147,6 +139,7 @@ TEST_TIMEOUT = 5.0
 STARTUP_DELAY = 2.0
 
 
+@needs_credentials
 @pytest.mark.asyncio
 async def test_streaming_http_transport():
     """Test streaming HTTP transport functionality."""
@@ -207,6 +200,7 @@ async def test_streaming_http_transport():
     # Server will be cleaned up when thread exits
 
 
+@needs_credentials
 @pytest.mark.asyncio
 async def test_parallel_calls():
     """Test multiple parallel tool calls to verify no connection issues.

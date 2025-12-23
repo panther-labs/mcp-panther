@@ -210,6 +210,9 @@ async def lifespan(mcp):
     that persist across requests, enabling proper connection pooling and
     preventing "Connector is closed" errors during parallel tool calls.
 
+    If credentials are not configured, the server will still start but tools
+    will fail with clear error messages when they attempt API calls.
+
     Args:
         mcp: The FastMCP server instance
 
@@ -220,6 +223,20 @@ async def lifespan(mcp):
     global _rest_session, _rest_connector
 
     logger.info("Initializing shared HTTP clients for Panther API")
+
+    # Check if credentials are available
+    instance_url = os.getenv("PANTHER_INSTANCE_URL")
+    api_token = os.getenv("PANTHER_API_TOKEN")
+
+    if not instance_url or not api_token:
+        logger.warning(
+            "Panther credentials not configured. "
+            "Set PANTHER_INSTANCE_URL and PANTHER_API_TOKEN environment variables. "
+            "Tools will fail when attempting API calls."
+        )
+        # Yield without initializing clients - tools will fail gracefully at call time
+        yield {}
+        return
 
     try:
         # Create persistent connection pools for all requests
