@@ -237,16 +237,37 @@ Once configured, navigate to Cursor Settings > MCP to view the running server:
 
 ### Claude Code
 
-[Claude Code](https://code.claude.com/docs) is Anthropic's official CLI tool. Add the Panther MCP server with a single command:
+[Claude Code](https://code.claude.com/docs) is Anthropic's official CLI tool. Add the Panther MCP server using Docker:
 
 ```bash
-claude mcp add-json panther '{"command":"docker","args":["run","-i","-e","PANTHER_INSTANCE_URL","-e","PANTHER_API_TOKEN","--rm","ghcr.io/panther-labs/mcp-panther"],"env":{"PANTHER_INSTANCE_URL":"https://YOUR-PANTHER-INSTANCE.domain","PANTHER_API_TOKEN":"YOUR-API-TOKEN"}}'
+claude mcp add-json panther '{
+  "command": "docker",
+  "args": [
+    "run",
+    "-i",
+    "-e", "PANTHER_INSTANCE_URL",
+    "-e", "PANTHER_API_TOKEN",
+    "--rm",
+    "ghcr.io/panther-labs/mcp-panther"
+  ],
+  "env": {
+    "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
+    "PANTHER_API_TOKEN": "YOUR-API-TOKEN"
+  }
+}'
 ```
 
 Alternatively, using UVX:
 
 ```bash
-claude mcp add-json panther '{"command":"uvx","args":["mcp-panther"],"env":{"PANTHER_INSTANCE_URL":"https://YOUR-PANTHER-INSTANCE.domain","PANTHER_API_TOKEN":"YOUR-API-TOKEN"}}'
+claude mcp add-json panther '{
+  "command": "uvx",
+  "args": ["mcp-panther"],
+  "env": {
+    "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
+    "PANTHER_API_TOKEN": "YOUR-API-TOKEN"
+  }
+}'
 ```
 
 After adding, verify the server is configured:
@@ -374,7 +395,9 @@ docker-compose down
 
 ```bash
 # Add the HTTP endpoint (note: http:// not https://)
-claude mcp add-json panther-http '{"url": "http://localhost:8000/mcp"}'
+claude mcp add-json panther-http '{
+  "url": "http://localhost:8000/mcp"
+}'
 
 # Verify configuration
 claude mcp list
@@ -420,9 +443,8 @@ lsof -i :8000
 docker ps | grep panther
 docker stop <container-id>
 
-# Or use a different port in docker-compose.yml:
-ports:
-  - "8080:8000"  # Map host port 8080 to container port 8000
+# Or use a different port via MCP_PORT environment variable:
+-e MCP_PORT=8080
 # Then connect to: http://localhost:8080/mcp
 ```
 

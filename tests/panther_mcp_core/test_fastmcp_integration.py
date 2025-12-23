@@ -7,10 +7,21 @@ import httpx
 import pytest
 from fastmcp.exceptions import ToolError
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("FASTMCP_INTEGRATION_TEST") != "1",
-    reason="Integration test only runs when FASTMCP_INTEGRATION_TEST=1",
-)
+from tests.conftest import has_panther_credentials
+
+# Skip all tests in this module if either:
+# 1. FASTMCP_INTEGRATION_TEST != 1 (integration tests not explicitly enabled)
+# 2. Panther credentials are not available (PANTHER_INSTANCE_URL and PANTHER_API_TOKEN)
+pytestmark = [
+    pytest.mark.skipif(
+        os.environ.get("FASTMCP_INTEGRATION_TEST") != "1",
+        reason="Integration test only runs when FASTMCP_INTEGRATION_TEST=1",
+    ),
+    pytest.mark.skipif(
+        not has_panther_credentials(),
+        reason="Test requires PANTHER_INSTANCE_URL and PANTHER_API_TOKEN environment variables",
+    ),
+]
 
 from fastmcp import Client
 
