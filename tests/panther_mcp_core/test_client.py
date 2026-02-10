@@ -132,6 +132,38 @@ async def test_get_instance_config_fallback():
             assert config == {"rest": "http://example.com"}
 
 
+@pytest.mark.parametrize(
+    "env_value,expected_ssl",
+    [
+        ("false", True),
+        ("False", True),
+        ("0", True),
+        ("no", True),
+        ("", True),
+        ("true", False),
+        ("1", False),
+        ("yes", False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_allow_insecure_instance_boolean_parsing(env_value, expected_ssl):
+    mock_response = mock.Mock(spec=ClientResponse)
+    mock_response.status = 200
+    mock_response.text.return_value = (
+        '<script id="__PANTHER_CONFIG__">{"key": "value"}</script>'
+    )
+
+    with mock.patch.dict(os.environ, {"PANTHER_ALLOW_INSECURE_INSTANCE": env_value}):
+        with mock.patch("aiohttp.ClientSession.get") as mock_get:
+            mock_get.return_value.__aenter__.return_value = mock_response
+            await get_json_from_script_tag(
+                "http://example.com", "__PANTHER_CONFIG__"
+            )
+            mock_get.assert_called_once_with(
+                "http://example.com", ssl=expected_ssl
+            )
+
+
 @pytest.mark.asyncio
 async def test_get_panther_rest_api_base():
     """Test REST API base URL resolution."""
