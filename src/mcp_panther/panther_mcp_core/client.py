@@ -13,6 +13,8 @@ from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.exceptions import TransportQueryError
 
+from .utils import parse_bool
+
 PACKAGE_NAME = "mcp-panther"
 
 # Get logger
@@ -57,7 +59,7 @@ async def get_json_from_script_tag(
     """
     async with aiohttp.ClientSession() as session:
         async with session.get(
-            url, ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE")
+            url, ssl=not parse_bool(os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"))
         ) as response:
             if response.status != 200:
                 raise UnexpectedResponseStatusError(
@@ -563,7 +565,7 @@ class PantherRestClient:
             self._build_url(path),
             headers=self._headers,
             params=params,
-            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+            ssl=not parse_bool(os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE")),
         ) as response:
             await self._validate_response(response, expected_codes)
             return await response.json(), response.status
@@ -599,7 +601,7 @@ class PantherRestClient:
             headers=self._headers,
             json=json_data,
             params=params,
-            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+            ssl=not parse_bool(os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE")),
         ) as response:
             await self._validate_response(response, expected_codes)
             return await response.json(), response.status
@@ -635,7 +637,7 @@ class PantherRestClient:
             headers=self._headers,
             json=json_data,
             params=params,
-            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+            ssl=not parse_bool(os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE")),
         ) as response:
             await self._validate_response(response, expected_codes)
             return await response.json(), response.status
@@ -671,7 +673,7 @@ class PantherRestClient:
             headers=self._headers,
             json=json_data,
             params=params,
-            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+            ssl=not parse_bool(os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE")),
         ) as response:
             await self._validate_response(response, expected_codes)
             return await response.json(), response.status
@@ -704,7 +706,7 @@ class PantherRestClient:
             self._build_url(path),
             headers=self._headers,
             params=params,
-            ssl=not os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"),
+            ssl=not parse_bool(os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE")),
         ) as response:
             await self._validate_response(response, expected_codes)
             return await response.json(), response.status
