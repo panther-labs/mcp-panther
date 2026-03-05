@@ -57,7 +57,7 @@ async def get_json_from_script_tag(
     Returns:
         Parsed JSON content, raw string if not valid JSON, or None if not found
     """
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=True) as session:
         async with session.get(
             url, ssl=not parse_bool(os.getenv("PANTHER_ALLOW_INSECURE_INSTANCE"))
         ) as response:
@@ -271,6 +271,7 @@ async def lifespan(mcp):
             client_session_args={
                 "connector": _graphql_connector,
                 "connector_owner": False,  # We manage connector lifecycle
+                "trust_env": True,  # Respect HTTP_PROXY/HTTPS_PROXY for sandboxed environments
             },
         )
 
@@ -290,6 +291,7 @@ async def lifespan(mcp):
             _rest_session = aiohttp.ClientSession(
                 connector=_rest_connector,
                 connector_owner=False,  # We manage connector lifecycle
+                trust_env=True,  # Respect HTTP_PROXY/HTTPS_PROXY for sandboxed environments
             )
             logger.info("REST session opened - ready for concurrent requests")
 
