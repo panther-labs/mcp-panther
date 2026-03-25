@@ -17,12 +17,43 @@ The `mcp-custom-handler` configuration profile in `host.json` automatically:
 
 ## Prerequisites
 
-| Tool | Version | Install |
-|---|---|---|
-| [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) | Latest | `brew install azure-cli` |
-| [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) | v4 | `npm install -g azure-functions-core-tools@4` |
-| Python | 3.12+ | `brew install python@3.12` |
-| [uv](https://docs.astral.sh/uv/getting-started/installation/) | Latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+### Azure CLI
+
+| OS | Install |
+|---|---|
+| macOS | `brew install azure-cli` |
+| Linux | `curl -sL https://aka.ms/InstallAzureCLIDeb \| sudo bash` |
+| Windows | `winget install Microsoft.AzureCLI` |
+
+### Azure Functions Core Tools v4
+
+| OS | Install |
+|---|---|
+| macOS | `brew tap azure/functions && brew install azure-functions-core-tools@4` |
+| Linux (Ubuntu/Debian) | See [Linux install instructions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local#linux) |
+| Windows | `winget install Microsoft.AzureFunctionsCoreTools` |
+
+### Python 3.12+
+
+| OS | Install |
+|---|---|
+| macOS | `brew install python@3.12` |
+| Linux (Ubuntu/Debian) | `sudo apt install python3.12 python3.12-venv` |
+| Windows | `winget install Python.Python.3.12` |
+
+### uv
+
+| OS | Install |
+|---|---|
+| macOS / Linux | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| Windows (PowerShell) | `powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 \| iex"` |
+
+> **Windows note:** `startup.sh` uses bash. For local development on Windows you need either
+> [Git Bash](https://git-scm.com/downloads) (recommended) or
+> [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install).
+> On Azure, the Functions host runs on Linux so `startup.sh` works without any extra setup.
+
+---
 
 ## Local Development
 
@@ -31,19 +62,25 @@ Test the Azure Functions setup locally before deploying to Azure using Azure Fun
 ### 1. Install dependencies
 
 ```bash
-# Create virtual environment and install mcp-panther with all dependencies
+# macOS / Linux / Windows (Git Bash)
 uv sync
 ```
 
 ### 2. Configure credentials
 
-Copy `local.settings.json` and fill in your Panther credentials:
+Edit `local.settings.json` with your Panther credentials:
 
+**macOS / Linux**
 ```bash
 cp local.settings.json local.settings.json.bak   # optional backup
 ```
 
-Edit `local.settings.json`:
+**Windows (PowerShell)**
+```powershell
+Copy-Item local.settings.json local.settings.json.bak   # optional backup
+```
+
+Then update the values:
 
 ```json
 {
@@ -59,9 +96,32 @@ Edit `local.settings.json`:
 
 > **Important:** `local.settings.json` is in `.gitignore` — never commit it.
 
-### 3. Start the local Functions host
+### 3. Activate the virtual environment
 
+**macOS / Linux**
 ```bash
+source .venv/bin/activate
+```
+
+**Windows (PowerShell)**
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+**Windows (Git Bash)**
+```bash
+source .venv/Scripts/activate
+```
+
+### 4. Start the local Functions host
+
+**macOS / Linux / Windows (Git Bash)**
+```bash
+func start
+```
+
+**Windows (PowerShell)**
+```powershell
 func start
 ```
 
@@ -79,7 +139,7 @@ Functions:
     custom-handler: [GET,POST] http://localhost:7071/{*route}
 ```
 
-### 4. Connect an MCP client locally
+### 5. Connect an MCP client locally
 
 Configure your MCP client to use the local Functions endpoint:
 
@@ -101,6 +161,7 @@ Configure your MCP client to use the local Functions endpoint:
 
 ### Step 1: Log in and set subscription
 
+**macOS / Linux / Windows**
 ```bash
 az login
 az account set --subscription "<YOUR-SUBSCRIPTION-ID>"
@@ -110,6 +171,7 @@ az account set --subscription "<YOUR-SUBSCRIPTION-ID>"
 
 > **Required plan:** Flex Consumption — self-hosted MCP servers must be hosted on the Flex Consumption plan per the [Azure Functions MCP documentation](https://learn.microsoft.com/en-us/azure/azure-functions/self-hosted-mcp-servers).
 
+**macOS / Linux / Windows (Git Bash)**
 ```bash
 # Variables — adjust to your preference
 RESOURCE_GROUP="rg-panther-mcp"
@@ -139,8 +201,39 @@ az functionapp create \
     --runtime-version 3.12
 ```
 
+**Windows (PowerShell)**
+```powershell
+# Variables — adjust to your preference
+$RESOURCE_GROUP = "rg-panther-mcp"
+$LOCATION = "eastus2"
+$STORAGE_ACCOUNT = "stpanthermcp$(Get-Random -Maximum 99999)"   # must be globally unique
+$FUNCTION_APP = "panther-mcp-$(Get-Random -Maximum 99999)"      # must be globally unique
+
+# Resource group
+az group create `
+    --name $RESOURCE_GROUP `
+    --location $LOCATION
+
+# Storage account (required by Functions)
+az storage account create `
+    --name $STORAGE_ACCOUNT `
+    --resource-group $RESOURCE_GROUP `
+    --location $LOCATION `
+    --sku Standard_LRS
+
+# Function App on Flex Consumption plan
+az functionapp create `
+    --resource-group $RESOURCE_GROUP `
+    --name $FUNCTION_APP `
+    --storage-account $STORAGE_ACCOUNT `
+    --flexconsumption-location $LOCATION `
+    --runtime python `
+    --runtime-version 3.12
+```
+
 ### Step 3: Configure application settings
 
+**macOS / Linux / Windows (Git Bash)**
 ```bash
 az functionapp config appsettings set \
     --resource-group "$RESOURCE_GROUP" \
@@ -152,21 +245,40 @@ az functionapp config appsettings set \
         LOG_LEVEL="WARNING"
 ```
 
+**Windows (PowerShell)**
+```powershell
+az functionapp config appsettings set `
+    --resource-group $RESOURCE_GROUP `
+    --name $FUNCTION_APP `
+    --settings `
+        FUNCTIONS_WORKER_RUNTIME=custom `
+        PANTHER_INSTANCE_URL="https://YOUR-INSTANCE.panther.io" `
+        PANTHER_API_TOKEN="YOUR-API-TOKEN" `
+        LOG_LEVEL="WARNING"
+```
+
 > **Security tip:** Use Azure Key Vault references instead of plain-text values for secrets:
-> ```bash
+> ```
 > PANTHER_API_TOKEN="@Microsoft.KeyVault(SecretUri=https://YOUR-VAULT.vault.azure.net/secrets/panther-api-token/)"
 > ```
 
 ### Step 4: Deploy the function app
 
+**macOS / Linux / Windows (Git Bash)**
 ```bash
 func azure functionapp publish "$FUNCTION_APP"
+```
+
+**Windows (PowerShell)**
+```powershell
+func azure functionapp publish $FUNCTION_APP
 ```
 
 `startup.sh` runs on first request and installs the package. Subsequent cold starts reuse the cached installation.
 
 ### Step 5: Verify deployment
 
+**macOS / Linux / Windows (Git Bash)**
 ```bash
 # Check the function app is running
 az functionapp show \
@@ -176,6 +288,18 @@ az functionapp show \
 
 # Test the MCP endpoint
 curl -s "https://${FUNCTION_APP}.azurewebsites.net/mcp"
+```
+
+**Windows (PowerShell)**
+```powershell
+# Check the function app is running
+az functionapp show `
+    --resource-group $RESOURCE_GROUP `
+    --name $FUNCTION_APP `
+    --query "state" -o tsv
+
+# Test the MCP endpoint
+Invoke-RestMethod -Uri "https://$FUNCTION_APP.azurewebsites.net/mcp"
 ```
 
 ---
@@ -243,11 +367,18 @@ Set `defaultAuthorizationLevel` in `host.json` and pass the key as a query param
 }
 ```
 
+**macOS / Linux / Windows (Git Bash)**
 ```bash
-# Get the function key
 az functionapp keys list \
     --resource-group "$RESOURCE_GROUP" \
     --name "$FUNCTION_APP"
+```
+
+**Windows (PowerShell)**
+```powershell
+az functionapp keys list `
+    --resource-group $RESOURCE_GROUP `
+    --name $FUNCTION_APP
 ```
 
 MCP client URL with key:
@@ -261,22 +392,40 @@ https://YOUR-FUNCTION-APP.azurewebsites.net/mcp?code=YOUR-FUNCTION-KEY
 
 ### `func start` fails to find `python`
 
-Ensure your virtual environment is activated or Python 3.12 is on your `PATH`:
+Ensure your virtual environment is activated.
 
+**macOS / Linux**
 ```bash
 source .venv/bin/activate
 func start
 ```
 
-### MCP client receives `404` or empty response
+**Windows (PowerShell)**
+```powershell
+.venv\Scripts\Activate.ps1
+func start
+```
 
-Verify the route prefix is empty. The `mcp-custom-handler` profile sets this automatically, but if you have a custom `host.json`, confirm `extensions.http.routePrefix` is `""`.
+**Windows (Git Bash)**
+```bash
+source .venv/Scripts/activate
+func start
+```
+
+### `startup.sh` not found or permission denied on Windows (local)
+
+`startup.sh` requires bash. Install [Git for Windows](https://git-scm.com/downloads) (includes Git Bash) and ensure `bash` is on your `PATH`, or use WSL 2. Verify with:
+
+```bash
+bash --version
+```
 
 ### `startup.sh` permission denied on Azure
 
 The deployment zip must preserve the executable bit. Check it with:
 
 ```bash
+# macOS / Linux / Windows (Git Bash)
 ls -la startup.sh  # should show -rwxr-xr-x
 ```
 
@@ -286,21 +435,33 @@ If lost, re-add it before deploying:
 chmod +x startup.sh
 ```
 
+### MCP client receives `404` or empty response
+
+Verify the route prefix is empty. The `mcp-custom-handler` profile sets this automatically, but if you have a custom `host.json`, confirm `extensions.http.routePrefix` is `""`.
+
 ### Cold start is slow
 
-`startup.sh` runs `pip install .` on every new instance cold start. To speed this up in CI/CD, pre-install dependencies into `.python_packages/` and update `startup.sh` to skip the install step:
+`startup.sh` runs `pip install .` on every new instance cold start. To speed this up in CI/CD, pre-install dependencies before deploying.
 
+**macOS / Linux / Windows (Git Bash)**
 ```bash
-# In your CI/CD pipeline, before deploying:
+# Pre-install dependencies into a local target directory
 pip install -r requirements.txt --target .python_packages/lib/site-packages
 
-# Then update startup.sh to skip install if packages are present:
+# Update startup.sh to use pre-installed packages instead of running pip install:
 export PYTHONPATH=".python_packages/lib/site-packages:${PYTHONPATH}"
 exec python -m mcp_panther.server --transport streamable-http --host 0.0.0.0 --port 8080
 ```
 
+**Windows (PowerShell)**
+```powershell
+# Pre-install dependencies into a local target directory
+pip install -r requirements.txt --target .python_packages/lib/site-packages
+```
+
 ### View server logs
 
+**macOS / Linux / Windows (Git Bash)**
 ```bash
 # Stream live logs from Azure
 func azure functionapp logstream "$FUNCTION_APP"
@@ -311,17 +472,35 @@ az webapp log tail \
     --name "$FUNCTION_APP"
 ```
 
+**Windows (PowerShell)**
+```powershell
+func azure functionapp logstream $FUNCTION_APP
+
+az webapp log tail `
+    --resource-group $RESOURCE_GROUP `
+    --name $FUNCTION_APP
+```
+
 ---
 
 ## Azure API Center Registration (Optional)
 
 Register the deployed server in Azure API Center to share it across your organization:
 
+**macOS / Linux / Windows (Git Bash)**
 ```bash
 az apic api register \
     --resource-group "$RESOURCE_GROUP" \
     --service-name "<YOUR-API-CENTER>" \
     --api-location "https://${FUNCTION_APP}.azurewebsites.net/mcp"
+```
+
+**Windows (PowerShell)**
+```powershell
+az apic api register `
+    --resource-group $RESOURCE_GROUP `
+    --service-name "<YOUR-API-CENTER>" `
+    --api-location "https://$FUNCTION_APP.azurewebsites.net/mcp"
 ```
 
 See [Register MCP servers in Azure API Center](https://learn.microsoft.com/en-us/azure/api-center/register-mcp-servers) for full details.
