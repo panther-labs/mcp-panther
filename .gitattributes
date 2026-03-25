@@ -1,0 +1,4 @@
+# Force LF line endings for shell scripts on all platforms.
+# Prevents Windows Git (core.autocrlf=true) from converting to CRLF,
+# which causes "command not found" errors when bash executes the script.
+startup.sh text eol=lf

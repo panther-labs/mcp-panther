@@ -398,27 +398,37 @@ https://YOUR-FUNCTION-APP.azurewebsites.net/mcp?code=YOUR-FUNCTION-KEY
 
 ## Troubleshooting
 
+### `$'\r': command not found` or `pip: command not found` on Windows
+
+This is caused by two separate Windows issues that the current `startup.sh` handles automatically — but only if your checkout has LF line endings.
+
+**Root cause 1 — CRLF line endings:** Windows Git converts `\n` to `\r\n` on checkout when `core.autocrlf=true`. Bash then sees `\r` as a command on every line. The repo contains a `.gitattributes` rule that forces LF for `startup.sh`, but if you cloned before this fix was added, your local copy may still have CRLF.
+
+Fix: re-checkout the file to apply the `.gitattributes` rule:
+
+```powershell
+# In PowerShell or Git Bash
+git checkout startup.sh
+```
+
+Verify the line endings are LF:
+```bash
+file startup.sh   # should NOT say "CRLF"
+```
+
+**Root cause 2 — venv not active in bash:** Even if you ran `.venv\Scripts\Activate.ps1` in PowerShell, the bash subprocess started by `func` gets its own environment. `startup.sh` now detects and activates the venv itself, so you no longer need to activate before running `func start`.
+
 ### `func start` fails to find `python`
 
-Ensure your virtual environment is activated.
+Ensure the virtual environment was created first:
 
-**macOS / Linux**
 ```bash
-source .venv/bin/activate
+# macOS / Linux / Windows (Git Bash or PowerShell)
+uv sync
 func start
 ```
 
-**Windows (PowerShell)**
-```powershell
-.venv\Scripts\Activate.ps1
-func start
-```
-
-**Windows (Git Bash)**
-```bash
-source .venv/Scripts/activate
-func start
-```
+`startup.sh` will activate the venv automatically. Manual activation before `func start` is no longer required.
 
 ### `startup.sh` not found or permission denied on Windows (local)
 
