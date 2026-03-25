@@ -1,0 +1,327 @@
+# Deploying mcp-panther to Azure Functions (Self-Hosted)
+
+This guide covers deploying mcp-panther as a remote MCP server on Azure Functions using the [self-hosted custom handler approach](https://learn.microsoft.com/en-us/azure/azure-functions/self-hosted-mcp-servers). No code changes to the server are required — only the configuration files in this repository are needed.
+
+## How It Works
+
+Azure Functions acts as a reverse proxy via the **custom handler** mechanism:
+
+```
+MCP Client → Azure Functions host (HTTPS) → startup.sh → mcp-panther (streamable-http on port 8080)
+```
+
+The `mcp-custom-handler` configuration profile in `host.json` automatically:
+- Enables HTTP proxying (`enableProxying: true`) so the full request is forwarded to the server
+- Sets a wildcard route (`{*route}`) so all paths (including `/mcp`) are forwarded
+- Removes the default `/api` route prefix so the MCP endpoint is at the root
+
+## Prerequisites
+
+| Tool | Version | Install |
+|---|---|---|
+| [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) | Latest | `brew install azure-cli` |
+| [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) | v4 | `npm install -g azure-functions-core-tools@4` |
+| Python | 3.12+ | `brew install python@3.12` |
+| [uv](https://docs.astral.sh/uv/getting-started/installation/) | Latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+
+## Local Development
+
+Test the Azure Functions setup locally before deploying to Azure using Azure Functions Core Tools, which simulates the Functions host and the custom handler proxy.
+
+### 1. Install dependencies
+
+```bash
+# Create virtual environment and install mcp-panther with all dependencies
+uv sync
+```
+
+### 2. Configure credentials
+
+Copy `local.settings.json` and fill in your Panther credentials:
+
+```bash
+cp local.settings.json local.settings.json.bak   # optional backup
+```
+
+Edit `local.settings.json`:
+
+```json
+{
+    "IsEncrypted": false,
+    "Values": {
+        "FUNCTIONS_WORKER_RUNTIME": "custom",
+        "PANTHER_INSTANCE_URL": "https://YOUR-INSTANCE.panther.io",
+        "PANTHER_API_TOKEN": "YOUR-API-TOKEN",
+        "LOG_LEVEL": "INFO"
+    }
+}
+```
+
+> **Important:** `local.settings.json` is in `.gitignore` — never commit it.
+
+### 3. Start the local Functions host
+
+```bash
+func start
+```
+
+The Functions host starts on `http://localhost:7071` and launches `startup.sh`, which installs the package and starts the MCP server on port 8080. The Functions host proxies all traffic to it.
+
+Expected output:
+```
+Azure Functions Core Tools
+Core Tools Version: 4.x.x
+...
+[startup.sh] Installing mcp-panther...
+[startup.sh] Starting Panther MCP server on port 8080...
+...
+Functions:
+    custom-handler: [GET,POST] http://localhost:7071/{*route}
+```
+
+### 4. Connect an MCP client locally
+
+Configure your MCP client to use the local Functions endpoint:
+
+```json
+{
+    "mcpServers": {
+        "panther-local": {
+            "url": "http://localhost:7071/mcp"
+        }
+    }
+}
+```
+
+> **Note:** `func start` is required for local testing — you cannot run `python -m mcp_panther.server` directly and have it work with the Functions proxy. If you need to test the server standalone without Functions, use `uv run python -m mcp_panther.server --transport streamable-http --host 127.0.0.1 --port 8080` instead.
+
+---
+
+## Azure Deployment
+
+### Step 1: Log in and set subscription
+
+```bash
+az login
+az account set --subscription "<YOUR-SUBSCRIPTION-ID>"
+```
+
+### Step 2: Create Azure resources
+
+> **Required plan:** Flex Consumption — self-hosted MCP servers must be hosted on the Flex Consumption plan per the [Azure Functions MCP documentation](https://learn.microsoft.com/en-us/azure/azure-functions/self-hosted-mcp-servers).
+
+```bash
+# Variables — adjust to your preference
+RESOURCE_GROUP="rg-panther-mcp"
+LOCATION="eastus2"
+STORAGE_ACCOUNT="stpanthermcp$RANDOM"   # must be globally unique
+FUNCTION_APP="panther-mcp-$RANDOM"      # must be globally unique
+
+# Resource group
+az group create \
+    --name "$RESOURCE_GROUP" \
+    --location "$LOCATION"
+
+# Storage account (required by Functions)
+az storage account create \
+    --name "$STORAGE_ACCOUNT" \
+    --resource-group "$RESOURCE_GROUP" \
+    --location "$LOCATION" \
+    --sku Standard_LRS
+
+# Function App on Flex Consumption plan
+az functionapp create \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$FUNCTION_APP" \
+    --storage-account "$STORAGE_ACCOUNT" \
+    --flexconsumption-location "$LOCATION" \
+    --runtime python \
+    --runtime-version 3.12
+```
+
+### Step 3: Configure application settings
+
+```bash
+az functionapp config appsettings set \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$FUNCTION_APP" \
+    --settings \
+        FUNCTIONS_WORKER_RUNTIME=custom \
+        PANTHER_INSTANCE_URL="https://YOUR-INSTANCE.panther.io" \
+        PANTHER_API_TOKEN="YOUR-API-TOKEN" \
+        LOG_LEVEL="WARNING"
+```
+
+> **Security tip:** Use Azure Key Vault references instead of plain-text values for secrets:
+> ```bash
+> PANTHER_API_TOKEN="@Microsoft.KeyVault(SecretUri=https://YOUR-VAULT.vault.azure.net/secrets/panther-api-token/)"
+> ```
+
+### Step 4: Deploy the function app
+
+```bash
+func azure functionapp publish "$FUNCTION_APP"
+```
+
+`startup.sh` runs on first request and installs the package. Subsequent cold starts reuse the cached installation.
+
+### Step 5: Verify deployment
+
+```bash
+# Check the function app is running
+az functionapp show \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$FUNCTION_APP" \
+    --query "state" -o tsv
+
+# Test the MCP endpoint
+curl -s "https://${FUNCTION_APP}.azurewebsites.net/mcp"
+```
+
+---
+
+## Connecting MCP Clients to the Remote Server
+
+### Claude Code
+
+```bash
+claude mcp add-json panther '{
+    "url": "https://YOUR-FUNCTION-APP.azurewebsites.net/mcp"
+}'
+```
+
+### Cursor / Claude Desktop / Other clients
+
+```json
+{
+    "mcpServers": {
+        "panther": {
+            "url": "https://YOUR-FUNCTION-APP.azurewebsites.net/mcp"
+        }
+    }
+}
+```
+
+---
+
+## Authentication (Recommended for Production)
+
+By default the endpoint is publicly accessible. Azure Functions provides two options to secure it.
+
+### Option A: Built-in App Service Authentication (OAuth / Entra ID)
+
+This satisfies the MCP authorization spec (issues 401 challenges, exposes Protected Resource Metadata). Configure it in the Azure portal:
+
+1. Navigate to your Function App → **Authentication**
+2. Click **Add identity provider** → Select **Microsoft**
+3. Configure the app registration (or let Azure create one)
+4. Set **Unauthenticated requests** to `HTTP 401 Unauthorized`
+
+Clients must obtain an Entra ID token and pass it as a bearer token:
+```
+Authorization: Bearer <token>
+```
+
+### Option B: Function-level API Keys
+
+Set `defaultAuthorizationLevel` in `host.json` and pass the key as a query parameter:
+
+```json
+{
+    "version": "2.0",
+    "configurationProfile": "mcp-custom-handler",
+    "customHandler": {
+        "description": {
+            "defaultExecutablePath": "bash",
+            "arguments": ["startup.sh"]
+        },
+        "port": "8080",
+        "http": {
+            "defaultAuthorizationLevel": "function"
+        }
+    }
+}
+```
+
+```bash
+# Get the function key
+az functionapp keys list \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$FUNCTION_APP"
+```
+
+MCP client URL with key:
+```
+https://YOUR-FUNCTION-APP.azurewebsites.net/mcp?code=YOUR-FUNCTION-KEY
+```
+
+---
+
+## Troubleshooting
+
+### `func start` fails to find `python`
+
+Ensure your virtual environment is activated or Python 3.12 is on your `PATH`:
+
+```bash
+source .venv/bin/activate
+func start
+```
+
+### MCP client receives `404` or empty response
+
+Verify the route prefix is empty. The `mcp-custom-handler` profile sets this automatically, but if you have a custom `host.json`, confirm `extensions.http.routePrefix` is `""`.
+
+### `startup.sh` permission denied on Azure
+
+The deployment zip must preserve the executable bit. Check it with:
+
+```bash
+ls -la startup.sh  # should show -rwxr-xr-x
+```
+
+If lost, re-add it before deploying:
+
+```bash
+chmod +x startup.sh
+```
+
+### Cold start is slow
+
+`startup.sh` runs `pip install .` on every new instance cold start. To speed this up in CI/CD, pre-install dependencies into `.python_packages/` and update `startup.sh` to skip the install step:
+
+```bash
+# In your CI/CD pipeline, before deploying:
+pip install -r requirements.txt --target .python_packages/lib/site-packages
+
+# Then update startup.sh to skip install if packages are present:
+export PYTHONPATH=".python_packages/lib/site-packages:${PYTHONPATH}"
+exec python -m mcp_panther.server --transport streamable-http --host 0.0.0.0 --port 8080
+```
+
+### View server logs
+
+```bash
+# Stream live logs from Azure
+func azure functionapp logstream "$FUNCTION_APP"
+
+# Or via Azure CLI
+az webapp log tail \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$FUNCTION_APP"
+```
+
+---
+
+## Azure API Center Registration (Optional)
+
+Register the deployed server in Azure API Center to share it across your organization:
+
+```bash
+az apic api register \
+    --resource-group "$RESOURCE_GROUP" \
+    --service-name "<YOUR-API-CENTER>" \
+    --api-location "https://${FUNCTION_APP}.azurewebsites.net/mcp"
+```
+
+See [Register MCP servers in Azure API Center](https://learn.microsoft.com/en-us/azure/api-center/register-mcp-servers) for full details.

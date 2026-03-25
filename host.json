@@ -1,0 +1,11 @@
+{
+    "version": "2.0",
+    "configurationProfile": "mcp-custom-handler",
+    "customHandler": {
+        "description": {
+            "defaultExecutablePath": "bash",
+            "arguments": ["startup.sh"]
+        },
+        "port": "8080"
+    }
+}
