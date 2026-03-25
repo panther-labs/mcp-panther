@@ -4,22 +4,27 @@
 # with streamable-http transport so Azure Functions can proxy requests to it.
 set -e
 
-# Activate the virtual environment if present so that pip and python resolve
-# correctly. This handles local development on all platforms:
-#   macOS / Linux / WSL  → .venv/bin/activate
-#   Windows (Git Bash)   → .venv/Scripts/activate
-# On Azure the venv does not exist and system pip/python are used instead.
-if [ -f ".venv/bin/activate" ]; then
-    source ".venv/bin/activate"
-elif [ -f ".venv/Scripts/activate" ]; then
-    source ".venv/Scripts/activate"
+# Resolve the Python executable from the virtual environment using a direct
+# path lookup. Sourcing the activate script is unreliable inside the bash
+# subprocess spawned by Azure Functions Core Tools on Windows because the
+# PATH update does not propagate correctly. Using python -m pip also avoids
+# needing a standalone pip executable on PATH.
+if [ -f ".venv/Scripts/python.exe" ]; then
+    # Windows (Git Bash / uv venv)
+    PYTHON=".venv/Scripts/python.exe"
+elif [ -f ".venv/bin/python" ]; then
+    # macOS / Linux / WSL
+    PYTHON=".venv/bin/python"
+else
+    # Azure or any environment where no local venv is present
+    PYTHON="python"
 fi
 
 echo "Installing mcp-panther..."
-pip install -q .
+"$PYTHON" -m pip install -q .
 
 echo "Starting Panther MCP server on port 8080..."
-exec python -m mcp_panther.server \
+exec "$PYTHON" -m mcp_panther.server \
     --transport streamable-http \
     --host 0.0.0.0 \
     --port 8080
