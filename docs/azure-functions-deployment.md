@@ -68,21 +68,11 @@ uv sync
 
 ### 2. Configure credentials
 
-Edit `local.settings.json` with your Panther credentials:
+`local.settings.json` is gitignored and not included in the repository — you need to create it in the project root yourself. Copy the template below into a new file named `local.settings.json` and fill in your Panther credentials:
 
 **macOS / Linux**
 ```bash
-cp local.settings.json local.settings.json.bak   # optional backup
-```
-
-**Windows (PowerShell)**
-```powershell
-Copy-Item local.settings.json local.settings.json.bak   # optional backup
-```
-
-Then update the values:
-
-```json
+cat > local.settings.json << 'EOF'
 {
     "IsEncrypted": false,
     "Values": {
@@ -92,9 +82,27 @@ Then update the values:
         "LOG_LEVEL": "INFO"
     }
 }
+EOF
 ```
 
-> **Important:** `local.settings.json` is in `.gitignore` — never commit it.
+**Windows (PowerShell)**
+```powershell
+@"
+{
+    "IsEncrypted": false,
+    "Values": {
+        "FUNCTIONS_WORKER_RUNTIME": "custom",
+        "PANTHER_INSTANCE_URL": "https://YOUR-INSTANCE.panther.io",
+        "PANTHER_API_TOKEN": "YOUR-API-TOKEN",
+        "LOG_LEVEL": "INFO"
+    }
+}
+"@ | Set-Content local.settings.json
+```
+
+Replace `YOUR-INSTANCE.panther.io` and `YOUR-API-TOKEN` with your actual values.
+
+> **Important:** `local.settings.json` is gitignored — never commit it. It contains your API token in plain text.
 
 ### 3. Activate the virtual environment
 
