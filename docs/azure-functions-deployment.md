@@ -149,7 +149,30 @@ Functions:
 
 ### 5. Connect an MCP client locally
 
-Configure your MCP client to use the local Functions endpoint:
+#### Claude Code
+
+Native HTTP support — no proxy needed:
+
+```bash
+claude mcp add-json panther-local '{"url": "http://localhost:7071/mcp"}'
+```
+
+#### Claude Desktop
+
+Claude Desktop only supports STDIO transport. Use [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) as a bridge (requires Node.js):
+
+```json
+{
+    "mcpServers": {
+        "panther-local": {
+            "command": "npx",
+            "args": ["-y", "mcp-remote", "http://localhost:7071/mcp"]
+        }
+    }
+}
+```
+
+#### Cursor
 
 ```json
 {
@@ -316,13 +339,30 @@ Invoke-RestMethod -Uri "https://$FUNCTION_APP.azurewebsites.net/mcp"
 
 ### Claude Code
 
+Native HTTP support — no proxy needed:
+
 ```bash
 claude mcp add-json panther '{
     "url": "https://YOUR-FUNCTION-APP.azurewebsites.net/mcp"
 }'
 ```
 
-### Cursor / Claude Desktop / Other clients
+### Claude Desktop
+
+Claude Desktop only supports STDIO transport. Use [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) as a bridge (requires Node.js):
+
+```json
+{
+    "mcpServers": {
+        "panther": {
+            "command": "npx",
+            "args": ["-y", "mcp-remote", "https://YOUR-FUNCTION-APP.azurewebsites.net/mcp"]
+        }
+    }
+}
+```
+
+### Cursor
 
 ```json
 {
