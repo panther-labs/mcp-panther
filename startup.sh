@@ -4,28 +4,22 @@
 # can proxy requests to it.
 set -e
 
-# Prefer uv if available. uv run handles venv activation and dependency
-# resolution without requiring pip, which uv-created venvs omit by default.
-if command -v uv &>/dev/null; then
-    echo "Starting Panther MCP server via uv..."
-    exec uv run python -m mcp_panther.server \
-        --transport streamable-http \
-        --host 0.0.0.0 \
-        --port 8080
-fi
-
-# Fallback for Azure Functions where uv is not installed.
-# Resolve Python from the venv if present, otherwise use system Python.
+# Resolve Python from the virtual environment if present.
+# Local dev: uv sync pre-installs everything into .venv, so no install step
+#            is needed — just run the server using the venv Python directly.
+# Azure:     no .venv exists, so fall back to system Python and install first.
 if [ -f ".venv/Scripts/python.exe" ]; then
+    # Windows (Git Bash) - venv created by uv sync
     PYTHON=".venv/Scripts/python.exe"
 elif [ -f ".venv/bin/python" ]; then
+    # macOS / Linux / WSL - venv created by uv sync
     PYTHON=".venv/bin/python"
 else
+    # Azure Functions - no local venv, install from source using system Python
     PYTHON="python"
+    echo "Installing mcp-panther..."
+    "$PYTHON" -m pip install -q .
 fi
-
-echo "Installing mcp-panther..."
-"$PYTHON" -m pip install -q .
 
 echo "Starting Panther MCP server on port 8080..."
 exec "$PYTHON" -m mcp_panther.server \
