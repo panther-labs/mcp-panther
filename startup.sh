@@ -1,22 +1,26 @@
 #!/bin/bash
 # Startup script for Azure Functions self-hosted MCP server.
-# Installs the mcp-panther package from source then starts the server
-# with streamable-http transport so Azure Functions can proxy requests to it.
+# Starts the server with streamable-http transport so Azure Functions
+# can proxy requests to it.
 set -e
 
-# Resolve the Python executable from the virtual environment using a direct
-# path lookup. Sourcing the activate script is unreliable inside the bash
-# subprocess spawned by Azure Functions Core Tools on Windows because the
-# PATH update does not propagate correctly. Using python -m pip also avoids
-# needing a standalone pip executable on PATH.
+# Prefer uv if available. uv run handles venv activation and dependency
+# resolution without requiring pip, which uv-created venvs omit by default.
+if command -v uv &>/dev/null; then
+    echo "Starting Panther MCP server via uv..."
+    exec uv run python -m mcp_panther.server \
+        --transport streamable-http \
+        --host 0.0.0.0 \
+        --port 8080
+fi
+
+# Fallback for Azure Functions where uv is not installed.
+# Resolve Python from the venv if present, otherwise use system Python.
 if [ -f ".venv/Scripts/python.exe" ]; then
-    # Windows (Git Bash / uv venv)
     PYTHON=".venv/Scripts/python.exe"
 elif [ -f ".venv/bin/python" ]; then
-    # macOS / Linux / WSL
     PYTHON=".venv/bin/python"
 else
-    # Azure or any environment where no local venv is present
     PYTHON="python"
 fi
 
