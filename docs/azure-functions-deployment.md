@@ -159,14 +159,14 @@ claude mcp add-json panther-local '{"url": "http://localhost:7071/mcp"}'
 
 #### Claude Desktop
 
-Claude Desktop only supports STDIO transport. Use [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) as a bridge (requires Node.js):
+Claude Desktop only supports STDIO transport. Use [`mcp-proxy`](https://pypi.org/project/mcp-proxy/) as a bridge via `uvx` (no npm required):
 
 ```json
 {
     "mcpServers": {
         "panther-local": {
-            "command": "npx",
-            "args": ["-y", "mcp-remote", "http://localhost:7071/mcp"]
+            "command": "uvx",
+            "args": ["mcp-proxy", "http://localhost:7071/mcp"]
         }
     }
 }
@@ -349,14 +349,14 @@ claude mcp add-json panther '{
 
 ### Claude Desktop
 
-Claude Desktop only supports STDIO transport. Use [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) as a bridge (requires Node.js):
+Claude Desktop only supports STDIO transport. Use [`mcp-proxy`](https://pypi.org/project/mcp-proxy/) as a bridge via `uvx` (no npm required):
 
 ```json
 {
     "mcpServers": {
         "panther": {
-            "command": "npx",
-            "args": ["-y", "mcp-remote", "https://YOUR-FUNCTION-APP.azurewebsites.net/mcp"]
+            "command": "uvx",
+            "args": ["mcp-proxy", "https://YOUR-FUNCTION-APP.azurewebsites.net/mcp"]
         }
     }
 }
