@@ -77,6 +77,8 @@ cat > local.settings.json << 'EOF'
     "IsEncrypted": false,
     "Values": {
         "FUNCTIONS_WORKER_RUNTIME": "custom",
+        "AzureWebJobsStorage": "",
+        "FUNCTIONS_HTTPWORKER_TIMEOUT": "120",
         "PANTHER_INSTANCE_URL": "https://YOUR-INSTANCE.panther.io",
         "PANTHER_API_TOKEN": "YOUR-API-TOKEN",
         "LOG_LEVEL": "INFO"
@@ -92,6 +94,8 @@ EOF
     "IsEncrypted": false,
     "Values": {
         "FUNCTIONS_WORKER_RUNTIME": "custom",
+        "AzureWebJobsStorage": "",
+        "FUNCTIONS_HTTPWORKER_TIMEOUT": "120",
         "PANTHER_INSTANCE_URL": "https://YOUR-INSTANCE.panther.io",
         "PANTHER_API_TOKEN": "YOUR-API-TOKEN",
         "LOG_LEVEL": "INFO"
@@ -101,6 +105,11 @@ EOF
 ```
 
 Replace `YOUR-INSTANCE.panther.io` and `YOUR-API-TOKEN` with your actual values.
+
+| Setting | Purpose |
+|---|---|
+| `AzureWebJobsStorage` | Required by the Functions host. Empty string is sufficient for HTTP-only custom handlers that don't use storage triggers. |
+| `FUNCTIONS_HTTPWORKER_TIMEOUT` | Seconds the Functions host waits for the worker to start. Default is 5 s — too short for Python's import chain. 120 s is safe for local dev. |
 
 > **Important:** `local.settings.json` is gitignored — never commit it. It contains your API token in plain text.
 
