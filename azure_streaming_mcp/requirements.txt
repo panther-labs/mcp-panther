@@ -1,0 +1,16 @@
+# Azure Functions runtime
+azure-functions>=1.18.0
+
+# MCP framework (must match the version pinned in the root pyproject.toml)
+fastmcp~=2.14.0
+
+# Panther API client dependencies (same constraints as root pyproject.toml)
+aiohttp>=3.11.14,<4.0.0
+gql>=3.5.2,<4.0.0
+click>=8.1.0,<9.0.0
+sqlparse>=0.4.4,<1.0.0
+
+# mcp-panther source is installed via the Dockerfile build or
+# by running `pip install -e <repo_root>` during local development.
+# If you prefer a self-contained deployment, uncomment and pin the version:
+# mcp-panther==2.3.1

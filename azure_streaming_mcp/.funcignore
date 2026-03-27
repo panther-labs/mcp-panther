@@ -1,0 +1,39 @@
+# Exclude development and test files from Azure Functions deployment package
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv
+venv
+env
+
+# Development tools
+.ruff_cache
+.pytest_cache
+*.egg-info
+
+# Documentation
+README.md
+*.md
+
+# Templates (real values go in App Settings / Key Vault)
+local.settings.json.template
+
+# Git
+.git
+.gitignore
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# IDE
+.vscode
+.idea
+*.swp

@@ -462,6 +462,134 @@ If you see `WARNING: Invalid HTTP request received` in the logs, this usually me
 - `MCP_HOST`: Host for HTTP transport (default: 127.0.0.1)
 - `MCP_LOG_FILE`: Log file path (optional)
 
+## Streaming Server Deployments
+
+In addition to the standard STDIO and Docker-based installations above, this
+repository ships two ready-to-use **streaming HTTP** deployments:
+
+### Repository Layout
+
+```
+mcp-panther/
+├── src/mcp_panther/          ← Core MCP server (tools, prompts, resources)
+├── azure_streaming_mcp/      ← Azure Functions streaming deployment
+└── local_streaming_mcp/      ← Local HTTP streaming server (dev/test)
+```
+
+### High-Level Architecture
+
+```
+                    ┌─────────────────────────────────────────┐
+MCP Client          │          Panther MCP Server             │
+(Claude / Cursor)   │                                         │
+       │            │  Transport layer (your choice):         │
+       │ stdio      │  ├─ STDIO          (default, Docker)    │
+       │ ── or ──►  │  ├─ Streamable-HTTP (local server)      │
+       │ HTTP       │  └─ Azure Functions (cloud, scalable)   │
+       │            │             │                           │
+       │            │  panther_mcp_core                       │
+       │            │  ├─ tools/   (40+ Panther tools)        │
+       │            │  ├─ prompts/ (alert triage, reporting)  │
+       │            │  └─ resources/ (config, metadata)       │
+       │            │             │                           │
+       │            └─────────────┼───────────────────────────┘
+       │                          │ GraphQL + REST (aiohttp)
+       │                          ▼
+       │                  Panther SIEM API
+       ▼
+  Security operations
+```
+
+---
+
+### Option A: Local Streaming Server
+
+A standalone development server using the MCP **Streamable-HTTP** transport.
+No Docker required – runs with a single command.
+
+```bash
+# Install deps (from repo root)
+uv sync
+
+# Start the server
+export PANTHER_INSTANCE_URL="https://your-tenant.runpanther.io"
+export PANTHER_API_TOKEN="your-token"
+uv run python local_streaming_mcp/server.py
+```
+
+MCP endpoint: `http://127.0.0.1:8000/mcp`
+
+Configure Claude Code:
+```bash
+claude mcp add-json panther-local '{"url": "http://127.0.0.1:8000/mcp"}'
+```
+
+Validate streaming is working:
+```bash
+uv run python local_streaming_mcp/test_streaming_client.py
+```
+
+> See [`local_streaming_mcp/README.md`](local_streaming_mcp/README.md) for the
+> full guide including configuration options, example curl requests, and
+> debugging tips.
+
+---
+
+### Option B: Azure Functions Streaming Deployment
+
+Deploy the MCP server as an **Azure Function App** for cloud-hosted,
+scalable streaming access.
+
+```bash
+# Create Azure resources
+az group create --name rg-panther-mcp --location eastus
+az functionapp create \
+  --resource-group rg-panther-mcp \
+  --consumption-plan-location eastus \
+  --runtime python --runtime-version 3.12 \
+  --functions-version 4 \
+  --name panther-mcp-prod \
+  --storage-account <your-storage>
+
+# Set secrets
+az functionapp config appsettings set \
+  --resource-group rg-panther-mcp \
+  --name panther-mcp-prod \
+  --settings \
+    PANTHER_INSTANCE_URL="https://your-tenant.runpanther.io" \
+    PANTHER_API_TOKEN="your-token" \
+    STATELESS_HTTP="true"
+
+# Deploy
+cd azure_streaming_mcp
+func azure functionapp publish panther-mcp-prod --python
+```
+
+Configure Claude Code to use the deployed endpoint:
+```bash
+claude mcp add-json panther-azure '{
+  "url": "https://panther-mcp-prod.azurewebsites.net/mcp"
+}'
+```
+
+> See [`azure_streaming_mcp/README.md`](azure_streaming_mcp/README.md) for the
+> complete deployment guide, container deployment option, streaming behaviour
+> details, and Azure plan recommendations.
+
+---
+
+### Choosing Between Transports
+
+| Scenario | Recommended transport |
+|----------|-----------------------|
+| Local tool usage (Claude Code, Cursor) | STDIO via Docker or UVX |
+| Local dev / testing streaming | `local_streaming_mcp/` – uvicorn HTTP |
+| Team-shared cloud endpoint | `azure_streaming_mcp/` – Azure Functions |
+| Production with long-lived SSE | Azure Premium plan or Docker + HTTP |
+| CI pipelines | STDIO or local streaming (`--skip-sse`) |
+
+---
+
 ## Security Best Practices
 
 We highly recommends the following MCP security best practices:

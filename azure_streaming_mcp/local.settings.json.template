@@ -1,0 +1,15 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+
+    "PANTHER_INSTANCE_URL": "https://YOUR-TENANT.runpanther.io",
+    "PANTHER_API_TOKEN": "YOUR-API-TOKEN-HERE",
+
+    "STATELESS_HTTP": "false",
+    "LOG_LEVEL": "INFO",
+
+    "MCP_TRANSPORT": "streamable-http"
+  }
+}
