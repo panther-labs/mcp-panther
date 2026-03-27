@@ -59,14 +59,34 @@ The `mcp-custom-handler` configuration profile in `host.json` automatically:
 
 Test the Azure Functions setup locally before deploying to Azure using Azure Functions Core Tools, which simulates the Functions host and the custom handler proxy.
 
-### 1. Install dependencies
+### 1. Start Azurite (local Azure Storage emulator)
+
+The Azure Functions host performs a storage health check on startup. Without valid storage, it marks the worker unhealthy and kills it every ~30 seconds regardless of whether the MCP server started correctly. Azurite is the local storage emulator that satisfies this check.
+
+**Run Azurite via Docker (recommended — no npm required):**
+
+```bash
+docker run -d --name azurite \
+    -p 10000:10000 -p 10001:10001 -p 10002:10002 \
+    mcr.microsoft.com/azure-storage/azurite
+```
+
+Keep this container running whenever you use `func start`. To stop it:
+
+```bash
+docker stop azurite
+```
+
+> **Alternative:** If you already have an Azure Storage account from your deployment, you can skip Azurite and paste its connection string into `AzureWebJobsStorage` instead (see Step 2).
+
+### 2. Install dependencies
 
 ```bash
 # macOS / Linux / Windows (Git Bash)
 uv sync
 ```
 
-### 2. Configure credentials
+### 3. Configure credentials
 
 `local.settings.json` is gitignored and not included in the repository — you need to create it in the project root yourself. Copy the template below into a new file named `local.settings.json` and fill in your Panther credentials:
 
@@ -77,8 +97,7 @@ cat > local.settings.json << 'EOF'
     "IsEncrypted": false,
     "Values": {
         "FUNCTIONS_WORKER_RUNTIME": "custom",
-        "AzureWebJobsStorage": "",
-        "FUNCTIONS_HTTPWORKER_TIMEOUT": "120",
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
         "PANTHER_INSTANCE_URL": "https://YOUR-INSTANCE.panther.io",
         "PANTHER_API_TOKEN": "YOUR-API-TOKEN",
         "LOG_LEVEL": "INFO"
@@ -94,8 +113,7 @@ EOF
     "IsEncrypted": false,
     "Values": {
         "FUNCTIONS_WORKER_RUNTIME": "custom",
-        "AzureWebJobsStorage": "",
-        "FUNCTIONS_HTTPWORKER_TIMEOUT": "120",
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
         "PANTHER_INSTANCE_URL": "https://YOUR-INSTANCE.panther.io",
         "PANTHER_API_TOKEN": "YOUR-API-TOKEN",
         "LOG_LEVEL": "INFO"
@@ -106,14 +124,11 @@ EOF
 
 Replace `YOUR-INSTANCE.panther.io` and `YOUR-API-TOKEN` with your actual values.
 
-| Setting | Purpose |
-|---|---|
-| `AzureWebJobsStorage` | Required by the Functions host. Empty string is sufficient for HTTP-only custom handlers that don't use storage triggers. |
-| `FUNCTIONS_HTTPWORKER_TIMEOUT` | Seconds the Functions host waits for the worker to start. Default is 5 s — too short for Python's import chain. 120 s is safe for local dev. |
+If using a real Azure Storage account instead of Azurite, replace `UseDevelopmentStorage=true` with the connection string from the Azure portal (Storage account → Access keys → Connection string).
 
 > **Important:** `local.settings.json` is gitignored — never commit it. It contains your API token in plain text.
 
-### 3. Activate the virtual environment
+### 4. Activate the virtual environment
 
 **macOS / Linux**
 ```bash
@@ -130,7 +145,7 @@ source .venv/bin/activate
 source .venv/Scripts/activate
 ```
 
-### 4. Start the local Functions host
+### 5. Start the local Functions host
 
 **macOS / Linux / Windows (Git Bash)**
 ```bash
@@ -156,7 +171,7 @@ Functions:
     custom-handler: [GET,POST] http://localhost:7071/{*route}
 ```
 
-### 5. Connect an MCP client locally
+### 6. Connect an MCP client locally
 
 #### Claude Code
 
