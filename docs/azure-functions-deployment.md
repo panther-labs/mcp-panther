@@ -235,7 +235,76 @@ Claude Desktop only supports STDIO transport. Use [`mcp-proxy`](https://pypi.org
 }
 ```
 
-> **Note:** `func start` is required for local testing — you cannot run `python -m mcp_panther.server` directly and have it work with the Functions proxy. If you need to test the server standalone without Functions, use `uv run python -m mcp_panther.server --transport streamable-http --host 127.0.0.1 --port 8080` instead.
+---
+
+## Local Standalone (without Azure Functions)
+
+If you want to run the MCP server locally without `func start` — no storage account, no Azure Functions host — use the streamable-http transport directly. This is useful for quick iteration and client testing.
+
+### Start the server
+
+**macOS / Linux**
+```bash
+export PANTHER_INSTANCE_URL="https://YOUR-INSTANCE.panther.io"
+export PANTHER_API_TOKEN="YOUR-API-TOKEN"
+
+uv run python -m mcp_panther.server \
+    --transport streamable-http \
+    --host 127.0.0.1 \
+    --port 8000
+```
+
+**Windows (PowerShell)**
+```powershell
+$env:PANTHER_INSTANCE_URL = "https://YOUR-INSTANCE.panther.io"
+$env:PANTHER_API_TOKEN = "YOUR-API-TOKEN"
+
+uv run python -m mcp_panther.server `
+    --transport streamable-http `
+    --host 127.0.0.1 `
+    --port 8000
+```
+
+Or use the Makefile shortcut (after setting the environment variables above):
+
+```bash
+make serve-http
+```
+
+### Connect an MCP client
+
+#### Claude Code
+
+```bash
+claude mcp add-json panther-local '{"url": "http://localhost:8000/mcp"}'
+```
+
+#### Claude Desktop
+
+```json
+{
+    "mcpServers": {
+        "panther-local": {
+            "command": "uvx",
+            "args": ["mcp-proxy", "http://localhost:8000/mcp"]
+        }
+    }
+}
+```
+
+#### Cursor
+
+```json
+{
+    "mcpServers": {
+        "panther-local": {
+            "url": "http://localhost:8000/mcp"
+        }
+    }
+}
+```
+
+> **Note:** The standalone server runs on port 8000. The Azure Functions local host (`func start`) runs on port 7071 and proxies to the server on port 8080. Use port 8000 for standalone mode and port 7071 for `func start` mode.
 
 ---
 

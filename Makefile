@@ -6,9 +6,6 @@ fmt:
 lint:
 	ruff check $(dirs)
 
-docker:
-	docker build -t mcp-panther -t mcp-panther:latest -t mcp-panther:$(shell git rev-parse --abbrev-ref HEAD | sed 's|/|-|g') .
-
 # Create a virtual environment using uv (https://github.com/astral-sh/uv)
 # After creating, run: source .venv/bin/activate
 venv:
@@ -28,6 +25,11 @@ sync:
 
 mcp-dev:
 	uv run fastmcp dev src/mcp_panther/server.py
+
+# Run the server locally with streamable-http transport on port 8000
+# Requires PANTHER_INSTANCE_URL and PANTHER_API_TOKEN to be set in the environment
+serve-http:
+	uv run python -m mcp_panther.server --transport streamable-http --host 127.0.0.1 --port 8000
 
 integration-test:
 	FASTMCP_INTEGRATION_TEST=1 uv run pytest -s tests/panther_mcp_core/test_fastmcp_integration.py

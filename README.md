@@ -152,49 +152,9 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 ## MCP Server Installation
 
-**Choose one of the following installation methods:**
+### UVX (Recommended)
 
-### Docker (Recommended)
-
-The easiest way to get started is using our pre-built Docker image:
-
-```json
-{
-  "mcpServers": {
-    "mcp-panther": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "-e", "PANTHER_INSTANCE_URL",
-        "-e", "PANTHER_API_TOKEN",
-        "--rm",
-        "ghcr.io/panther-labs/mcp-panther"
-      ],
-      "env": {
-        "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-        "PANTHER_API_TOKEN": "YOUR-API-KEY"
-      }
-    }
-  }
-}
-```
-
-**Version Pinning:** For production stability, pin to a specific version tag:
-
-```json
-"ghcr.io/panther-labs/mcp-panther:v2.2.0"
-```
-
-Available tags can be found on the [GitHub Container Registry](https://github.com/panther-labs/mcp-panther/pkgs/container/mcp-panther).
-
-### UVX
-
-For Python users, you can run directly from PyPI using uvx:
-
-1. [Install UV](https://docs.astral.sh/uv/getting-started/installation/)
-
-2. Configure your MCP client:
+Run directly from PyPI using [uvx](https://docs.astral.sh/uv/getting-started/installation/) — no installation required:
 
 ```json
 {
@@ -237,27 +197,7 @@ Once configured, navigate to Cursor Settings > MCP to view the running server:
 
 ### Claude Code
 
-[Claude Code](https://code.claude.com/docs) is Anthropic's official CLI tool. Add the Panther MCP server using Docker:
-
-```bash
-claude mcp add-json panther '{
-  "command": "docker",
-  "args": [
-    "run",
-    "-i",
-    "-e", "PANTHER_INSTANCE_URL",
-    "-e", "PANTHER_API_TOKEN",
-    "--rm",
-    "ghcr.io/panther-labs/mcp-panther"
-  ],
-  "env": {
-    "PANTHER_INSTANCE_URL": "https://YOUR-PANTHER-INSTANCE.domain",
-    "PANTHER_API_TOKEN": "YOUR-API-TOKEN"
-  }
-}'
-```
-
-Alternatively, using UVX:
+[Claude Code](https://code.claude.com/docs) is Anthropic's official CLI tool. Add the Panther MCP server using UVX:
 
 ```bash
 claude mcp add-json panther '{
@@ -334,59 +274,59 @@ uv run python -m mcp_panther.server
 
 ### Streamable HTTP
 
-For running as a persistent web service, use the HTTP transport. This is ideal for:
-- Long-running server deployments
-- Multiple clients connecting to the same server
+For running as a persistent local web service, use the HTTP transport. This is ideal for:
+- Multiple clients connecting to the same server instance
 - Testing and debugging with continuous log monitoring
+- Hosting on a remote server (e.g., Azure Functions — see [Azure deployment guide](docs/azure-functions-deployment.md))
 
-#### Using Docker Run (Detached)
+#### Starting the Server
 
+Set your credentials as environment variables, then start the server:
+
+**macOS / Linux**
 ```bash
-docker run -d \
-  --name panther-mcp-server \
-  -p 8000:8000 \
-  -e PANTHER_INSTANCE_URL=https://YOUR-PANTHER-INSTANCE.domain \
-  -e PANTHER_API_TOKEN=YOUR-API-TOKEN \
-  -e MCP_TRANSPORT=streamable-http \
-  -e MCP_HOST=0.0.0.0 \
-  -e MCP_PORT=8000 \
-  -e LOG_LEVEL=INFO \
-  --restart unless-stopped \
-  ghcr.io/panther-labs/mcp-panther:latest
+export PANTHER_INSTANCE_URL="https://YOUR-PANTHER-INSTANCE.domain"
+export PANTHER_API_TOKEN="YOUR-API-TOKEN"
+
+uv run python -m mcp_panther.server \
+  --transport streamable-http \
+  --host 127.0.0.1 \
+  --port 8000
 ```
 
-#### Using Docker Compose (Recommended)
+**Windows (PowerShell)**
+```powershell
+$env:PANTHER_INSTANCE_URL = "https://YOUR-PANTHER-INSTANCE.domain"
+$env:PANTHER_API_TOKEN = "YOUR-API-TOKEN"
 
-Create a `docker-compose.yml` file:
-
-```yaml
-services:
-  panther-mcp:
-    image: ghcr.io/panther-labs/mcp-panther:latest
-    container_name: panther-mcp-server
-    ports:
-      - "8000:8000"
-    environment:
-      - PANTHER_INSTANCE_URL=https://YOUR-PANTHER-INSTANCE.domain
-      - PANTHER_API_TOKEN=YOUR-API-TOKEN
-      - MCP_TRANSPORT=streamable-http
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=8000
-      - LOG_LEVEL=INFO
-    restart: unless-stopped
+uv run python -m mcp_panther.server `
+  --transport streamable-http `
+  --host 127.0.0.1 `
+  --port 8000
 ```
 
-Start the server:
+The server starts at `http://localhost:8000/mcp`. To run in the background:
 
+**macOS / Linux**
 ```bash
-# Start in detached mode
-docker-compose up -d
+uv run python -m mcp_panther.server \
+  --transport streamable-http \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --log-file mcp-panther.log &
 
-# View logs
-docker-compose logs -f
+echo "Server PID: $!"
+```
 
-# Stop the server
-docker-compose down
+**Windows (PowerShell)**
+```powershell
+$job = Start-Job {
+  uv run python -m mcp_panther.server `
+    --transport streamable-http `
+    --host 127.0.0.1 `
+    --port 8000
+}
+Write-Host "Server Job ID: $($job.Id)"
 ```
 
 #### Connecting Claude Code to HTTP Server
@@ -408,11 +348,6 @@ claude mcp list
 ```bash
 # Test the HTTP endpoint
 curl http://localhost:8000/mcp
-
-# View server logs
-docker logs -f panther-mcp-server
-# Or with docker-compose:
-docker-compose logs -f
 ```
 
 You can also test using the FastMCP client:
@@ -433,18 +368,20 @@ asyncio.run(test_connection())
 
 **Port Already in Use**
 
-If you see `Bind for 0.0.0.0:8000 failed: port is already allocated`:
+If you see `address already in use` on port 8000:
 
 ```bash
-# Check what's using the port
-lsof -i :8000
+# macOS / Linux: find and stop the process using the port
+lsof -ti :8000 | xargs kill -9
 
-# Stop conflicting containers
-docker ps | grep panther
-docker stop <container-id>
+# Windows (PowerShell): find and stop the process
+Get-Process -Id (Get-NetTCPConnection -LocalPort 8000).OwningProcess | Stop-Process
+```
 
-# Or use a different port via MCP_PORT environment variable:
--e MCP_PORT=8080
+Or use a different port:
+
+```bash
+uv run python -m mcp_panther.server --transport streamable-http --port 8080
 # Then connect to: http://localhost:8080/mcp
 ```
 
@@ -467,7 +404,7 @@ If you see `WARNING: Invalid HTTP request received` in the logs, this usually me
 We highly recommends the following MCP security best practices:
 
 - **Apply strict least-privilege to Panther API tokens.** Scope tokens to the minimal permissions required and bind them to an IP allow-list or CIDR range so they're useless if exfiltrated. Rotate credentials on a preferred interval (e.g., every 30d).
-- **Host the MCP server in a locked-down sandbox (e.g., Docker) with read-only mounts.** This confines any compromise to a minimal blast radius.
+- **Host the MCP server in a locked-down sandbox with network isolation.** For remote deployments (e.g., Azure Functions), use platform-level access controls and least-privilege networking.
 - **Monitor credential access to Panther and monitor for anomalies.** Write a Panther rule!
 - **Run only trusted, officially signed MCP servers.** Verify digital signatures or checksums before running, audit the tool code, and avoid community tools from unofficial publishers.
 
