@@ -329,7 +329,9 @@ $job = Start-Job {
 Write-Host "Server Job ID: $($job.Id)"
 ```
 
-#### Connecting Claude Code to HTTP Server
+#### Connecting MCP Clients to the HTTP Server
+
+##### Claude Code
 
 **Important:** The server runs on HTTP (not HTTPS). Configure Claude Code with the `http://` URL:
 
@@ -342,6 +344,32 @@ claude mcp add-json panther-http '{
 # Verify configuration
 claude mcp list
 ```
+
+##### Claude Desktop
+
+Claude Desktop only supports STDIO transport. Use [`mcp-proxy`](https://pypi.org/project/mcp-proxy/) as a bridge — runnable via `uvx` with no separate installation required.
+
+1. Start the HTTP server first (see above)
+2. Open Claude Desktop settings → **Developer** tab → **Edit Config**
+3. Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "panther-http": {
+      "command": "uvx",
+      "args": ["mcp-proxy", "http://localhost:8000/mcp"]
+    }
+  }
+}
+```
+
+4. Save and restart Claude Desktop
+
+> **Config file locations:**
+> - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+> - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+> - Linux: `~/.config/Claude/claude_desktop_config.json`
 
 #### Testing the Connection
 
