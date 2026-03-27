@@ -59,36 +59,62 @@ The `mcp-custom-handler` configuration profile in `host.json` automatically:
 
 Test the Azure Functions setup locally before deploying to Azure using Azure Functions Core Tools, which simulates the Functions host and the custom handler proxy.
 
-### 1. Start Azurite (local Azure Storage emulator)
-
-The Azure Functions host performs a storage health check on startup. Without valid storage, it marks the worker unhealthy and kills it every ~30 seconds regardless of whether the MCP server started correctly. Azurite is the local storage emulator that satisfies this check.
-
-**Run Azurite via Docker (recommended — no npm required):**
-
-```bash
-docker run -d --name azurite \
-    -p 10000:10000 -p 10001:10001 -p 10002:10002 \
-    mcr.microsoft.com/azure-storage/azurite
-```
-
-Keep this container running whenever you use `func start`. To stop it:
-
-```bash
-docker stop azurite
-```
-
-> **Alternative:** If you already have an Azure Storage account from your deployment, you can skip Azurite and paste its connection string into `AzureWebJobsStorage` instead (see Step 2).
-
-### 2. Install dependencies
+### 1. Install dependencies
 
 ```bash
 # macOS / Linux / Windows (Git Bash)
 uv sync
 ```
 
+### 2. Get your Azure Storage connection string
+
+The Azure Functions host performs a storage health check on startup and requires a valid `AzureWebJobsStorage` connection string. Use the same Azure Storage account you create in the [Azure Deployment](#azure-deployment) section below.
+
+**If you haven't created a storage account yet**, create one now (you'll need it for deployment anyway):
+
+```bash
+# macOS / Linux / Windows (Git Bash)
+az login
+RESOURCE_GROUP="rg-panther-mcp"
+STORAGE_ACCOUNT="stpanthermcp$RANDOM"   # must be globally unique
+az group create --name "$RESOURCE_GROUP" --location "eastus2"
+az storage account create \
+    --name "$STORAGE_ACCOUNT" \
+    --resource-group "$RESOURCE_GROUP" \
+    --location "eastus2" \
+    --sku Standard_LRS
+```
+
+**Get the connection string** (run this after creating or identifying your storage account):
+
+**macOS / Linux / Windows (Git Bash)**
+```bash
+az storage account show-connection-string \
+    --name "$STORAGE_ACCOUNT" \
+    --resource-group "$RESOURCE_GROUP" \
+    --query connectionString \
+    --output tsv
+```
+
+**Windows (PowerShell)**
+```powershell
+az storage account show-connection-string `
+    --name $STORAGE_ACCOUNT `
+    --resource-group $RESOURCE_GROUP `
+    --query connectionString `
+    --output tsv
+```
+
+The output looks like:
+```
+DefaultEndpointsProtocol=https;AccountName=stpanthermcp12345;AccountKey=ABC123...;EndpointSuffix=core.windows.net
+```
+
+> **Azure portal alternative:** Go to your Storage account → **Security + networking** → **Access keys** → copy **Connection string** under `key1`.
+
 ### 3. Configure credentials
 
-`local.settings.json` is gitignored and not included in the repository — you need to create it in the project root yourself. Copy the template below into a new file named `local.settings.json` and fill in your Panther credentials:
+`local.settings.json` is gitignored and not included in the repository — you need to create it in the project root yourself. Copy the template below into a new file named `local.settings.json` and fill in your credentials:
 
 **macOS / Linux**
 ```bash
@@ -97,7 +123,7 @@ cat > local.settings.json << 'EOF'
     "IsEncrypted": false,
     "Values": {
         "FUNCTIONS_WORKER_RUNTIME": "custom",
-        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "AzureWebJobsStorage": "DefaultEndpointsProtocol=https;AccountName=YOUR-STORAGE-ACCOUNT;AccountKey=YOUR-ACCOUNT-KEY;EndpointSuffix=core.windows.net",
         "PANTHER_INSTANCE_URL": "https://YOUR-INSTANCE.panther.io",
         "PANTHER_API_TOKEN": "YOUR-API-TOKEN",
         "LOG_LEVEL": "INFO"
@@ -113,7 +139,7 @@ EOF
     "IsEncrypted": false,
     "Values": {
         "FUNCTIONS_WORKER_RUNTIME": "custom",
-        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "AzureWebJobsStorage": "DefaultEndpointsProtocol=https;AccountName=YOUR-STORAGE-ACCOUNT;AccountKey=YOUR-ACCOUNT-KEY;EndpointSuffix=core.windows.net",
         "PANTHER_INSTANCE_URL": "https://YOUR-INSTANCE.panther.io",
         "PANTHER_API_TOKEN": "YOUR-API-TOKEN",
         "LOG_LEVEL": "INFO"
@@ -122,11 +148,12 @@ EOF
 "@ | Set-Content local.settings.json
 ```
 
-Replace `YOUR-INSTANCE.panther.io` and `YOUR-API-TOKEN` with your actual values.
+Replace:
+- `YOUR-STORAGE-ACCOUNT` and `YOUR-ACCOUNT-KEY` with the values from Step 2
+- `YOUR-INSTANCE.panther.io` with your Panther instance URL
+- `YOUR-API-TOKEN` with your Panther API token
 
-If using a real Azure Storage account instead of Azurite, replace `UseDevelopmentStorage=true` with the connection string from the Azure portal (Storage account → Access keys → Connection string).
-
-> **Important:** `local.settings.json` is gitignored — never commit it. It contains your API token in plain text.
+> **Important:** `local.settings.json` is gitignored — never commit it. It contains your storage key and API token in plain text.
 
 ### 4. Activate the virtual environment
 
@@ -481,6 +508,26 @@ file startup.sh   # should NOT say "CRLF"
 ```
 
 **Root cause 2 — venv not active in bash:** Even if you ran `.venv\Scripts\Activate.ps1` in PowerShell, the bash subprocess started by `func` gets its own environment. `startup.sh` now detects and activates the venv itself, so you no longer need to activate before running `func start`.
+
+### `func start` worker killed every ~30 seconds (`Unhealthy` storage or `HttpWorker timed out`)
+
+The Azure Functions host requires a valid `AzureWebJobsStorage` connection string. If it fails the storage health check it repeatedly kills and restarts the worker process.
+
+Verify your `local.settings.json` has a real Azure Storage connection string (not a placeholder):
+
+```json
+"AzureWebJobsStorage": "DefaultEndpointsProtocol=https;AccountName=mystorageacct;AccountKey=ABC123...;EndpointSuffix=core.windows.net"
+```
+
+Get the correct value for your storage account:
+
+```bash
+az storage account show-connection-string \
+    --name "<YOUR-STORAGE-ACCOUNT>" \
+    --resource-group "<YOUR-RESOURCE-GROUP>" \
+    --query connectionString \
+    --output tsv
+```
 
 ### `func start` fails to find `python`
 
