@@ -217,7 +217,7 @@ Claude Desktop only supports STDIO transport. Use [`mcp-proxy`](https://pypi.org
     "mcpServers": {
         "panther-local": {
             "command": "uvx",
-            "args": ["mcp-proxy", "http://localhost:7071/mcp"]
+            "args": ["mcp-proxy", "--transport", "streamable-http", "http://localhost:7071/mcp"]
         }
     }
 }
@@ -286,7 +286,7 @@ claude mcp add-json panther-local '{"url": "http://localhost:8000/mcp"}'
     "mcpServers": {
         "panther-local": {
             "command": "uvx",
-            "args": ["mcp-proxy", "http://localhost:8000/mcp"]
+            "args": ["mcp-proxy", "--transport", "streamable-http", "http://localhost:8000/mcp"]
         }
     }
 }
@@ -476,7 +476,7 @@ Claude Desktop only supports STDIO transport. Use [`mcp-proxy`](https://pypi.org
     "mcpServers": {
         "panther": {
             "command": "uvx",
-            "args": ["mcp-proxy", "https://YOUR-FUNCTION-APP.azurewebsites.net/mcp"]
+            "args": ["mcp-proxy", "--transport", "streamable-http", "https://YOUR-FUNCTION-APP.azurewebsites.net/mcp"]
         }
     }
 }

@@ -358,7 +358,7 @@ Claude Desktop only supports STDIO transport. Use [`mcp-proxy`](https://pypi.org
   "mcpServers": {
     "panther-http": {
       "command": "uvx",
-      "args": ["mcp-proxy", "http://localhost:8000/mcp"]
+      "args": ["mcp-proxy", "--transport", "streamable-http", "http://localhost:8000/mcp"]
     }
   }
 }
