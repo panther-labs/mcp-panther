@@ -47,6 +47,11 @@ MCP Client (Claude Code / Cursor / etc.)
 - [`uv`](https://docs.astral.sh/uv/getting-started/installation/) (recommended) **or** pip
 - `PANTHER_INSTANCE_URL` and `PANTHER_API_TOKEN` environment variables
 
+> **Windows note**: Python 3.12 on Windows requires the [Windows Store](https://apps.microsoft.com/detail/9ncvdn91xzqp)
+> or the [python.org installer](https://www.python.org/downloads/). Ensure
+> `python` and `pip` are on your `PATH`. PowerShell 7+ is recommended over
+> the legacy Command Prompt.
+
 ---
 
 ## Quick Start
@@ -64,9 +69,22 @@ pip install uvicorn starlette
 
 ### 2. Set environment variables
 
+**macOS / Linux**
 ```bash
 export PANTHER_INSTANCE_URL="https://your-tenant.runpanther.io"
 export PANTHER_API_TOKEN="your-api-token"
+```
+
+**Windows – PowerShell**
+```powershell
+$env:PANTHER_INSTANCE_URL = "https://your-tenant.runpanther.io"
+$env:PANTHER_API_TOKEN    = "your-api-token"
+```
+
+**Windows – Command Prompt**
+```cmd
+set PANTHER_INSTANCE_URL=https://your-tenant.runpanther.io
+set PANTHER_API_TOKEN=your-api-token
 ```
 
 ### 3. Start the server
@@ -158,6 +176,11 @@ uv run python local_streaming_mcp/server.py --reload
 
 ## Example Requests
 
+> **Windows quoting**: `curl.exe` is available on Windows 10/11 but uses
+> different quoting rules. Examples below show both `bash` and PowerShell
+> variants where they differ. In Command Prompt, replace single quotes with
+> double quotes and escape inner double quotes with `\"`.
+
 ### Health check
 
 ```bash
@@ -175,6 +198,7 @@ curl http://localhost:8000/health
 
 ### MCP initialize handshake
 
+**macOS / Linux**
 ```bash
 curl -s -X POST http://localhost:8000/mcp \
   -H "Content-Type: application/json" \
@@ -191,8 +215,17 @@ curl -s -X POST http://localhost:8000/mcp \
   }'
 ```
 
+**Windows – PowerShell**
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/mcp `
+  -ContentType "application/json" `
+  -Headers @{ Accept = "application/json, text/event-stream" } `
+  -Body '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl-test","version":"1.0"}}}'
+```
+
 ### List available tools
 
+**macOS / Linux**
 ```bash
 curl -s -X POST http://localhost:8000/mcp \
   -H "Content-Type: application/json" \
@@ -202,8 +235,18 @@ curl -s -X POST http://localhost:8000/mcp \
     print('\n'.join(t['name'] for t in r.get('result',{}).get('tools',[])))"
 ```
 
+**Windows – PowerShell**
+```powershell
+$r = Invoke-RestMethod -Method Post http://localhost:8000/mcp `
+  -ContentType "application/json" `
+  -Headers @{ Accept = "application/json, text/event-stream" } `
+  -Body '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+$r.result.tools | Select-Object -ExpandProperty name
+```
+
 ### Call a tool
 
+**macOS / Linux**
 ```bash
 curl -s -X POST http://localhost:8000/mcp \
   -H "Content-Type: application/json" \
@@ -222,10 +265,28 @@ curl -s -X POST http://localhost:8000/mcp \
   }'
 ```
 
+**Windows – PowerShell**
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/mcp `
+  -ContentType "application/json" `
+  -Headers @{ Accept = "application/json, text/event-stream" } `
+  -Body '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_alerts","arguments":{"severities":["CRITICAL","HIGH"],"page_size":5}}}'
+```
+
 ### Open an SSE channel and watch events stream in
 
+**macOS / Linux**
 ```bash
 curl -N -H "Accept: text/event-stream" http://localhost:8000/mcp
+```
+
+**Windows – PowerShell** (streams until Ctrl+C)
+```powershell
+$req = [System.Net.WebRequest]::Create("http://localhost:8000/mcp")
+$req.Headers.Add("Accept", "text/event-stream")
+$stream = $req.GetResponse().GetResponseStream()
+$reader = [System.IO.StreamReader]::new($stream)
+while (-not $reader.EndOfStream) { Write-Host $reader.ReadLine() }
 ```
 
 You will see raw SSE events like:
@@ -361,7 +422,27 @@ pip install uvicorn
 
 ### `Address already in use`
 
-Another process is using port 8000.  Either stop it or change the port:
+Another process is using port 8000. Find and stop it, or use a different port:
+
+**macOS / Linux** – find the process holding the port:
+```bash
+lsof -i :8000
+```
+
+**Windows – PowerShell**:
+```powershell
+netstat -ano | findstr :8000
+# Note the PID in the last column, then:
+Stop-Process -Id <PID>
+```
+
+**Windows – Command Prompt**:
+```cmd
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+```
+
+Or just run on a different port:
 ```bash
 uv run python local_streaming_mcp/server.py --port 8080
 ```
@@ -374,8 +455,14 @@ in Panther's **Settings → API Tokens**.
 
 ### SSE events not appearing
 
-Ensure you pass `-N` (no-buffer) and the correct `Accept` header to curl:
+**macOS / Linux** – ensure you pass `-N` (no-buffer) and the correct `Accept` header:
 ```bash
 curl -N -H "Accept: text/event-stream" http://localhost:8000/mcp
 ```
-Some proxies buffer SSE; test with a direct connection first.
+
+**Windows** – `curl.exe` in Windows 10/11 supports `-N` but may buffer through
+the terminal. Use the PowerShell `StreamReader` example above for reliable
+line-by-line output.
+
+Some corporate proxies buffer SSE regardless of platform; test with a direct
+connection (bypass the proxy) first.
