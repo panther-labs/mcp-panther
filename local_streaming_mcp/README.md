@@ -43,42 +43,111 @@ MCP Client (Claude Code / Cursor / etc.)
 
 ## Prerequisites
 
-- Python 3.12+
-- [`uv`](https://docs.astral.sh/uv/getting-started/installation/) (recommended) **or** pip
-- `PANTHER_INSTANCE_URL` and `PANTHER_API_TOKEN` environment variables
+### macOS
 
-> **Windows note**: Python 3.12 on Windows requires the [Windows Store](https://apps.microsoft.com/detail/9ncvdn91xzqp)
-> or the [python.org installer](https://www.python.org/downloads/). Ensure
-> `python` and `pip` are on your `PATH`. PowerShell 7+ is recommended over
-> the legacy Command Prompt.
+**Python 3.12+**
+```bash
+# Option A – Homebrew (recommended)
+brew install python@3.12
+
+# Option B – python.org installer
+# Download from https://www.python.org/downloads/macos/
+```
+
+**uv** (recommended package manager)
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# or via Homebrew:
+brew install uv
+```
+
+### Linux
+
+**Python 3.12+**
+```bash
+# Debian / Ubuntu
+sudo apt update && sudo apt install python3.12 python3.12-venv python3-pip
+
+# Fedora / RHEL / CentOS
+sudo dnf install python3.12
+
+# Arch
+sudo pacman -S python
+
+# Or use pyenv for any distro:
+curl https://pyenv.run | bash
+pyenv install 3.12
+pyenv global 3.12
+```
+
+**uv** (recommended package manager)
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### Windows
+
+**Python 3.12+**
+
+Install from the [Microsoft Store](https://apps.microsoft.com/detail/9ncvdn91xzqp)
+or the [python.org installer](https://www.python.org/downloads/windows/).
+During installation, check **"Add Python to PATH"**.
+
+**uv** (recommended package manager) – run in PowerShell:
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+> PowerShell 7+ is recommended over the legacy Command Prompt for the best
+> experience. Install it from the
+> [Microsoft Store](https://apps.microsoft.com/detail/9n0dx20hk701).
 
 ---
 
 ## Quick Start
 
-### 1. Install dependencies (from the repo root)
-
-```bash
-# Using uv (recommended):
-uv sync
-
-# Or pip:
-pip install -e .
-pip install uvicorn starlette
-```
-
-### 2. Set environment variables
+### Step 1 – Clone the repo and install dependencies
 
 **macOS / Linux**
+```bash
+git clone https://github.com/panther-labs/mcp-panther.git
+cd mcp-panther
+uv sync
+```
+
+**Windows – PowerShell**
+```powershell
+git clone https://github.com/panther-labs/mcp-panther.git
+cd mcp-panther
+uv sync
+```
+
+> If you prefer plain pip over uv, run `pip install -e .` followed by
+> `pip install uvicorn starlette` on any platform.
+
+---
+
+### Step 2 – Set environment variables
+
+**macOS / Linux** (bash or zsh)
 ```bash
 export PANTHER_INSTANCE_URL="https://your-tenant.runpanther.io"
 export PANTHER_API_TOKEN="your-api-token"
 ```
 
+To persist across sessions, add the two lines above to `~/.zshrc` (macOS default)
+or `~/.bashrc` (Linux default), then `source` the file.
+
 **Windows – PowerShell**
 ```powershell
 $env:PANTHER_INSTANCE_URL = "https://your-tenant.runpanther.io"
 $env:PANTHER_API_TOKEN    = "your-api-token"
+```
+
+To persist permanently in PowerShell:
+```powershell
+[System.Environment]::SetEnvironmentVariable("PANTHER_INSTANCE_URL","https://your-tenant.runpanther.io","User")
+[System.Environment]::SetEnvironmentVariable("PANTHER_API_TOKEN","your-api-token","User")
 ```
 
 **Windows – Command Prompt**
@@ -87,10 +156,13 @@ set PANTHER_INSTANCE_URL=https://your-tenant.runpanther.io
 set PANTHER_API_TOKEN=your-api-token
 ```
 
-### 3. Start the server
+---
+
+### Step 3 – Start the server
+
+The start command is the same on all platforms:
 
 ```bash
-# From the repo root:
 uv run python local_streaming_mcp/server.py
 ```
 
@@ -110,9 +182,11 @@ You should see:
 ╚══════════════════════════════════════════════════════════╝
 ```
 
-### 4. Connect your MCP client
+---
 
-**Claude Code:**
+### Step 4 – Connect your MCP client
+
+**Claude Code** (all platforms):
 ```bash
 claude mcp add-json panther-local '{"url": "http://127.0.0.1:8000/mcp"}'
 ```
@@ -143,13 +217,13 @@ All options can be set via environment variables or CLI flags.
 | `PANTHER_INSTANCE_URL` | – | **required** | Panther base URL |
 | `PANTHER_API_TOKEN` | – | **required** | Panther API token |
 
-### Custom port example
+### Custom port
 
 ```bash
 uv run python local_streaming_mcp/server.py --port 9000
 ```
 
-### Bind to all interfaces (for network access)
+### Bind to all interfaces (for LAN access)
 
 ```bash
 uv run python local_streaming_mcp/server.py --host 0.0.0.0
@@ -176,12 +250,9 @@ uv run python local_streaming_mcp/server.py --reload
 
 ## Example Requests
 
-> **Windows quoting**: `curl.exe` is available on Windows 10/11 but uses
-> different quoting rules. Examples below show both `bash` and PowerShell
-> variants where they differ. In Command Prompt, replace single quotes with
-> double quotes and escape inner double quotes with `\"`.
-
 ### Health check
+
+Works identically on macOS, Linux, and Windows:
 
 ```bash
 curl http://localhost:8000/health
@@ -195,6 +266,8 @@ curl http://localhost:8000/health
   "mcp_endpoint": "/mcp"
 }
 ```
+
+---
 
 ### MCP initialize handshake
 
@@ -223,6 +296,16 @@ Invoke-RestMethod -Method Post http://localhost:8000/mcp `
   -Body '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl-test","version":"1.0"}}}'
 ```
 
+**Windows – Command Prompt** (curl.exe, available on Windows 10/11)
+```cmd
+curl -s -X POST http://localhost:8000/mcp ^
+  -H "Content-Type: application/json" ^
+  -H "Accept: application/json, text/event-stream" ^
+  -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"curl-test\",\"version\":\"1.0\"}}}"
+```
+
+---
+
 ### List available tools
 
 **macOS / Linux**
@@ -243,6 +326,8 @@ $r = Invoke-RestMethod -Method Post http://localhost:8000/mcp `
   -Body '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 $r.result.tools | Select-Object -ExpandProperty name
 ```
+
+---
 
 ### Call a tool
 
@@ -273,6 +358,8 @@ Invoke-RestMethod -Method Post http://localhost:8000/mcp `
   -Body '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_alerts","arguments":{"severities":["CRITICAL","HIGH"],"page_size":5}}}'
 ```
 
+---
+
 ### Open an SSE channel and watch events stream in
 
 **macOS / Linux**
@@ -287,6 +374,11 @@ $req.Headers.Add("Accept", "text/event-stream")
 $stream = $req.GetResponse().GetResponseStream()
 $reader = [System.IO.StreamReader]::new($stream)
 while (-not $reader.EndOfStream) { Write-Host $reader.ReadLine() }
+```
+
+**Windows – Command Prompt**
+```cmd
+curl -N -H "Accept: text/event-stream" http://localhost:8000/mcp
 ```
 
 You will see raw SSE events like:
@@ -304,10 +396,11 @@ data: {"jsonrpc":"2.0","method":"notifications/...","params":{...}}
 
 ## Validate Streaming with the Test Client
 
-A test script is included to exercise all key paths of the streaming server:
+A test script is included to exercise all key paths of the streaming server.
+It uses only the Python standard library – no extra dependencies needed.
 
 ```bash
-# Make sure the server is running first, then:
+# Make sure the server is running first, then (all platforms):
 uv run python local_streaming_mcp/test_streaming_client.py
 
 # Verbose output (prints full request/response bodies):
@@ -417,45 +510,58 @@ Run `uv sync` from the repo root, or `pip install -e .`.
 
 ```bash
 pip install uvicorn
-# or: uv pip install uvicorn
+# or:
+uv pip install uvicorn
 ```
 
 ### `Address already in use`
 
-Another process is using port 8000. Find and stop it, or use a different port:
+Another process is using port 8000. Find and stop it, or use a different port.
 
-**macOS / Linux** – find the process holding the port:
+**macOS**
 ```bash
 lsof -i :8000
+kill -9 <PID>
 ```
 
-**Windows – PowerShell**:
+**Linux**
+```bash
+# Option A – lsof (install with: sudo apt install lsof)
+lsof -i :8000
+kill -9 <PID>
+
+# Option B – ss (available on most modern distros without extra install)
+ss -tulpn | grep :8000
+kill -9 <PID>
+```
+
+**Windows – PowerShell**
 ```powershell
 netstat -ano | findstr :8000
 # Note the PID in the last column, then:
 Stop-Process -Id <PID>
 ```
 
-**Windows – Command Prompt**:
+**Windows – Command Prompt**
 ```cmd
 netstat -ano | findstr :8000
 taskkill /PID <PID> /F
 ```
 
-Or just run on a different port:
+Or just change the port on any platform:
 ```bash
 uv run python local_streaming_mcp/server.py --port 8080
 ```
 
 ### Tool returns `{"success": false, "message": "Request failed (HTTP 403)"}`
 
-Your `PANTHER_API_TOKEN` lacks the permissions required by that tool.  Refer
+Your `PANTHER_API_TOKEN` lacks the permissions required by that tool. Refer
 to the tool's description for the required permissions, and update the token
 in Panther's **Settings → API Tokens**.
 
 ### SSE events not appearing
 
-**macOS / Linux** – ensure you pass `-N` (no-buffer) and the correct `Accept` header:
+**macOS / Linux** – pass `-N` (no-buffer) and the correct `Accept` header:
 ```bash
 curl -N -H "Accept: text/event-stream" http://localhost:8000/mcp
 ```
@@ -466,3 +572,16 @@ line-by-line output.
 
 Some corporate proxies buffer SSE regardless of platform; test with a direct
 connection (bypass the proxy) first.
+
+### `uv` command not found after install
+
+**macOS / Linux** – restart your terminal or source your shell profile:
+```bash
+source ~/.zshrc   # macOS default shell
+source ~/.bashrc  # Linux default shell
+```
+
+**Windows** – close and reopen PowerShell, or run:
+```powershell
+$env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","User")
+```
