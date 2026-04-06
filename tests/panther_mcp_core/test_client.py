@@ -156,12 +156,8 @@ async def test_allow_insecure_instance_boolean_parsing(env_value, expected_ssl):
     with mock.patch.dict(os.environ, {"PANTHER_ALLOW_INSECURE_INSTANCE": env_value}):
         with mock.patch("aiohttp.ClientSession.get") as mock_get:
             mock_get.return_value.__aenter__.return_value = mock_response
-            await get_json_from_script_tag(
-                "http://example.com", "__PANTHER_CONFIG__"
-            )
-            mock_get.assert_called_once_with(
-                "http://example.com", ssl=expected_ssl
-            )
+            await get_json_from_script_tag("http://example.com", "__PANTHER_CONFIG__")
+            mock_get.assert_called_once_with("http://example.com", ssl=expected_ssl)
 
 
 @pytest.mark.asyncio
