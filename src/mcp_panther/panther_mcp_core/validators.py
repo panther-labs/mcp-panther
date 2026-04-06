@@ -120,3 +120,23 @@ def _validate_alert_status(v: str) -> str:
             f"Invalid status '{v}'. Must be one of: {', '.join(sorted(valid_statuses))}"
         )
     return v
+
+
+def _validate_auth_method(v: str) -> str:
+    """Validate HTTP log source authentication method."""
+    valid_methods = {"None", "Bearer", "Basic", "HMAC", "SharedSecret"}
+    if v not in valid_methods:
+        raise ValueError(
+            f"Invalid auth method '{v}'. Must be one of: {', '.join(sorted(valid_methods))}"
+        )
+    return v
+
+
+def _validate_log_stream_type(v: str) -> str:
+    """Validate HTTP log source stream type."""
+    valid_types = {"Auto", "JSON", "JsonArray", "Lines", "CloudWatchLogs", "XML"}
+    if v not in valid_types:
+        raise ValueError(
+            f"Invalid log stream type '{v}'. Must be one of: {', '.join(sorted(valid_types))}"
+        )
+    return v

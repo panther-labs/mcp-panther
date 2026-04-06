@@ -5,12 +5,13 @@ Tools for interacting with Panther log sources.
 import logging
 from typing import Any
 
-from pydantic import Field
+from pydantic import BeforeValidator, Field
 from typing_extensions import Annotated
 
 from ..client import _execute_query, get_rest_client
 from ..permissions import Permission, all_perms
 from ..queries import GET_SOURCES_QUERY
+from ..validators import _validate_auth_method, _validate_log_stream_type
 from .registry import mcp_tool
 
 logger = logging.getLogger("mcp-panther")
@@ -129,6 +130,181 @@ async def list_log_sources(
     except Exception as e:
         logger.error(f"Failed to fetch log sources: {str(e)}")
         return {"success": False, "message": f"Failed to fetch log sources: {str(e)}"}
+
+
+@mcp_tool(
+    annotations={
+        "permissions": all_perms(Permission.LOG_SOURCE_MODIFY),
+        "destructiveHint": False,
+        "idempotentHint": False,
+    }
+)
+async def create_http_log_source(
+    integration_label: Annotated[
+        str,
+        Field(
+            description="The name/label for the HTTP log source",
+            min_length=1,
+            examples=["My Webhook Source", "SIEM Forwarder"],
+        ),
+    ],
+    log_types: Annotated[
+        list[str],
+        Field(
+            description="List of log types this source will handle",
+            min_length=1,
+            examples=[["Custom.WebhookData"], ["AWS.CloudTrail", "Custom.AppLogs"]],
+        ),
+    ],
+    log_stream_type: Annotated[
+        str,
+        BeforeValidator(_validate_log_stream_type),
+        Field(
+            description="The log stream type for parsing incoming data",
+            examples=["Auto", "JSON", "JsonArray", "Lines", "CloudWatchLogs", "XML"],
+        ),
+    ],
+    auth_method: Annotated[
+        str,
+        BeforeValidator(_validate_auth_method),
+        Field(
+            description="The authentication method for the HTTP source",
+            examples=["None", "Bearer", "Basic", "HMAC", "SharedSecret"],
+        ),
+    ],
+    auth_bearer_token: Annotated[
+        str | None,
+        Field(
+            description="Bearer token value. Required when auth_method is 'Bearer'",
+        ),
+    ] = None,
+    auth_username: Annotated[
+        str | None,
+        Field(
+            description="Username for Basic auth. Required when auth_method is 'Basic'",
+        ),
+    ] = None,
+    auth_password: Annotated[
+        str | None,
+        Field(
+            description="Password for Basic auth. Required when auth_method is 'Basic'",
+        ),
+    ] = None,
+    auth_header_key: Annotated[
+        str | None,
+        Field(
+            description="Header key for HMAC or SharedSecret auth. Required when auth_method is 'HMAC' or 'SharedSecret'",
+        ),
+    ] = None,
+    auth_secret_value: Annotated[
+        str | None,
+        Field(
+            description="Secret value for HMAC or SharedSecret auth. Required when auth_method is 'HMAC' or 'SharedSecret'",
+        ),
+    ] = None,
+    auth_hmac_alg: Annotated[
+        str | None,
+        Field(
+            description="HMAC algorithm. Required when auth_method is 'HMAC'",
+            examples=["sha256", "sha512"],
+        ),
+    ] = None,
+    json_array_envelope_field: Annotated[
+        str | None,
+        Field(
+            description="Path to the array value to extract elements from. Only applicable when log_stream_type is 'JsonArray'. Leave empty if the input JSON is an array itself",
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """Create a new HTTP log source in Panther for ingesting logs via HTTP endpoint/webhook.
+
+    This tool onboards a new HTTP log source that can receive logs via HTTP POST requests.
+    After creation, Panther will provide an integration ID that can be used to send logs
+    to the source's HTTP endpoint.
+
+    Authentication parameters are conditionally required based on the auth_method:
+    - None: No additional auth parameters needed
+    - Bearer: Requires auth_bearer_token
+    - Basic: Requires auth_username and auth_password
+    - HMAC: Requires auth_header_key, auth_secret_value, and auth_hmac_alg
+    - SharedSecret: Requires auth_header_key and auth_secret_value
+    """
+    logger.info(f"Creating HTTP log source: {integration_label}")
+
+    try:
+        # Build the request payload with required fields
+        payload: dict[str, Any] = {
+            "integrationLabel": integration_label,
+            "logTypes": log_types,
+            "logStreamType": log_stream_type,
+            "authMethod": auth_method,
+        }
+
+        # Add auth-specific fields based on method
+        if auth_method == "Bearer":
+            if not auth_bearer_token:
+                return {
+                    "success": False,
+                    "message": "auth_bearer_token is required when auth_method is 'Bearer'",
+                }
+            payload["authBearerToken"] = auth_bearer_token
+
+        elif auth_method == "Basic":
+            if not auth_username or not auth_password:
+                return {
+                    "success": False,
+                    "message": "auth_username and auth_password are required when auth_method is 'Basic'",
+                }
+            payload["authUsername"] = auth_username
+            payload["authPassword"] = auth_password
+
+        elif auth_method == "HMAC":
+            if not auth_header_key or not auth_secret_value or not auth_hmac_alg:
+                return {
+                    "success": False,
+                    "message": "auth_header_key, auth_secret_value, and auth_hmac_alg are required when auth_method is 'HMAC'",
+                }
+            payload["authHeaderKey"] = auth_header_key
+            payload["authSecretValue"] = auth_secret_value
+            payload["authHmacAlg"] = auth_hmac_alg
+
+        elif auth_method == "SharedSecret":
+            if not auth_header_key or not auth_secret_value:
+                return {
+                    "success": False,
+                    "message": "auth_header_key and auth_secret_value are required when auth_method is 'SharedSecret'",
+                }
+            payload["authHeaderKey"] = auth_header_key
+            payload["authSecretValue"] = auth_secret_value
+
+        # Add optional log stream type options
+        if json_array_envelope_field is not None:
+            payload["logStreamTypeOptions"] = {
+                "jsonArrayEnvelopeField": json_array_envelope_field,
+            }
+
+        # Execute the REST API call
+        async with get_rest_client() as client:
+            response_data, status_code = await client.post(
+                "/log-sources/http",
+                json_data=payload,
+                expected_codes=[201],
+            )
+
+        logger.info(
+            f"Successfully created HTTP log source: {response_data.get('integrationId', 'unknown')}"
+        )
+
+        return {
+            "success": True,
+            "source": response_data,
+        }
+    except Exception as e:
+        logger.error(f"Failed to create HTTP log source: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to create HTTP log source: {str(e)}",
+        }
 
 
 @mcp_tool(

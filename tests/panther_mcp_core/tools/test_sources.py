@@ -3,10 +3,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from mcp_panther.panther_mcp_core.tools.sources import (
+    create_http_log_source,
     get_http_log_source,
     list_log_sources,
 )
-from tests.utils.helpers import patch_execute_query
+from tests.utils.helpers import patch_execute_query, patch_rest_client
 
 SOURCES_MODULE_PATH = "mcp_panther.panther_mcp_core.tools.sources"
 
@@ -290,3 +291,307 @@ async def test_get_http_log_source_with_json_array_stream_type(mock_get_client):
     assert (
         result["source"]["logStreamTypeOptions"]["jsonArrayEnvelopeField"] == "events"
     )
+
+
+# =====================================================================
+# create_http_log_source tests
+# =====================================================================
+
+MOCK_CREATED_HTTP_SOURCE = {
+    "integrationId": "new-http-source-123",
+    "integrationLabel": "My Webhook Source",
+    "logTypes": ["Custom.WebhookData"],
+    "logStreamType": "JSON",
+    "logStreamTypeOptions": None,
+    "authMethod": "None",
+    "authBearerToken": None,
+    "authUsername": None,
+    "authPassword": None,
+    "authHeaderKey": None,
+    "authSecretValue": None,
+    "authHmacAlg": None,
+}
+
+
+@pytest.mark.asyncio
+@patch_rest_client(SOURCES_MODULE_PATH)
+async def test_create_http_log_source_no_auth(mock_client):
+    """Test creating an HTTP log source with no authentication."""
+    mock_client.post.return_value = (MOCK_CREATED_HTTP_SOURCE, 201)
+
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="None",
+    )
+
+    assert result["success"] is True
+    assert result["source"]["integrationId"] == "new-http-source-123"
+    assert result["source"]["integrationLabel"] == "My Webhook Source"
+    assert result["source"]["authMethod"] == "None"
+
+    mock_client.post.assert_called_once_with(
+        "/log-sources/http",
+        json_data={
+            "integrationLabel": "My Webhook Source",
+            "logTypes": ["Custom.WebhookData"],
+            "logStreamType": "JSON",
+            "authMethod": "None",
+        },
+        expected_codes=[201],
+    )
+
+
+@pytest.mark.asyncio
+@patch_rest_client(SOURCES_MODULE_PATH)
+async def test_create_http_log_source_bearer_auth(mock_client):
+    """Test creating an HTTP log source with Bearer authentication."""
+    mock_response = MOCK_CREATED_HTTP_SOURCE.copy()
+    mock_response.update(
+        {
+            "authMethod": "Bearer",
+            "authBearerToken": "my-secret-token",
+        }
+    )
+    mock_client.post.return_value = (mock_response, 201)
+
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="Bearer",
+        auth_bearer_token="my-secret-token",
+    )
+
+    assert result["success"] is True
+    assert result["source"]["authMethod"] == "Bearer"
+    assert result["source"]["authBearerToken"] == "my-secret-token"
+
+    call_args = mock_client.post.call_args
+    assert call_args[1]["json_data"]["authBearerToken"] == "my-secret-token"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(SOURCES_MODULE_PATH)
+async def test_create_http_log_source_basic_auth(mock_client):
+    """Test creating an HTTP log source with Basic authentication."""
+    mock_response = MOCK_CREATED_HTTP_SOURCE.copy()
+    mock_response.update(
+        {
+            "authMethod": "Basic",
+            "authUsername": "testuser",
+            "authPassword": "testpass",
+        }
+    )
+    mock_client.post.return_value = (mock_response, 201)
+
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="Basic",
+        auth_username="testuser",
+        auth_password="testpass",
+    )
+
+    assert result["success"] is True
+    assert result["source"]["authMethod"] == "Basic"
+
+    call_args = mock_client.post.call_args
+    assert call_args[1]["json_data"]["authUsername"] == "testuser"
+    assert call_args[1]["json_data"]["authPassword"] == "testpass"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(SOURCES_MODULE_PATH)
+async def test_create_http_log_source_hmac_auth(mock_client):
+    """Test creating an HTTP log source with HMAC authentication."""
+    mock_response = MOCK_CREATED_HTTP_SOURCE.copy()
+    mock_response.update(
+        {
+            "authMethod": "HMAC",
+            "authHeaderKey": "X-Signature",
+            "authSecretValue": "secret-key",
+            "authHmacAlg": "sha256",
+        }
+    )
+    mock_client.post.return_value = (mock_response, 201)
+
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="HMAC",
+        auth_header_key="X-Signature",
+        auth_secret_value="secret-key",
+        auth_hmac_alg="sha256",
+    )
+
+    assert result["success"] is True
+    assert result["source"]["authMethod"] == "HMAC"
+
+    call_args = mock_client.post.call_args
+    assert call_args[1]["json_data"]["authHeaderKey"] == "X-Signature"
+    assert call_args[1]["json_data"]["authSecretValue"] == "secret-key"
+    assert call_args[1]["json_data"]["authHmacAlg"] == "sha256"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(SOURCES_MODULE_PATH)
+async def test_create_http_log_source_shared_secret_auth(mock_client):
+    """Test creating an HTTP log source with SharedSecret authentication."""
+    mock_response = MOCK_CREATED_HTTP_SOURCE.copy()
+    mock_response.update(
+        {
+            "authMethod": "SharedSecret",
+            "authHeaderKey": "X-Secret",
+            "authSecretValue": "my-secret",
+        }
+    )
+    mock_client.post.return_value = (mock_response, 201)
+
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="SharedSecret",
+        auth_header_key="X-Secret",
+        auth_secret_value="my-secret",
+    )
+
+    assert result["success"] is True
+    assert result["source"]["authMethod"] == "SharedSecret"
+
+    call_args = mock_client.post.call_args
+    assert call_args[1]["json_data"]["authHeaderKey"] == "X-Secret"
+    assert call_args[1]["json_data"]["authSecretValue"] == "my-secret"
+
+
+@pytest.mark.asyncio
+@patch_rest_client(SOURCES_MODULE_PATH)
+async def test_create_http_log_source_with_json_array_envelope(mock_client):
+    """Test creating an HTTP log source with JsonArray stream type and envelope field."""
+    mock_response = MOCK_CREATED_HTTP_SOURCE.copy()
+    mock_response.update(
+        {
+            "logStreamType": "JsonArray",
+            "logStreamTypeOptions": {"jsonArrayEnvelopeField": "events"},
+        }
+    )
+    mock_client.post.return_value = (mock_response, 201)
+
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JsonArray",
+        auth_method="None",
+        json_array_envelope_field="events",
+    )
+
+    assert result["success"] is True
+    assert result["source"]["logStreamType"] == "JsonArray"
+
+    call_args = mock_client.post.call_args
+    assert call_args[1]["json_data"]["logStreamTypeOptions"] == {
+        "jsonArrayEnvelopeField": "events"
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_http_log_source_missing_bearer_token():
+    """Test that missing bearer token returns validation error."""
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="Bearer",
+    )
+
+    assert result["success"] is False
+    assert "auth_bearer_token is required" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_create_http_log_source_missing_basic_auth_fields():
+    """Test that missing basic auth fields return validation error."""
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="Basic",
+    )
+
+    assert result["success"] is False
+    assert "auth_username and auth_password are required" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_create_http_log_source_missing_hmac_fields():
+    """Test that missing HMAC fields return validation error."""
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="HMAC",
+        auth_header_key="X-Signature",
+    )
+
+    assert result["success"] is False
+    assert (
+        "auth_header_key, auth_secret_value, and auth_hmac_alg are required"
+        in result["message"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_http_log_source_missing_shared_secret_fields():
+    """Test that missing SharedSecret fields return validation error."""
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="SharedSecret",
+    )
+
+    assert result["success"] is False
+    assert "auth_header_key and auth_secret_value are required" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(SOURCES_MODULE_PATH)
+async def test_create_http_log_source_api_error(mock_client):
+    """Test handling of API errors during creation."""
+    mock_client.post.side_effect = Exception(
+        'Request failed (HTTP 400): {"message": "invalid log type"}'
+    )
+
+    result = await create_http_log_source(
+        integration_label="My Webhook Source",
+        log_types=["Invalid.LogType"],
+        log_stream_type="JSON",
+        auth_method="None",
+    )
+
+    assert result["success"] is False
+    assert "Failed to create HTTP log source" in result["message"]
+
+
+@pytest.mark.asyncio
+@patch_rest_client(SOURCES_MODULE_PATH)
+async def test_create_http_log_source_conflict_error(mock_client):
+    """Test handling of conflict (duplicate) errors during creation."""
+    mock_client.post.side_effect = Exception(
+        'Request failed (HTTP 409): {"message": "source already exists"}'
+    )
+
+    result = await create_http_log_source(
+        integration_label="Duplicate Source",
+        log_types=["Custom.WebhookData"],
+        log_stream_type="JSON",
+        auth_method="None",
+    )
+
+    assert result["success"] is False
+    assert "Failed to create HTTP log source" in result["message"]
+    assert "409" in result["message"]
