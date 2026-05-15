@@ -1,2 +1,25 @@
-# Maintainers
-* @panther-labs/mcp-team @tomasz-sq
+# Default / shared ownership
+*  @panther-labs/business-platform
+
+# Context & Data
+src/mcp_panther/panther_mcp_core/tools/data_lake.py  @panther-labs/context-data-experience
+src/mcp_panther/panther_mcp_core/tools/sources.py    @panther-labs/context-data-experience
+src/mcp_panther/panther_mcp_core/tools/schemas.py    @panther-labs/context-data-experience
+
+# Detection & threat hunting
+src/mcp_panther/panther_mcp_core/tools/detections.py        @panther-labs/detection-threat-hunting-experience
+src/mcp_panther/panther_mcp_core/tools/global_helpers.py    @panther-labs/detection-threat-hunting-experience
+src/mcp_panther/panther_mcp_core/tools/data_models.py       @panther-labs/detection-threat-hunting-experience
+src/mcp_panther/panther_mcp_core/tools/scheduled_queries.py @panther-labs/detection-threat-hunting-experience
+
+# Alert response
+src/mcp_panther/panther_mcp_core/tools/alerts.py     @panther-labs/alert-response-experience
+src/mcp_panther/panther_mcp_core/prompts/             @panther-labs/alert-response-experience
+
+# Metrics (shared: alert metrics + data ingestion metrics)
+src/mcp_panther/panther_mcp_core/tools/metrics.py    @panther-labs/alert-response-experience @panther-labs/context-data-experience
+
+# Business platform
+src/mcp_panther/panther_mcp_core/tools/users.py       @panther-labs/business-platform
+src/mcp_panther/panther_mcp_core/tools/roles.py        @panther-labs/business-platform
+src/mcp_panther/panther_mcp_core/tools/permissions.py  @panther-labs/business-platform
