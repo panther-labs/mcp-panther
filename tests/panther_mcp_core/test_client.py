@@ -11,6 +11,7 @@ from mcp_panther.panther_mcp_core.client import (
     get_instance_config,
     get_json_from_script_tag,
     get_panther_rest_api_base,
+    get_rest_client,
 )
 
 
@@ -191,3 +192,35 @@ async def test_get_panther_rest_api_base():
     ):
         base = await get_panther_rest_api_base()
         assert base == ""
+
+
+@pytest.mark.asyncio
+async def test_rest_client_contexts_are_independent():
+    shared_session = mock.MagicMock()
+
+    with (
+        mock.patch(
+            "mcp_panther.panther_mcp_core.client._rest_session",
+            shared_session,
+        ),
+        mock.patch(
+            "mcp_panther.panther_mcp_core.client.get_panther_rest_api_base",
+            new=mock.AsyncMock(return_value="https://example.com"),
+        ),
+        mock.patch(
+            "mcp_panther.panther_mcp_core.client.get_panther_api_key",
+            return_value="test-token",
+        ),
+    ):
+        first_client = get_rest_client()
+        second_client = get_rest_client()
+
+        async with first_client:
+            async with second_client:
+                assert first_client._session is shared_session
+                assert second_client._session is shared_session
+
+            assert first_client._session is shared_session
+
+    assert first_client._session is None
+    assert second_client._session is None
