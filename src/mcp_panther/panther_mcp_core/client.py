@@ -30,8 +30,7 @@ _graphql_session: Optional[aiohttp.ClientSession] = (
     None  # GQL session for concurrent GraphQL requests
 )
 
-# REST API client storage
-_rest_client: Optional["PantherRestClient"] = None
+# REST API session storage
 _rest_session: Optional[aiohttp.ClientSession] = (
     None  # Persistent session for REST API requests
 )
