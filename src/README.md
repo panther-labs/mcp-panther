@@ -183,7 +183,15 @@ from . import my_new_module  # Add this line
 5. Update the `__all__` list if you created a new module:
 
 ```python
-__all__ = ["alerts", "rules", "data_lake", "sources", "metrics", "users", "my_new_module"]
+__all__ = [
+    "alerts",
+    "rules",
+    "data_lake",
+    "sources",
+    "metrics",
+    "users",
+    "my_new_module",
+]
 ```
 
 ### Adding New Prompts (`mcp_prompt`)

@@ -30,8 +30,7 @@ _graphql_session: Optional[aiohttp.ClientSession] = (
     None  # GQL session for concurrent GraphQL requests
 )
 
-# REST API client storage
-_rest_client: Optional["PantherRestClient"] = None
+# REST API session storage
 _rest_session: Optional[aiohttp.ClientSession] = (
     None  # Persistent session for REST API requests
 )
@@ -714,19 +713,10 @@ class PantherRestClient:
             return await response.json(), response.status
 
 
-_rest_client: Optional[PantherRestClient] = None
-
-
 def get_rest_client() -> PantherRestClient:
-    """Get the singleton instance of PantherRestClient.
-
-    This function lazily instantiates the client on first call
-    and returns the same instance for subsequent calls.
+    """Create a REST client for a single async context.
 
     Returns:
-        PantherRestClient: The singleton instance of the REST client
+        PantherRestClient: A new REST client instance
     """
-    global _rest_client
-    if _rest_client is None:
-        _rest_client = PantherRestClient()
-    return _rest_client
+    return PantherRestClient()
