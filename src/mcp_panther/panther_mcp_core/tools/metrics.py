@@ -218,16 +218,14 @@ async def get_rule_alert_metrics(
             raise Exception("Failed to fetch metrics data")
 
         metrics_data = result["metrics"]
+        # The API returns null instead of an empty list when no rules alerted
+        alerts_per_rule = metrics_data.get("alertsPerRule") or []
 
         # Filter by rule IDs if provided
         if rule_ids:
             alerts_per_rule = [
-                item
-                for item in metrics_data["alertsPerRule"]
-                if item["entityId"] in rule_ids
+                item for item in alerts_per_rule if item["entityId"] in rule_ids
             ]
-        else:
-            alerts_per_rule = metrics_data["alertsPerRule"]
 
         return {
             "success": True,

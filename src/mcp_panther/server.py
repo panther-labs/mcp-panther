@@ -65,7 +65,6 @@ except ImportError:
     from .panther_mcp_core.tools.registry import register_all_tools
 
 # Create the MCP server with lifespan context for shared HTTP client management
-# Note: Dependencies are declared in fastmcp.json for FastMCP v2.14.0+
 mcp = FastMCP(MCP_SERVER_NAME, lifespan=lifespan)
 
 # Register all tools with MCP using the registry
