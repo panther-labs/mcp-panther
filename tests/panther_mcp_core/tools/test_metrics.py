@@ -215,6 +215,21 @@ class TestGetMetricsAlertsPerRule:
         mock_get_week_date_range.assert_called_once()
         mock_execute_query.assert_called_once()
 
+    @pytest.mark.parametrize("rule_ids", [[], ["AWS.EC2.RouteTableModified"]])
+    async def test_null_alerts_per_rule(
+        self, mock_execute_query, mock_get_week_date_range, rule_ids
+    ):
+        """Test that a null alertsPerRule (no alerts in the period) returns an empty list."""
+        mock_execute_query.return_value = {
+            "metrics": {"alertsPerRule": None, "totalAlerts": 0}
+        }
+
+        result = await get_rule_alert_metrics(rule_ids=rule_ids)
+
+        assert result["success"] is True
+        assert result["alerts_per_rule"] == []
+        assert result["total_alerts"] == 0
+
     async def test_error_handling(self, mock_execute_query, mock_get_week_date_range):
         """Test error handling when query fails."""
         mock_execute_query.side_effect = Exception("Query failed")
