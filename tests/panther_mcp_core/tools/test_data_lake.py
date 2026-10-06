@@ -269,6 +269,15 @@ async def test_cancel_data_lake_query_no_id_returned(mock_execute_query):
         "SELECT $$create 'null'; \"quoted\"\ntext$$ AS sample_value",
         "SELECT 'null' AS sample_value -- 'create' stays a comment\n",
         "SELECT /* 'null' */ 'create' AS sample_value;\n",
+        "SELECT 'table', 'column', 'index' FROM sample_table",
+        "SELECT sample_value FROM sample_table WHERE sample_value = 'where'",
+        "SELECT sample_value FROM sample_table WHERE event_time > '2024-01-01'",
+        """
+    SELECT sample_value AS "select", region AS "from"
+    FROM sample_table
+    WHERE p_event_time >= CURRENT_TIMESTAMP() - INTERVAL '1 DAY'
+    ORDER BY "select", "from"
+    """,
     ],
     ids=[
         "null-literal",
@@ -284,6 +293,10 @@ async def test_cancel_data_lake_query_no_id_returned(mock_execute_query):
         "multiline-dollar-quoted-literal",
         "line-comment",
         "block-comment",
+        "reserved-literal-projection",
+        "reserved-literal-predicate",
+        "date-literal",
+        "quoted-aliases-and-interval",
     ],
 )
 async def test_query_data_lake_preserves_sql(sql):
@@ -300,15 +313,37 @@ async def test_query_data_lake_preserves_sql(sql):
             "success": True,
             "status": "succeeded",
             "results": [],
+            "column_info": {},
+            "stats": {},
+            "has_next_page": False,
+            "next_cursor": None,
+            "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
 
         result = await query_data_lake(sql)
 
     assert result["success"] is True
+    assert result["status"] == "succeeded"
+    assert result["query_id"] == MOCK_QUERY_ID
     mock_execute_query.assert_awaited_once()
     variables = mock_execute_query.call_args.args[1]
     assert variables["input"]["sql"] == sql
+
+
+@pytest.mark.asyncio
+async def test_query_data_lake_preserves_malformed_sql_for_backend_validation():
+    """Leave SQL syntax validation to the backend and report its error."""
+    sql = "SELECT FROM WHERE ((("
+    with patch(f"{DATA_LAKE_MODULE_PATH}._execute_query") as mock_execute_query:
+        mock_execute_query.side_effect = Exception("SQL compilation error")
+        result = await query_data_lake(sql)
+
+    mock_execute_query.assert_awaited_once()
+    assert mock_execute_query.call_args.args[1]["input"]["sql"] == sql
+    assert result["success"] is False
+    assert "SQL compilation error" in result["message"]
+    assert result["query_id"] is None
 
 
 @pytest.mark.asyncio

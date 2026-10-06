@@ -224,7 +224,7 @@ async def query_data_lake(
     - Nested field access: "SELECT p_enrichment:ipinfo_privacy:\"context.ip_address\" FROM table WHERE p_occurs_since('1 h')"
 
     Query Syntax (Snowflake SQL):
-    - String literals use single quotes; identifiers use double quotes. SQL is submitted unchanged.
+    - String literals use single quotes or $$; delimited identifiers use double quotes. SQL is submitted unchanged.
     - Access nested JSON: column:field.subfield
     - Quote special characters: column:"field name" or p_enrichment:"context.ip_address"
     - Array searches: ARRAY_CONTAINS('value'::VARIANT, array_column)
@@ -269,7 +269,7 @@ async def query_data_lake(
 
     try:
         # Preserve SQL verbatim: single quotes denote string literals, while
-        # identifiers (including reserved words) must use double quotes.
+        # reserved words used as identifiers require double quotes.
         variables = {"input": {"sql": sql, "databaseName": database_name}}
 
         logger.debug(f"Query variables: {variables}")
