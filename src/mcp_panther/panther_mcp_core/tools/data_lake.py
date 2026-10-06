@@ -192,6 +192,24 @@ def _decode_page_cursor(cursor: str, sql: str, database_name: str) -> tuple[str,
     return payload["query_id"], payload["cursor"]
 
 
+def _with_page_cursor(
+    result: Dict[str, Any], query_id: str, sql: str, database_name: str
+) -> Dict[str, Any]:
+    """Attach the original query ID to a backend cursor when another page exists."""
+    if not (
+        result.get("success")
+        and result.get("has_next_page")
+        and result.get("next_cursor")
+    ):
+        return result
+    return {
+        **result,
+        "next_cursor": _encode_page_cursor(
+            query_id, result["next_cursor"], sql, database_name
+        ),
+    }
+
+
 @mcp_tool(
     annotations={
         "permissions": all_perms(Permission.DATA_ANALYTICS_READ),
@@ -400,6 +418,8 @@ async def query_data_lake(
         else "Executing data lake query"
     )
 
+    start_time = time.time()
+
     # Validate that the query includes a time filter (p_event_time or Panther macros)
     sql_lower = sql.lower().replace("\n", " ")
     has_p_event_time = re.search(
@@ -430,69 +450,56 @@ async def query_data_lake(
             return {"success": False, "message": str(exc), "query_id": None}
 
     try:
-        if cursor is None:
-            start_time = time.time()
-            # Process reserved words in the SQL
-            processed_sql = wrap_reserved_words(sql)
-            logger.debug(f"Original SQL: {sql}")
-            logger.debug(f"Processed SQL: {processed_sql}")
-
-            # Prepare input variables
-            variables = {"input": {"sql": processed_sql, "databaseName": database_name}}
-
-            logger.debug(f"Query variables: {variables}")
-
-            # Execute the query using shared client
-            result = await _execute_query(EXECUTE_DATA_LAKE_QUERY, variables)
-
-            # Get query ID from result
-            query_id = result.get("executeDataLakeQuery", {}).get("id")
-
-            if not query_id:
-                raise ValueError("No query ID returned from execution")
-
-            logger.info(f"Successfully executed query with ID: {query_id}")
-
-            sleep_time = INITIAL_QUERY_SLEEP_SECONDS
-            while True:
-                await asyncio.sleep(sleep_time)
-
-                result = await _get_data_lake_query_results(
-                    query_id=query_id, max_rows=max_rows, cursor=None
-                )
-
-                if result.get("status") == "running":
-                    if (time.time() - start_time) >= timeout:
-                        await _cancel_data_lake_query(query_id=query_id)
-                        return {
-                            "success": False,
-                            "status": "cancelled",
-                            "message": "Query time exceeded timeout, and has been cancelled. A longer timout may be required. "
-                            "Retrying may be faster due to caching, or you may need to reduce the duration of data being queried.",
-                            "query_id": query_id,
-                        }
-                else:
-                    break
-
-                if sleep_time <= MAX_QUERY_SLEEP_SECONDS:
-                    sleep_time += 1
-        else:
+        if cursor is not None:
             result = await _get_data_lake_query_results(
                 query_id=query_id, max_rows=max_rows, cursor=backend_cursor
             )
+            return _with_page_cursor(result, query_id, sql, database_name)
 
-        if (
-            result.get("success")
-            and result.get("has_next_page")
-            and result.get("next_cursor")
-        ):
-            return {
-                **result,
-                "next_cursor": _encode_page_cursor(
-                    query_id, result["next_cursor"], sql, database_name
-                ),
-            }
-        return result
+        # Process reserved words in the SQL
+        processed_sql = wrap_reserved_words(sql)
+        logger.debug(f"Original SQL: {sql}")
+        logger.debug(f"Processed SQL: {processed_sql}")
+
+        # Prepare input variables
+        variables = {"input": {"sql": processed_sql, "databaseName": database_name}}
+
+        logger.debug(f"Query variables: {variables}")
+
+        # Execute the query using shared client
+        result = await _execute_query(EXECUTE_DATA_LAKE_QUERY, variables)
+
+        # Get query ID from result
+        query_id = result.get("executeDataLakeQuery", {}).get("id")
+
+        if not query_id:
+            raise ValueError("No query ID returned from execution")
+
+        logger.info(f"Successfully executed query with ID: {query_id}")
+
+        sleep_time = INITIAL_QUERY_SLEEP_SECONDS
+        while True:
+            await asyncio.sleep(sleep_time)
+
+            result = await _get_data_lake_query_results(
+                query_id=query_id, max_rows=max_rows, cursor=None
+            )
+
+            if result.get("status") == "running":
+                if (time.time() - start_time) >= timeout:
+                    await _cancel_data_lake_query(query_id=query_id)
+                    return {
+                        "success": False,
+                        "status": "cancelled",
+                        "message": "Query time exceeded timeout, and has been cancelled. A longer timout may be required. "
+                        "Retrying may be faster due to caching, or you may need to reduce the duration of data being queried.",
+                        "query_id": query_id,
+                    }
+            else:
+                return _with_page_cursor(result, query_id, sql, database_name)
+
+            if sleep_time <= MAX_QUERY_SLEEP_SECONDS:
+                sleep_time += 1
     except Exception as e:
         logger.error(f"Failed to execute data lake query: {str(e)}")
         # Try to get query_id if it was set before the error
