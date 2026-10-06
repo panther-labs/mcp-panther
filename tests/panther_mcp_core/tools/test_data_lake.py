@@ -5,7 +5,6 @@ import pytest
 from mcp_panther.panther_mcp_core.tools.data_lake import (
     _cancel_data_lake_query,
     query_data_lake,
-    wrap_reserved_words,
 )
 from tests.utils.helpers import patch_execute_query
 
@@ -253,110 +252,63 @@ async def test_cancel_data_lake_query_no_id_returned(mock_execute_query):
     assert "No query ID returned" in result["message"]
 
 
-# Reserved Words Tests
-
-
-def test_wrap_reserved_words_basic():
-    """Test basic reserved word wrapping."""
-    test_cases = [
-        {
-            "input": "SELECT eventName as 'select', awsRegion as 'from' FROM aws_cloudtrail",
-            "expected": 'SELECT eventName as "select", awsRegion as "from" FROM aws_cloudtrail',
-        },
-        {
-            "input": "SELECT 'table', 'column', 'index' FROM aws_cloudtrail",
-            "expected": 'SELECT "table", "column", "index" FROM aws_cloudtrail',
-        },
-        {
-            "input": "SELECT eventName FROM aws_cloudtrail WHERE 'where' > 100",
-            "expected": 'SELECT eventName FROM aws_cloudtrail WHERE "where" > 100',
-        },
-    ]
-
-    for case in test_cases:
-        result = wrap_reserved_words(case["input"])
-        assert result == case["expected"], (
-            f"Expected '{case['expected']}' but got '{result}'"
-        )
-
-
-def test_wrap_reserved_words_preserves_non_reserved():
-    """Test that non-reserved words are not modified."""
-    sql = "SELECT eventName FROM aws_cloudtrail WHERE eventTime > '2024-01-01'"
-    result = wrap_reserved_words(sql)
-
-    # Should not quote non-reserved words
-    assert '"2024-01-01"' not in result
-    assert "'2024-01-01'" in result
-
-
-def test_wrap_reserved_words_complex_query():
-    """Test reserved words in complex queries."""
-    sql = """
-    SELECT eventName as 'select', awsRegion as 'from'
-    FROM aws_cloudtrail 
-    WHERE p_event_time >= CURRENT_TIMESTAMP() - INTERVAL '1 DAY'
-    ORDER BY 'select', 'from'
-    """
-
-    expected = """
-    SELECT eventName as "select", awsRegion as "from"
-    FROM aws_cloudtrail 
-    WHERE p_event_time >= CURRENT_TIMESTAMP() - INTERVAL '1 DAY'
-    ORDER BY "select", "from"
-    """
-
-    result = wrap_reserved_words(sql)
-    assert result == expected
-
-
-def test_wrap_reserved_words_handles_errors():
-    """Test that function handles malformed SQL gracefully."""
-    malformed_sql = "SELECT FROM WHERE ((("
-    result = wrap_reserved_words(malformed_sql)
-    # Should return original SQL if parsing fails
-    assert result == malformed_sql
-
-
 @pytest.mark.asyncio
-@patch_execute_query(DATA_LAKE_MODULE_PATH)
-async def test_query_data_lake_with_reserved_words_processing(
-    mock_execute_query,
-):
-    """Test that query_data_lake processes reserved words."""
-    mock_execute_query.return_value = {"executeDataLakeQuery": {"id": MOCK_QUERY_ID}}
-
-    # SQL with single-quoted reserved words that should be converted to double-quoted
-    input_sql = "SELECT eventName as 'select', awsRegion as 'from' FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10"
-    expected_processed_sql = 'SELECT eventName as "select", awsRegion as "from" FROM panther_logs.public.aws_cloudtrail WHERE p_event_time >= DATEADD(day, -30, CURRENT_TIMESTAMP()) LIMIT 10'
-
-    # Mock the query results function to return success
-    with patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_results:
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT 'null' AS sample_value",
+        "SELECT 'create' AS sample_value",
+        "SELECT 'NuLl' AS sample_value",
+        "SELECT 'ordinary text' AS sample_value",
+        "SELECT 'it''s null' AS sample_value",
+        r"SELECT 'it\'s create' AS sample_value",
+        'SELECT "create", "null", "MixedCase" FROM "sample_table"',
+        'SELECT "a""b" FROM "sample_table"',
+        "SELECT 'null' AS \"create\", 'create' AS \"null\"",
+        "SELECT $$null$$ AS sample_value",
+        "SELECT $$create 'null'; \"quoted\"\ntext$$ AS sample_value",
+        "SELECT 'null' AS sample_value -- 'create' stays a comment\n",
+        "SELECT /* 'null' */ 'create' AS sample_value;\n",
+    ],
+    ids=[
+        "null-literal",
+        "create-literal",
+        "mixed-case-literal",
+        "ordinary-literal",
+        "doubled-quote-literal",
+        "backslash-escaped-literal",
+        "quoted-identifiers",
+        "escaped-identifier",
+        "literals-and-identifiers",
+        "dollar-quoted-literal",
+        "multiline-dollar-quoted-literal",
+        "line-comment",
+        "block-comment",
+    ],
+)
+async def test_query_data_lake_preserves_sql(sql):
+    """Submit literals and quoted identifiers to the API without rewriting SQL."""
+    with (
+        patch(f"{DATA_LAKE_MODULE_PATH}._execute_query") as mock_execute_query,
+        patch(f"{DATA_LAKE_MODULE_PATH}._get_data_lake_query_results") as mock_results,
+        patch(f"{DATA_LAKE_MODULE_PATH}.asyncio.sleep"),
+    ):
+        mock_execute_query.return_value = {
+            "executeDataLakeQuery": {"id": MOCK_QUERY_ID}
+        }
         mock_results.return_value = {
             "success": True,
             "status": "succeeded",
             "results": [],
-            "column_info": {},
-            "stats": {},
-            "has_next_page": False,
-            "next_cursor": None,
-            "message": "Query executed successfully",
             "query_id": MOCK_QUERY_ID,
         }
 
-        result = await query_data_lake(input_sql)
+        result = await query_data_lake(sql)
 
-    # Verify the function returns success
     assert result["success"] is True
-    assert result["status"] == "succeeded"
-    assert result["query_id"] == MOCK_QUERY_ID
-
-    # Verify the SQL was processed for reserved words
-    call_args = mock_execute_query.call_args[0][1]
-    processed_sql = call_args["input"]["sql"]
-
-    # Assert the exact transformed SQL
-    assert processed_sql == expected_processed_sql
+    mock_execute_query.assert_awaited_once()
+    variables = mock_execute_query.call_args.args[1]
+    assert variables["input"]["sql"] == sql
 
 
 @pytest.mark.asyncio
