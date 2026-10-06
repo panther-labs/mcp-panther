@@ -3,6 +3,10 @@ Tools for interacting with Panther's data lake.
 """
 
 import asyncio
+import base64
+import binascii
+import hashlib
+import json
 import logging
 import re
 import time
@@ -28,6 +32,7 @@ logger = logging.getLogger("mcp-panther")
 
 INITIAL_QUERY_SLEEP_SECONDS = 1
 MAX_QUERY_SLEEP_SECONDS = 5
+PAGE_CURSOR_PREFIX = "mcp-panther-query-page-v1:"
 
 
 # Snowflake reserved words that should be quoted when used as identifiers
@@ -137,6 +142,54 @@ class QueryStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+def _pagination_request_hash(sql: str, database_name: str) -> str:
+    """Bind a page cursor to the caller's exact query and database."""
+    request = json.dumps([sql, database_name], separators=(",", ":"))
+    return hashlib.sha256(request.encode()).hexdigest()
+
+
+def _encode_page_cursor(
+    query_id: str, cursor: str, sql: str, database_name: str
+) -> str:
+    """Keep the query ID with its backend cursor across tool calls."""
+    payload = {
+        "query_id": query_id,
+        "cursor": cursor,
+        "request_hash": _pagination_request_hash(sql, database_name),
+    }
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode()
+    ).decode("ascii")
+    return f"{PAGE_CURSOR_PREFIX}{encoded}"
+
+
+def _decode_page_cursor(cursor: str, sql: str, database_name: str) -> tuple[str, str]:
+    """Reject cursors that cannot identify the original query or request."""
+    if not cursor.startswith(PAGE_CURSOR_PREFIX):
+        raise ValueError("Unsupported pagination cursor; rerun the query from page one")
+
+    try:
+        encoded = cursor.removeprefix(PAGE_CURSOR_PREFIX)
+        payload = json.loads(
+            base64.b64decode(encoded.encode("ascii"), altchars=b"-_", validate=True)
+        )
+    except (binascii.Error, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Invalid pagination cursor") from exc
+
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("query_id"), str)
+        or not payload["query_id"]
+        or not isinstance(payload.get("cursor"), str)
+        or not payload["cursor"]
+        or not isinstance(payload.get("request_hash"), str)
+    ):
+        raise ValueError("Invalid pagination cursor")
+    if payload["request_hash"] != _pagination_request_hash(sql, database_name):
+        raise ValueError("Pagination cursor does not match the SQL and database")
+    return payload["query_id"], payload["cursor"]
 
 
 @mcp_tool(
@@ -283,7 +336,7 @@ async def query_data_lake(
     cursor: Annotated[
         str | None,
         Field(
-            description="Optional pagination cursor from previous query to fetch next page of results",
+            description="Opaque next_cursor from the previous page of this SQL query",
         ),
     ] = None,
 ) -> Dict[str, Any]:
@@ -315,8 +368,9 @@ async def query_data_lake(
 
     Pagination:
     - First call: No cursor parameter - returns first page with max_rows results
-    - Subsequent calls: Use next_cursor from previous response to get next page
+    - Subsequent calls: Use next_cursor from previous response with the same SQL and database_name
     - Continue until has_next_page is False
+    - Cursors issued before this version cannot be resumed; start again without a cursor
 
     Common Examples:
     - Recent failed logins: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL"
@@ -340,9 +394,11 @@ async def query_data_lake(
         - stats: Query performance metrics (execution time, bytes scanned)
         - success/status/message: Query execution status
     """
-    logger.info("Executing data lake query")
-
-    start_time = time.time()
+    logger.info(
+        "Fetching data lake query page"
+        if cursor is not None
+        else "Executing data lake query"
+    )
 
     # Validate that the query includes a time filter (p_event_time or Panther macros)
     sql_lower = sql.lower().replace("\n", " ")
@@ -367,51 +423,76 @@ async def query_data_lake(
             "query_id": None,
         }
 
+    if cursor is not None:
+        try:
+            query_id, backend_cursor = _decode_page_cursor(cursor, sql, database_name)
+        except ValueError as exc:
+            return {"success": False, "message": str(exc), "query_id": None}
+
     try:
-        # Process reserved words in the SQL
-        processed_sql = wrap_reserved_words(sql)
-        logger.debug(f"Original SQL: {sql}")
-        logger.debug(f"Processed SQL: {processed_sql}")
+        if cursor is None:
+            start_time = time.time()
+            # Process reserved words in the SQL
+            processed_sql = wrap_reserved_words(sql)
+            logger.debug(f"Original SQL: {sql}")
+            logger.debug(f"Processed SQL: {processed_sql}")
 
-        # Prepare input variables
-        variables = {"input": {"sql": processed_sql, "databaseName": database_name}}
+            # Prepare input variables
+            variables = {"input": {"sql": processed_sql, "databaseName": database_name}}
 
-        logger.debug(f"Query variables: {variables}")
+            logger.debug(f"Query variables: {variables}")
 
-        # Execute the query using shared client
-        result = await _execute_query(EXECUTE_DATA_LAKE_QUERY, variables)
+            # Execute the query using shared client
+            result = await _execute_query(EXECUTE_DATA_LAKE_QUERY, variables)
 
-        # Get query ID from result
-        query_id = result.get("executeDataLakeQuery", {}).get("id")
+            # Get query ID from result
+            query_id = result.get("executeDataLakeQuery", {}).get("id")
 
-        if not query_id:
-            raise ValueError("No query ID returned from execution")
+            if not query_id:
+                raise ValueError("No query ID returned from execution")
 
-        logger.info(f"Successfully executed query with ID: {query_id}")
+            logger.info(f"Successfully executed query with ID: {query_id}")
 
-        sleep_time = INITIAL_QUERY_SLEEP_SECONDS
-        while True:
-            await asyncio.sleep(sleep_time)
+            sleep_time = INITIAL_QUERY_SLEEP_SECONDS
+            while True:
+                await asyncio.sleep(sleep_time)
 
+                result = await _get_data_lake_query_results(
+                    query_id=query_id, max_rows=max_rows, cursor=None
+                )
+
+                if result.get("status") == "running":
+                    if (time.time() - start_time) >= timeout:
+                        await _cancel_data_lake_query(query_id=query_id)
+                        return {
+                            "success": False,
+                            "status": "cancelled",
+                            "message": "Query time exceeded timeout, and has been cancelled. A longer timout may be required. "
+                            "Retrying may be faster due to caching, or you may need to reduce the duration of data being queried.",
+                            "query_id": query_id,
+                        }
+                else:
+                    break
+
+                if sleep_time <= MAX_QUERY_SLEEP_SECONDS:
+                    sleep_time += 1
+        else:
             result = await _get_data_lake_query_results(
-                query_id=query_id, max_rows=max_rows, cursor=cursor
+                query_id=query_id, max_rows=max_rows, cursor=backend_cursor
             )
 
-            if result.get("status") == "running":
-                if (time.time() - start_time) >= timeout:
-                    await _cancel_data_lake_query(query_id=query_id)
-                    return {
-                        "success": False,
-                        "status": "cancelled",
-                        "message": "Query time exceeded timeout, and has been cancelled. A longer timout may be required. "
-                        "Retrying may be faster due to caching, or you may need to reduce the duration of data being queried.",
-                        "query_id": query_id,
-                    }
-            else:
-                return result
-
-            if sleep_time <= MAX_QUERY_SLEEP_SECONDS:
-                sleep_time += 1
+        if (
+            result.get("success")
+            and result.get("has_next_page")
+            and result.get("next_cursor")
+        ):
+            return {
+                **result,
+                "next_cursor": _encode_page_cursor(
+                    query_id, result["next_cursor"], sql, database_name
+                ),
+            }
+        return result
     except Exception as e:
         logger.error(f"Failed to execute data lake query: {str(e)}")
         # Try to get query_id if it was set before the error
