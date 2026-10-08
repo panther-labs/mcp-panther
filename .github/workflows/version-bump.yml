@@ -14,18 +14,27 @@ on:
         default: 'minor'
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   version_bump_pr:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Generate GitHub App token
+      id: app-token
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      with:
+        app-id: ${{ secrets.PANTHER_BOT_APP_ID }}
+        private-key: ${{ secrets.PANTHER_BOT_APP_PRIVATE_KEY }}
+        permission-contents: write
+        permission-pull-requests: write
+
     - name: Check out the repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 1
+        persist-credentials: false
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -98,29 +107,16 @@ jobs:
         # Re-lock without upgrades so only the mcp-panther version entry changes
         uv lock
 
-    - name: Import GPG key
-      uses: crazy-max/ghaction-import-gpg@v6
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
       with:
-        gpg_private_key: ${{ secrets.PANTHER_BOT_GPG_PRIVATE_KEY }}
-        passphrase: ${{ secrets.PANTHER_BOT_GPG_PRIVATE_KEY_PASSPHRASE }}
-        git_user_signingkey: true
-        git_commit_gpgsign: true
-
-    - name: Create Branch and Pull Request
-      run: |
-        NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
-        git config --global user.email "github-service-account-automation@panther.io"
-        git config --global user.name "panther-bot-automation"
-
-        BRANCH_NAME="bump-version-to-$NEW_VERSION"
-        git checkout -b "$BRANCH_NAME"
-        git add pyproject.toml uv.lock
-        git commit -S -m "Bump version to $NEW_VERSION"
-        git push --set-upstream origin "$BRANCH_NAME"
-
-        gh pr create \
-          --title "Version bump to v$NEW_VERSION" \
-          --body "Automated version bump to prepare for release v$NEW_VERSION" \
-          --base main
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ steps.app-token.outputs.token }}
+        sign-commits: true
+        add-paths: |
+          pyproject.toml
+          uv.lock
+        base: main
+        branch: bump-version-to-${{ steps.bump_version.outputs.new_version }}
+        commit-message: Bump version to ${{ steps.bump_version.outputs.new_version }}
+        title: Version bump to v${{ steps.bump_version.outputs.new_version }}
+        body: Automated version bump to prepare for release v${{ steps.bump_version.outputs.new_version }}

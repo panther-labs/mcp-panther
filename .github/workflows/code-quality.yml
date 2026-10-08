@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   code-quality:
@@ -15,11 +15,26 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.12"]
+    env:
+      # Same-repo, non-dependabot PRs get ruff fixes pushed back to the PR branch.
+      AUTO_FIX: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && github.event.pull_request.user.login != 'dependabot[bot]' }}
 
     steps:
+      - name: Generate GitHub App token
+        if: env.AUTO_FIX == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.PANTHER_BOT_APP_ID }}
+          private-key: ${{ secrets.PANTHER_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      # Auto-fix checks out the PR branch with the App token so it can push; otherwise the default merge ref.
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ env.AUTO_FIX == 'true' && github.head_ref || '' }}
+          token: ${{ steps.app-token.outputs.token || github.token }}
+          persist-credentials: ${{ env.AUTO_FIX == 'true' }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -35,31 +50,24 @@ jobs:
         run: |
           uv pip install --system ruff
 
-      - name: Import GPG key
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && github.event.pull_request.user.login != 'dependabot[bot]'
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.PANTHER_BOT_GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.PANTHER_BOT_GPG_PRIVATE_KEY_PASSPHRASE }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-
       - name: Format and fix code
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && github.event.pull_request.user.login != 'dependabot[bot]'
+        if: env.AUTO_FIX == 'true'
         run: |
           ruff format src
           ruff check --fix src
 
           # Check if there are any changes to commit
           if [ -n "$(git status --porcelain)" ]; then
-            git config --global user.email "github-service-account-automation@panther.io"
-            git config --global user.name "panther-bot-automation"
+            app_user_id=$(gh api "/users/${APP_SLUG}[bot]" --jq .id)
+            git config user.email "${app_user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+            git config user.name "${APP_SLUG}[bot]"
             git add src
-            git commit -S -m "style: format and fix code with ruff"
+            git commit -m "style: format and fix code with ruff"
             git push
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
 
       - name: Check formatting
         run: |
