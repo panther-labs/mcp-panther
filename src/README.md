@@ -80,8 +80,6 @@ Or add the following to your MCP client configuration:
         "--with",
         "fastmcp",
         "--with",
-        "sqlparse",
-        "--with",
         "aiohttp",
         "--with",
         "gql[aiohttp]",

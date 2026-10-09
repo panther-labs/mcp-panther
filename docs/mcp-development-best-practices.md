@@ -436,23 +436,17 @@ async def get_alert_events(
 
 ### 1. Input Sanitization
 
-Sanitize all inputs, especially for SQL queries and external API calls:
+Validate input requirements without rewriting SQL. Panther/Snowflake validates SQL syntax; a local parser is not required. The [data lake tool](../src/mcp_panther/panther_mcp_core/tools/data_lake.py) checks for a `p_event_time` condition or Panther time macro when a query references a Panther table, then submits the original SQL unchanged. For example, an empty-input check can reject missing SQL without changing valid input:
 
 ```python
-import sqlparse
-
 @mcp.tool
 async def query_data_lake(sql: str) -> dict[str, Any]:
-    # Parse and validate SQL
-    try:
-        parsed = sqlparse.parse(sql)
-        if not parsed:
-            return {"success": False, "error": "Invalid SQL query"}
-    except Exception:
-        return {"success": False, "error": "Failed to parse SQL query"}
+    if not sql or not sql.strip():
+        return {"success": False, "error": "SQL query cannot be empty"}
     
-    # Additional validation logic
-    # Execute query
+    # Apply the data lake tool's existing time-filter check for Panther tables.
+    # Submit sql unchanged; report any Panther/Snowflake syntax error.
+    # ...
 ```
 
 ### 2. Permission Checks

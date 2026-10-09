@@ -527,15 +527,12 @@ async def disable_detection(
 
 ### 2. The Input Sanitization Pattern
 
-Clean and validate all inputs:
+Validate input requirements without rewriting SQL. Panther/Snowflake validates SQL syntax. The existing [data lake tool](../src/mcp_panther/panther_mcp_core/tools/data_lake.py) checks for a `p_event_time` condition or Panther time macro when a query references a Panther table, then submits the original SQL unchanged. The empty-input and length checks below illustrate additional input constraints:
 
 ```python
-import sqlparse
-import re
-
 @mcp.tool
 async def query_data_lake(sql: str) -> dict[str, Any]:
-    """Execute SQL query with comprehensive input validation."""
+    """Check input constraints before submitting SQL unchanged."""
     
     # Basic validation
     if not sql or not sql.strip():
@@ -553,32 +550,8 @@ async def query_data_lake(sql: str) -> dict[str, Any]:
             "error_code": "QUERY_TOO_LONG"
         }
     
-    # SQL parsing validation
-    try:
-        parsed = sqlparse.parse(sql.strip())
-        if not parsed:
-            return {
-                "success": False,
-                "error": "Invalid SQL query",
-                "error_code": "INVALID_SQL"
-            }
-    except Exception:
-        return {
-            "success": False,
-            "error": "Failed to parse SQL query",
-            "error_code": "SQL_PARSE_ERROR"
-        }
-    
-    # Check for required p_event_time filter
-    sql_lower = sql.lower()
-    if 'p_event_time' not in sql_lower:
-        return {
-            "success": False,
-            "error": "Query must include a p_event_time filter for performance",
-            "error_code": "MISSING_TIME_FILTER"
-        }
-    
-    # Proceed with execution
+    # Apply the data lake tool's existing time-filter check for Panther tables.
+    # Submit sql unchanged; report any Panther/Snowflake syntax error.
     # ...
 ```
 

@@ -272,6 +272,7 @@ async def test_cancel_data_lake_query_no_id_returned(mock_execute_query):
         "SELECT 'table', 'column', 'index' FROM sample_table",
         "SELECT sample_value FROM sample_table WHERE sample_value = 'where'",
         "SELECT sample_value FROM sample_table WHERE event_time > '2024-01-01'",
+        "SELECT 'null' AS sample_value FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') LIMIT 1",
         """
     SELECT sample_value AS "select", region AS "from"
     FROM sample_table
@@ -296,6 +297,7 @@ async def test_cancel_data_lake_query_no_id_returned(mock_execute_query):
         "reserved-literal-projection",
         "reserved-literal-predicate",
         "date-literal",
+        "panther-table-with-time-macro",
         "quoted-aliases-and-interval",
     ],
 )
