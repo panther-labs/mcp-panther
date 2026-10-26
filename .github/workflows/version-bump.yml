@@ -19,17 +19,11 @@ permissions:
 jobs:
   version_bump_pr:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
-    - name: Generate GitHub App token
-      id: app-token
-      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-      with:
-        client-id: Iv23lie716nKFq0B7AyL
-        private-key: ${{ secrets.PANTHER_BOT_APP_PRIVATE_KEY }}
-        permission-contents: write
-        permission-pull-requests: write
-
     - name: Check out the repository
       uses: actions/checkout@v4
       with:
@@ -106,6 +100,13 @@ jobs:
       run: |
         # Re-lock without upgrades so only the mcp-panther version entry changes
         uv lock
+
+    - name: Generate GitHub automation token
+      id: app-token
+      uses: ./.github/actions/github-automation-token
+      with:
+        broker_url: ${{ secrets.PANTHER_GITHUB_TOKEN_BROKER_URL }}
+        permissions: '{"contents":"write","pull_requests":"write"}'
 
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1

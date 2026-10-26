@@ -67,3 +67,19 @@ jobs:
       - name: Run integration tests
         run: |
           make integration-test
+
+  github-automation-token:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+
+      - name: Test github-automation-token action
+        run: node --test .github/actions/github-automation-token/test_github_automation_token.js
