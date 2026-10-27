@@ -461,6 +461,7 @@ If you see `WARNING: Invalid HTTP request received` in the logs, this usually me
 - `MCP_PORT`: Port for HTTP transport (default: 3000)
 - `MCP_HOST`: Host for HTTP transport (default: 127.0.0.1)
 - `MCP_LOG_FILE`: Log file path (optional)
+- `MCP_MAX_RESULT_SIZE_CHARS`: Advertise `_meta["anthropic/maxResultSizeChars"]` on every tool, so Claude Code returns text results up to this many characters inline instead of saving them to a file (optional; Claude Code accepts up to 500,000)
 
 ## Security Best Practices
 

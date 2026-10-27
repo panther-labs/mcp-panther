@@ -7,6 +7,7 @@ and can be registered with the MCP server using register_all_tools().
 """
 
 import logging
+import os
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Set
 
@@ -14,6 +15,25 @@ logger = logging.getLogger("mcp-panther")
 
 # Registry to store all decorated tools
 _tool_registry: Set[Callable] = set()
+
+MAX_RESULT_SIZE_ENV = "MCP_MAX_RESULT_SIZE_CHARS"
+# Claude Code saves larger text results to a file instead of returning them inline.
+RESULT_SIZE_META_KEY = "anthropic/maxResultSizeChars"
+
+
+def _result_size_meta() -> Optional[Dict[str, int]]:
+    """Return the tool result size metadata configured by MCP_MAX_RESULT_SIZE_CHARS."""
+    value = os.environ.get(MAX_RESULT_SIZE_ENV, "").strip()
+    if not value:
+        return None
+    try:
+        size = int(value)
+    except ValueError:
+        size = 0
+    if size < 1:
+        logger.warning(f"Ignoring {MAX_RESULT_SIZE_ENV}: expected a positive integer")
+        return None
+    return {RESULT_SIZE_META_KEY: size}
 
 
 def mcp_tool(
@@ -80,6 +100,7 @@ def register_all_tools(mcp_instance) -> None:
         mcp_instance: The FastMCP instance to register tools with
     """
     logger.info(f"Registering {len(_tool_registry)} tools with MCP")
+    meta = _result_size_meta()
 
     # Sort tools by name
     sorted_funcs = sorted(_tool_registry, key=lambda f: f.__name__)
@@ -95,6 +116,7 @@ def register_all_tools(mcp_instance) -> None:
             name=metadata.get("name"),
             description=metadata.get("description"),
             annotations=annotations,
+            meta=meta,
         )
 
         if annotations and annotations.get("permissions"):
