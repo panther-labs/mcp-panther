@@ -9,7 +9,7 @@ from importlib.metadata import version
 from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
 
 import aiohttp
-from gql import Client, gql
+from gql import Client, GraphQLRequest
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.exceptions import TransportQueryError
 
@@ -278,6 +278,9 @@ async def lifespan(mcp):
         _graphql_client = Client(
             transport=_graphql_transport,
             fetch_schema_from_transport=True,
+            # gql 4 defaults to includeDeprecated on args/inputFields, which
+            # older Panther servers reject, failing the schema fetch on connect
+            introspection_args={"input_value_deprecation": False},
             execute_timeout=60,
         )
 
@@ -418,7 +421,9 @@ def _get_week_date_range() -> Tuple[str, str]:
     return created_after, created_before
 
 
-async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any]:
+async def _execute_query(
+    query: GraphQLRequest, variables: Dict[str, Any]
+) -> Dict[str, Any]:
     """Execute a GraphQL query using the persistent GQL session.
 
     This function uses the module-level persistent GQL session that is created
@@ -448,7 +453,9 @@ async def _execute_query(query: gql, variables: Dict[str, Any]) -> Dict[str, Any
 
     try:
         # Use the persistent session which is safe for concurrent requests
-        result = await _graphql_session.execute(query, variable_values=variables)
+        # Copy rather than mutate: query objects are shared module-level constants
+        request = GraphQLRequest(query, variable_values=variables)
+        result = await _graphql_session.execute(request)
         return result
 
     except TransportQueryError as e:

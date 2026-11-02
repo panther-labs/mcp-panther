@@ -3,15 +3,20 @@ from unittest import mock
 
 import pytest
 from aiohttp import ClientResponse
+from gql import Client, gql
+from gql.transport.async_transport import AsyncTransport
+from graphql import ExecutionResult, build_schema, graphql, print_ast
 
 from mcp_panther.panther_mcp_core.client import (
     UnexpectedResponseStatusError,
+    _execute_query,
     _get_user_agent,
     _is_running_in_docker,
     get_instance_config,
     get_json_from_script_tag,
     get_panther_rest_api_base,
     get_rest_client,
+    lifespan,
 )
 
 
@@ -224,3 +229,88 @@ async def test_rest_client_contexts_are_independent():
 
     assert first_client._session is None
     assert second_client._session is None
+
+
+@pytest.mark.asyncio
+async def test_execute_query_sends_variables_without_mutating_query():
+    transport = _RecordingTransport()
+    query = gql("query Alert($id: ID!) { alert(id: $id) { id } }")
+
+    async with Client(transport=transport) as session:
+        with mock.patch(
+            "mcp_panther.panther_mcp_core.client._graphql_session", session
+        ):
+            result = await _execute_query(query, {"id": "a1"})
+
+    assert result == {"alert": {"id": "a1"}}
+    assert transport.requests[0].variable_values == {"id": "a1"}
+    assert query.variable_values is None
+
+
+@pytest.mark.asyncio
+async def test_lifespan_introspection_omits_input_value_deprecation():
+    transport = _SchemaTransport()
+
+    with (
+        mock.patch.dict(
+            os.environ,
+            {
+                "PANTHER_INSTANCE_URL": "https://example.com",
+                "PANTHER_API_TOKEN": "test-token",
+            },
+        ),
+        mock.patch(
+            "mcp_panther.panther_mcp_core.client.get_panther_gql_endpoint",
+            new=mock.AsyncMock(return_value="https://example.com/public/graphql"),
+        ),
+        mock.patch(
+            "mcp_panther.panther_mcp_core.client.AIOHTTPTransport",
+            return_value=transport,
+        ),
+    ):
+        async with lifespan(None):
+            pass
+
+    introspection = transport.queries[0]
+    assert "__schema" in introspection
+    assert "args(includeDeprecated" not in introspection
+    assert "inputFields(includeDeprecated" not in introspection
+
+
+class _SchemaTransport(AsyncTransport):
+    schema = build_schema("type Query { ping: String }")
+
+    def __init__(self):
+        self.queries = []
+
+    async def connect(self):
+        pass
+
+    async def close(self):
+        pass
+
+    async def execute(self, request):
+        query = print_ast(request.document)
+        self.queries.append(query)
+        return await graphql(self.schema, query)
+
+    def subscribe(self, request):
+        raise NotImplementedError
+
+
+class _RecordingTransport(AsyncTransport):
+    def __init__(self):
+        self.requests = []
+
+    async def connect(self):
+        pass
+
+    async def close(self):
+        pass
+
+    async def execute(self, request):
+        self.requests.append(request)
+        return ExecutionResult(data={"alert": {"id": "a1"}})
+
+    def subscribe(self, request):
+        raise NotImplementedError
