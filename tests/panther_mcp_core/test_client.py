@@ -3,9 +3,13 @@ from unittest import mock
 
 import pytest
 from aiohttp import ClientResponse
+from gql import Client, gql
+from gql.transport.async_transport import AsyncTransport
+from graphql import ExecutionResult
 
 from mcp_panther.panther_mcp_core.client import (
     UnexpectedResponseStatusError,
+    _execute_query,
     _get_user_agent,
     _is_running_in_docker,
     get_instance_config,
@@ -224,3 +228,37 @@ async def test_rest_client_contexts_are_independent():
 
     assert first_client._session is None
     assert second_client._session is None
+
+
+@pytest.mark.asyncio
+async def test_execute_query_sends_variables_without_mutating_query():
+    transport = _RecordingTransport()
+    query = gql("query Alert($id: ID!) { alert(id: $id) { id } }")
+
+    async with Client(transport=transport) as session:
+        with mock.patch(
+            "mcp_panther.panther_mcp_core.client._graphql_session", session
+        ):
+            result = await _execute_query(query, {"id": "a1"})
+
+    assert result == {"alert": {"id": "a1"}}
+    assert transport.requests[0].variable_values == {"id": "a1"}
+    assert query.variable_values is None
+
+
+class _RecordingTransport(AsyncTransport):
+    def __init__(self):
+        self.requests = []
+
+    async def connect(self):
+        pass
+
+    async def close(self):
+        pass
+
+    async def execute(self, request):
+        self.requests.append(request)
+        return ExecutionResult(data={"alert": {"id": "a1"}})
+
+    def subscribe(self, request):
+        raise NotImplementedError
