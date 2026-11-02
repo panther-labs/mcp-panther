@@ -278,6 +278,9 @@ async def lifespan(mcp):
         _graphql_client = Client(
             transport=_graphql_transport,
             fetch_schema_from_transport=True,
+            # gql 4 defaults to includeDeprecated on args/inputFields, which
+            # older Panther servers reject, failing the schema fetch on connect
+            introspection_args={"input_value_deprecation": False},
             execute_timeout=60,
         )
 
