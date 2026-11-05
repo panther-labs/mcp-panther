@@ -45,20 +45,6 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 </details>
 
-### Data lake SQL backends
-
-`query_data_lake` uses the instance's SQL dialect (Snowflake or Databricks).
-Discover names and types with `list_databases`, `list_database_tables`, and `get_table_schema`.
-
-| Backend | `database_name` | Example table |
-|---------|-----------------|---------------|
-| Snowflake | `panther_logs.public` (default) | `panther_logs.public.aws_cloudtrail` |
-| Databricks | `panther_logs` (pass explicitly) | `panther_logs.aws_cloudtrail` |
-
-`get_alert_event_stats` currently requires Snowflake. On Databricks, query
-`panther_signals.correlation_signals` through `query_data_lake` with
-`database_name="panther_signals"`.
-
 <details>
 <summary><strong>Scheduled Queries</strong></summary>
 
@@ -143,6 +129,20 @@ Discover names and types with `list_databases`, `list_database_tables`, and `get
 | `get_role` | Get detailed information about a specific role including permissions | "Get complete details for the 'Admin' role" |
 
 </details>
+
+### Data lake SQL backends
+
+`query_data_lake` uses the instance's SQL dialect (Snowflake or Databricks).
+Discover names and types with `list_databases`, `list_database_tables`, and `get_table_schema`.
+
+| Backend | `database_name` | Example table |
+|---------|-----------------|---------------|
+| Snowflake | `panther_logs.public` (default) | `panther_logs.public.aws_cloudtrail` |
+| Databricks | `panther_logs` (pass explicitly) | `panther_logs.aws_cloudtrail` |
+
+`get_alert_event_stats` currently requires Snowflake. On Databricks, query
+`panther_signals.correlation_signals` through `query_data_lake` with
+`database_name="panther_signals"`.
 
 ## Panther Configuration
 
