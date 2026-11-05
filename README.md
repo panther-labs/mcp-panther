@@ -45,6 +45,25 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 </details>
 
+### Data lake SQL backends
+
+`query_data_lake` accepts SQL for the Panther instance's configured backend:
+Snowflake SQL for Snowflake-backed instances or Databricks SQL for
+Databricks-backed instances. SQL is submitted unchanged. Use `list_databases`,
+`list_database_tables`, and `get_table_schema` to discover valid names and types.
+
+- **Snowflake:** The default `database_name` is `panther_logs.public`.
+  Example: `SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') LIMIT 10`.
+- **Databricks:** Explicitly pass `database_name="panther_logs"` (or the name
+  returned by `list_databases`).
+  Example: `SELECT * FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('1 d') LIMIT 10`.
+  Array membership uses `ARRAY_CONTAINS(p_any_emails, 'user@domain.com')`,
+  with the array first and no Snowflake `::VARIANT` cast.
+
+`get_alert_event_stats` currently generates Snowflake SQL with a hard-coded
+`panther_signals.public` database. On Databricks-backed instances, use
+`query_data_lake` with Databricks SQL and `database_name="panther_signals"` instead.
+
 <details>
 <summary><strong>Scheduled Queries</strong></summary>
 

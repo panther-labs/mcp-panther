@@ -28,3 +28,27 @@ async def test_result_size_meta_is_omitted_when_unset_or_invalid(monkeypatch, va
     else:
         monkeypatch.setenv("MCP_MAX_RESULT_SIZE_CHARS", value)
     assert await _result_size_meta() == {None}
+
+
+@pytest.mark.asyncio
+async def test_data_lake_tools_advertise_backend_specific_sql():
+    """Clients need dialect and database guidance in the actual MCP metadata."""
+    mcp = FastMCP("test")
+    register_all_tools(mcp)
+    async with Client(mcp) as client:
+        tools = {tool.name: tool for tool in await client.list_tools()}
+
+    query = tools["query_data_lake"]
+    sql_description = query.inputSchema["properties"]["sql"]["description"]
+    assert "Snowflake" in sql_description
+    assert "Databricks" in sql_description
+    database = query.inputSchema["properties"]["database_name"]
+    assert database["default"] == "panther_logs.public"
+    assert "list_databases" in database["description"]
+    assert "Databricks" in query.description
+    assert "panther_logs.aws_cloudtrail" in query.description
+    assert "ARRAY_CONTAINS(p_any_emails, 'user@domain.com')" in query.description
+    assert "panther_logs.public.aws_cloudtrail" in query.description
+    assert "'user@domain.com'::VARIANT" in query.description
+    assert "Databricks" in tools["get_table_schema"].description
+    assert "Databricks" in tools["get_alert_event_stats"].description

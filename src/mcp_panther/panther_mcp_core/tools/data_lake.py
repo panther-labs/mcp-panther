@@ -155,6 +155,11 @@ async def get_alert_event_stats(
     Results are ordered chronologically with the most recent first, helping analysts identify temporal patterns,
     common entities, and potential incident scope.
 
+    Backend limitation: This tool generates Snowflake SQL and uses
+    panther_signals.public.correlation_signals. For Databricks-backed instances,
+    use query_data_lake with Databricks SQL against panther_signals.correlation_signals
+    and database_name="panther_signals" instead.
+
     Returns:
         Dict containing:
         - success: Boolean indicating if the query was successful
@@ -232,10 +237,16 @@ async def query_data_lake(
     sql: Annotated[
         str,
         Field(
-            description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND. The query must be compatible with Snowflake SQL."
+            description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND, or a Panther time filter macro. Use SQL matching the Panther instance's data lake backend: Snowflake SQL for Snowflake, Databricks SQL for Databricks. SQL is submitted unchanged."
         ),
     ],
-    database_name: str = "panther_logs.public",
+    database_name: Annotated[
+        str,
+        Field(
+            description="Database name from list_databases. Defaults to panther_logs.public for Snowflake; for Databricks, explicitly pass the returned name (e.g. panther_logs, without .public).",
+            examples=["panther_logs.public", "panther_logs"],
+        ),
+    ] = "panther_logs.public",
     timeout: Annotated[
         int,
         Field(
@@ -258,6 +269,15 @@ async def query_data_lake(
     ] = None,
 ) -> Dict[str, Any]:
     """Query Panther's security data lake using SQL for log analysis and threat hunting.
+
+    Backend: Use Snowflake SQL for Snowflake-backed instances and Databricks SQL
+    for Databricks-backed instances. SQL is submitted unchanged; this tool does
+    not translate between dialects or detect the backend. Use list_databases,
+    list_database_tables, and get_table_schema to discover valid names and types.
+    Snowflake typically uses panther_logs.public.aws_cloudtrail; Databricks uses
+    panther_logs.aws_cloudtrail. For Databricks, explicitly set
+    database_name="panther_logs" (or another name returned by list_databases);
+    the default database_name="panther_logs.public" is for Snowflake.
 
     REQUIRED: Include time filter with p_event_time (required for performance and partitioning)
 
@@ -289,9 +309,9 @@ async def query_data_lake(
     - Continue until has_next_page is False
     - Cursors issued before this version cannot be resumed; start again without a cursor
 
-    Common Examples:
+    Common Examples (Snowflake SQL):
     - Recent failed logins: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL"
-    - IP activity summary: "SELECT sourceippaddress, COUNT(*) FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('6 h') GROUP BY sourceippaddress"
+    - IP activity summary: "SELECT sourceipaddress, COUNT(*) FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('6 h') GROUP BY sourceipaddress"
     - User correlation: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('2 h') AND ARRAY_CONTAINS('user@domain.com'::VARIANT, p_any_emails)"
     - Nested field access: "SELECT p_enrichment:ipinfo_privacy:\"context.ip_address\" FROM table WHERE p_occurs_since('1 h')"
 
@@ -300,6 +320,17 @@ async def query_data_lake(
     - Access nested JSON: column:field.subfield
     - Quote special characters: column:"field name" or p_enrichment:"context.ip_address"
     - Array searches: ARRAY_CONTAINS('value'::VARIANT, array_column)
+
+    Common Examples (Databricks SQL; pass database_name="panther_logs"):
+    - Recent failed logins: "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL"
+    - IP activity summary: "SELECT sourceipaddress, COUNT(*) FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('6 h') GROUP BY sourceipaddress"
+    - User correlation: "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('2 h') AND ARRAY_CONTAINS(p_any_emails, 'user@domain.com')"
+
+    Query Syntax (Databricks SQL):
+    - Use single quotes for string literals and backticks for delimited identifiers.
+    - Array searches: ARRAY_CONTAINS(array_column, 'value') — array first, without the Snowflake ::VARIANT cast.
+    - Nested field access depends on the column type; inspect get_table_schema
+      and get_log_type_schema_details rather than copying Snowflake JSON paths.
 
     Returns:
         Dict with query results:
@@ -619,7 +650,7 @@ async def list_database_tables(
         str,
         Field(
             description="The name of the database to list tables for",
-            examples=["panther_logs.public"],
+            examples=["panther_logs.public", "panther_logs"],
         ),
     ],
 ) -> Dict[str, Any]:
@@ -697,7 +728,7 @@ async def get_table_schema(
         str,
         Field(
             description="The name of the database where the table is located",
-            examples=["panther_logs.public"],
+            examples=["panther_logs.public", "panther_logs"],
         ),
     ],
     table_name: Annotated[
@@ -710,15 +741,18 @@ async def get_table_schema(
 ) -> Dict[str, Any]:
     """Get column details for a specific data lake table.
 
-    IMPORTANT: This returns the table structure in Snowflake. For writing
-    optimal queries, ALSO call get_panther_log_type_schema() to understand:
+    IMPORTANT: This returns the table structure in the instance's data lake
+    backend (Snowflake or Databricks). Use database names from list_databases:
+    e.g. panther_logs.public for Snowflake or panther_logs for Databricks.
+    For writing optimal queries, ALSO call get_log_type_schema_details() to understand:
     - Nested object structures (only shown as 'object' type here)
     - Which fields map to p_any_* indicator columns
     - Array element structures
 
     Example workflow:
-    1. get_panther_log_type_schema(["AWS.CloudTrail"]) - understand structure
-    2. get_table_schema("panther_logs.public", "aws_cloudtrail") - get column names/types
+    1. get_log_type_schema_details(["AWS.CloudTrail"]) - understand structure
+    2. get_table_schema("panther_logs.public", "aws_cloudtrail") for Snowflake,
+       or get_table_schema("panther_logs", "aws_cloudtrail") for Databricks - get column names/types
     3. Write query using both: nested paths from log schema, column names from table schema
 
     Returns:
