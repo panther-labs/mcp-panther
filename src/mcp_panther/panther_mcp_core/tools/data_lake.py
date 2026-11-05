@@ -237,13 +237,13 @@ async def query_data_lake(
     sql: Annotated[
         str,
         Field(
-            description="The SQL query to execute. Must include a p_event_time filter condition after WHERE or AND, or a Panther time filter macro. Use SQL matching the Panther instance's data lake backend: Snowflake SQL for Snowflake, Databricks SQL for Databricks. SQL is submitted unchanged."
+            description="SQL for the instance's backend (Snowflake or Databricks). Include a p_event_time filter or Panther time macro. Submitted unchanged."
         ),
     ],
     database_name: Annotated[
         str,
         Field(
-            description="Database name from list_databases. Defaults to panther_logs.public for Snowflake; for Databricks, explicitly pass the returned name (e.g. panther_logs, without .public).",
+            description="Database from list_databases. Defaults to panther_logs.public (Snowflake); explicitly pass panther_logs for Databricks.",
             examples=["panther_logs.public", "panther_logs"],
         ),
     ] = "panther_logs.public",
@@ -270,14 +270,9 @@ async def query_data_lake(
 ) -> Dict[str, Any]:
     """Query Panther's security data lake using SQL for log analysis and threat hunting.
 
-    Backend: Use Snowflake SQL for Snowflake-backed instances and Databricks SQL
-    for Databricks-backed instances. SQL is submitted unchanged; this tool does
-    not translate between dialects or detect the backend. Use list_databases,
-    list_database_tables, and get_table_schema to discover valid names and types.
-    Snowflake typically uses panther_logs.public.aws_cloudtrail; Databricks uses
-    panther_logs.aws_cloudtrail. For Databricks, explicitly set
-    database_name="panther_logs" (or another name returned by list_databases);
-    the default database_name="panther_logs.public" is for Snowflake.
+    Use the instance's SQL dialect (Snowflake or Databricks). SQL is submitted unchanged.
+    Discover names and types with list_databases, list_database_tables, and get_table_schema.
+    For Databricks, set database_name="panther_logs" (or another name from list_databases).
 
     REQUIRED: Include time filter with p_event_time (required for performance and partitioning)
 
@@ -323,7 +318,6 @@ async def query_data_lake(
 
     Common Examples (Databricks SQL; pass database_name="panther_logs"):
     - Recent failed logins: "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL"
-    - IP activity summary: "SELECT sourceipaddress, COUNT(*) FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('6 h') GROUP BY sourceipaddress"
     - User correlation: "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('2 h') AND ARRAY_CONTAINS(p_any_emails, 'user@domain.com')"
 
     Query Syntax (Databricks SQL):
