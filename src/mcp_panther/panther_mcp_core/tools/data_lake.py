@@ -272,6 +272,7 @@ async def query_data_lake(
 
     Use the instance's SQL dialect (Snowflake or Databricks). SQL is submitted unchanged.
     Discover names and types with list_databases, list_database_tables, and get_table_schema.
+    Before using vendor-specific fields, retrieve their schema; reuse schemas already fetched in this conversation.
     For Databricks, set database_name="panther_logs" (or another name from list_databases).
 
     REQUIRED: Include time filter with p_event_time (required for performance and partitioning)
@@ -297,6 +298,7 @@ async def query_data_lake(
     - Start with summary queries, then drill down to specific timeframes
     - Use p_any_* fields for faster correlation (p_any_ip_addresses, p_any_usernames, p_any_emails)
     - Query specific fields instead of SELECT * for better performance
+    - Use SQL LIMIT 100 for exploratory queries; max_rows only controls page size.
 
     Pagination:
     - First call: No cursor parameter - returns first page with max_rows results
@@ -305,10 +307,10 @@ async def query_data_lake(
     - Cursors issued before this version cannot be resumed; start again without a cursor
 
     Common Examples (Snowflake SQL):
-    - Recent failed logins: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL"
-    - IP activity summary: "SELECT sourceipaddress, COUNT(*) FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('6 h') GROUP BY sourceipaddress"
-    - User correlation: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('2 h') AND ARRAY_CONTAINS('user@domain.com'::VARIANT, p_any_emails)"
-    - Nested field access: "SELECT p_enrichment:ipinfo_privacy:\"context.ip_address\" FROM table WHERE p_occurs_since('1 h')"
+    - Recent failed logins: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL LIMIT 100"
+    - IP activity summary: "SELECT sourceipaddress, COUNT(*) FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('6 h') GROUP BY sourceipaddress LIMIT 100"
+    - User correlation: "SELECT * FROM panther_logs.public.aws_cloudtrail WHERE p_occurs_since('2 h') AND ARRAY_CONTAINS('user@domain.com'::VARIANT, p_any_emails) LIMIT 100"
+    - Nested field access: "SELECT p_enrichment:ipinfo_privacy:\"context.ip_address\" FROM table WHERE p_occurs_since('1 h') LIMIT 100"
 
     Query Syntax (Snowflake SQL):
     - String literals use single quotes or $$; delimited identifiers use double quotes.
@@ -317,14 +319,20 @@ async def query_data_lake(
     - Array searches: ARRAY_CONTAINS('value'::VARIANT, array_column)
 
     Common Examples (Databricks SQL; pass database_name="panther_logs"):
-    - Recent failed logins: "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL"
-    - User correlation: "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('2 h') AND ARRAY_CONTAINS(p_any_emails, 'user@domain.com')"
+    - Recent failed logins: "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('1 d') AND errorcode IS NOT NULL LIMIT 100"
+    - User correlation: "SELECT * FROM panther_logs.aws_cloudtrail WHERE p_occurs_since('2 h') AND ARRAY_CONTAINS(p_any_emails, 'user@domain.com') LIMIT 100"
 
     Query Syntax (Databricks SQL):
     - Use single quotes for string literals and backticks for delimited identifiers.
     - Array searches: ARRAY_CONTAINS(array_column, 'value') — array first, without the Snowflake ::VARIANT cast.
     - Nested field access depends on the column type; inspect get_table_schema
       and get_log_type_schema_details rather than copying Snowflake JSON paths.
+
+    Original signal events:
+    - Snowflake: panther_signals.public.correlation_signals_variant, using data:field paths.
+    - Databricks: panther_signals.correlation_signals, using event:field paths.
+      Cast nested VARIANT fields before comparisons, e.g. event:field::string = 'value'.
+      This applies to the signals event column, not regular structured log columns.
 
     Returns:
         Dict with query results:

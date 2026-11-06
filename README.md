@@ -134,6 +134,8 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 `query_data_lake` uses the instance's SQL dialect (Snowflake or Databricks).
 Discover names and types with `list_databases`, `list_database_tables`, and `get_table_schema`.
+Fetch schemas before using vendor-specific fields; reuse schemas already fetched in the conversation.
+Use SQL `LIMIT` to bound results; `max_rows` controls page size.
 
 | Backend | `database_name` | Example table |
 |---------|-----------------|---------------|
