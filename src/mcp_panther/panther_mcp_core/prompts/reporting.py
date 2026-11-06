@@ -59,7 +59,7 @@ def get_monthly_log_sources_report(month: str, year: str) -> str:
 
 1. List log sources and their health status for {month} {year}.
 2. If any log sources are unhealthy, search for a related SYSTEM alert for that source during {month} {year}. You may need to look a few weeks back within the month.
-3. If the reason for being unhealthy is a classification error, query the panther_monitor.public.classification_failures table with a matching p_source_id for events in {month} {year}. Read the payload column and try to infer the log type based on the data, and then compare it to the log source's attached schemas to pinpoint why it isn't classifying.
+3. For classification errors, query classification_failures in panther_monitor.public (Snowflake) or panther_monitor (Databricks), using the matching database_name and SQL dialect. Filter by p_source_id and {month} {year}. Inspect payload to infer the log type and compare it with the source's attached schemas to identify the classification failure.
 4. If no sources are unhealthy, print a summary of your findings for {month} {year}. If several are unhealthy, triage one at a time, providing a summary for each one.
 
 Be sure to scope all findings and queries to the specified month and year."""

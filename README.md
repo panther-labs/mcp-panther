@@ -130,6 +130,22 @@ Panther's Model Context Protocol (MCP) server provides functionality to:
 
 </details>
 
+### Data lake SQL backends
+
+`query_data_lake` uses the instance's SQL dialect (Snowflake or Databricks).
+Discover names and types with `list_databases`, `list_database_tables`, and `get_table_schema`.
+Fetch schemas before using vendor-specific fields; reuse schemas already fetched in the conversation.
+Use SQL `LIMIT` to bound results; `max_rows` controls page size.
+
+| Backend | `database_name` | Example table |
+|---------|-----------------|---------------|
+| Snowflake | `panther_logs.public` (default) | `panther_logs.public.aws_cloudtrail` |
+| Databricks | `panther_logs` (pass explicitly) | `panther_logs.aws_cloudtrail` |
+
+`get_alert_event_stats` currently requires Snowflake. On Databricks, query
+`panther_signals.correlation_signals` through `query_data_lake` with
+`database_name="panther_signals"`.
+
 ## Panther Configuration
 
 **Follow these steps to configure your API credentials and environment.**
